@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* 살림템 메모장 - 크림/베이지톤 생활 메모장 팔레트 */
+@theme {
+  --color-cream: #fff8f0;
+  --color-card: #ffffff;
+  --color-primary: #d98c5f;
+  --color-primary-dark: #c47a4e;
+  --color-ink: #3f342c;
+  --color-sub: #7a6a5f;
+  --color-accent: #f5c7a9;
+  --color-accent-soft: #fbe9db;
+}
+
+:root {
+  --background: #fff8f0;
+  --foreground: #3f342c;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    "Pretendard Variable",
+    Pretendard,
+    "Noto Sans KR",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    sans-serif;
+}
