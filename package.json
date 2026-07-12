@@ -12,6 +12,7 @@
     "webhook:set": "node scripts/set-webhook.mjs",
     "worker": "tsx worker/render-worker.ts",
     "worker:once": "tsx worker/render-worker.ts --once",
+    "scout": "tsx worker/scout-runner.ts",
     "remotion:studio": "remotion studio",
     "remotion:render": "remotion render TemplateA renders/sample.mp4"
   },
