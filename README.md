@@ -2,6 +2,9 @@
 
 아이 둘 키우는 30~40대 엄마 감성의 **번호 기반 추천템 링크 사이트 + 쿠팡파트너스 숏폼 자동화 시스템**.
 
+> 🟢 **라이브**: https://coupang-partners-shop.vercel.app · 봇 @Coupang1bot · 배포·운영은 [DEPLOY.md](./DEPLOY.md) 참고
+> (이 브랜치에 `git push` 하면 Vercel이 자동 재배포됨)
+
 텔레그램에 `영상` 이라고 보내면:
 
 1. 후보 상품 중 하나를 자동 선택

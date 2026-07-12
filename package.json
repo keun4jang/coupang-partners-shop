@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "deploy": "vercel deploy --prod --yes",
+    "webhook:set": "node scripts/set-webhook.mjs",
     "worker": "tsx worker/render-worker.ts",
     "worker:once": "tsx worker/render-worker.ts --once",
     "remotion:studio": "remotion studio",
