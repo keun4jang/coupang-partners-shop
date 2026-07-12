@@ -90,6 +90,39 @@ npm run worker:once   # 대기중인 것만 처리하고 종료
 업로드가 실패해도 렌더된 영상은 로컬 `renders/` 에 남고 **완료 처리**된다
 (텔레그램 알림에 실패 사유 표시). 즉 드라이브가 잠깐 안 돼도 영상 생성은 안 멈춘다.
 
+## 🤖 매일 자동화 (스카우트 + 성과 리포트) — Vercel Cron
+
+`vercel.json` 에 cron 두 개가 등록돼 있다(코드/스케줄은 배포 완료):
+
+| 경로 | 스케줄(UTC) | KST | 하는 일 |
+|---|---|---|---|
+| `/api/cron/scout` | `0 23 * * *` | 아침 08:00 | 쿠팡에서 주부 인기 상품 후보 자동 등록 + 텔레그램 알림 |
+| `/api/cron/report` | `0 11 * * *` | 저녁 20:00 | click_logs 집계 → 오늘/이번주 클릭·인기 번호 리포트 |
+
+> 승인 게이트: 스카우트는 **후보만** 올린다(영상 자동 제작 안 함). 영상은 사람이 승인 후.
+
+### 켜려면 — Vercel 환경변수 3개 필요 (한 번만)
+
+Vercel 프로젝트 → **Settings → Environment Variables** 에서 아래 3개를 추가하고
+(Environments: **Production** 체크) 저장 후 **재배포**:
+
+| Key | Value |
+|---|---|
+| `COUPANG_ACCESS_KEY` | 쿠팡파트너스 오픈API 액세스 키 |
+| `COUPANG_SECRET_KEY` | 쿠팡파트너스 오픈API 시크릿 키 |
+| `CRON_SECRET` | 아무 랜덤 문자열(직접 정함). cron 인증용 |
+
+- `CRON_SECRET` 은 Vercel Cron 이 `Authorization: Bearer` 헤더로 자동 전송 → 라우트가 검증.
+- 없으면 라우트가 401 로 거부(공개 남용 방지).
+- 수동 실행/테스트: `https://<도메인>/api/cron/scout?key=<CRON_SECRET>`
+
+### 로컬에서 수동 실행 (선택)
+
+```bash
+npm run scout           # 후보 수집 + 텔레그램 (즉시)
+npm run scout -- --dry  # 저장/알림 없이 수집만 출력
+```
+
 ## 📦 Vercel 프로젝트 참고
 
 - Framework: **Next.js** (must be set; null이면 라우트가 전부 404남)
