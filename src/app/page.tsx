@@ -16,13 +16,15 @@ async function findByNumber(q: string): Promise<VideoItemWithProduct | null> {
   return (data as VideoItemWithProduct | null) ?? null;
 }
 
-async function recentItems(): Promise<VideoItemWithProduct[]> {
+async function visibleItems(): Promise<VideoItemWithProduct[]> {
+  // 노출 설정된 번호는 전부 보여준다(개수 제한 없음).
+  // 방문자가 검색한 번호 외에 다른 생활템도 눌러볼 수 있도록.
   const { data } = await supabaseAdmin()
     .from("video_items")
     .select("*, products(*)")
     .eq("landing_visible", true)
     .order("display_number", { ascending: false })
-    .limit(12);
+    .limit(1000);
   return (data as VideoItemWithProduct[] | null) ?? [];
 }
 
@@ -50,31 +52,16 @@ function ItemCard({
         highlight ? "border-primary" : "border-accent-soft"
       }`}
     >
-      <div className="flex items-start gap-4">
-        {product.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={product.image_url}
-            alt={product.product_name}
-            className="w-20 h-20 rounded-xl object-cover bg-accent-soft shrink-0"
-          />
-        ) : (
-          <div className="w-20 h-20 rounded-xl bg-accent-soft flex items-center justify-center text-2xl shrink-0">
-            🏠
-          </div>
-        )}
-        <div className="min-w-0">
-          <div className="inline-block bg-accent-soft text-primary-dark font-bold rounded-full px-3 py-0.5 text-sm">
-            {formatDisplayNumber(item.display_number)}
-          </div>
-          <h3 className="font-bold text-lg mt-1.5 leading-snug">
-            {product.product_name}
-          </h3>
-          {item.hook_text && (
-            <p className="text-sub text-sm mt-1">{item.hook_text}</p>
-          )}
-        </div>
+      {/* 사진 없이 글자만 */}
+      <div className="inline-block bg-accent-soft text-primary-dark font-bold rounded-full px-3 py-0.5 text-sm">
+        {formatDisplayNumber(item.display_number)}
       </div>
+      <h3 className="font-bold text-lg mt-1.5 leading-snug">
+        {product.product_name}
+      </h3>
+      {item.hook_text && (
+        <p className="text-sub text-sm mt-1">{item.hook_text}</p>
+      )}
       <p className="text-ink/80 text-sm mt-3 leading-relaxed">
         {shortDescription(item)}
       </p>
@@ -97,11 +84,11 @@ export default async function Home({
   const { q } = await searchParams;
 
   let result: VideoItemWithProduct | null = null;
-  let recent: VideoItemWithProduct[] = [];
+  let items: VideoItemWithProduct[] = [];
   let dbReady = true;
   try {
     if (q) result = await findByNumber(q);
-    recent = await recentItems();
+    items = await visibleItems();
   } catch {
     dbReady = false;
   }
@@ -167,12 +154,12 @@ export default async function Home({
         </section>
       )}
 
-      {/* 최근 목록 */}
-      {dbReady && recent.length > 0 && (
+      {/* 전체 목록 (노출된 번호 전부) */}
+      {dbReady && items.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-bold text-xl mb-4">최근에 정리한 추천템</h2>
+          <h2 className="font-bold text-xl mb-4">정리해둔 생활템 전체</h2>
           <div className="flex flex-col gap-4">
-            {recent
+            {items
               .filter((item) => item.id !== result?.id)
               .map((item) => (
                 <ItemCard key={item.id} item={item} />
