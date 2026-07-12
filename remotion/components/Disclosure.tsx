@@ -1,14 +1,14 @@
 import React from "react";
-import { DISCLOSURE_TEXT, FONT_SIZES } from "../config/videoConfig";
+import { DISCLOSURE_TEXT, FONT_SIZES, LAYOUT } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
-/** 하단 대가성 문구 - 영상 내내 작게 표시 */
+/** 하단 대가성 문구 - 영상 내내 작게 표시 (하단 데드존 위에 배치) */
 export const Disclosure: React.FC = () => {
   return (
     <div
       style={{
         position: "absolute",
-        bottom: 42,
+        bottom: LAYOUT.disclosureBottom,
         left: 0,
         width: "100%",
         textAlign: "center",

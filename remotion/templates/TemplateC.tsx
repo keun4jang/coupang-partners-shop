@@ -93,7 +93,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
         <div
           style={{
             position: "absolute",
-            top: "9%",
+            top: "13%",
             left: "7%",
             width: "86%",
             background: "rgba(255, 248, 240, 0.96)",
@@ -136,6 +136,8 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
           polaroid
+          topRatio={0.4}
+          widthRatio={0.44}
         />
       </Sequence>
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORS, FONT_SIZES, MOTION } from "../config/videoConfig";
+import { COLORS, FONT_SIZES, LAYOUT, MOTION } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /** 상단 작은 배지 (템플릿 B/C 의 감성 라벨) */
@@ -17,7 +17,7 @@ export const TopBadge: React.FC<{ text: string }> = ({ text }) => {
     <div
       style={{
         position: "absolute",
-        top: 90,
+        top: LAYOUT.topBadgeTop,
         left: 0,
         width: "100%",
         display: "flex",

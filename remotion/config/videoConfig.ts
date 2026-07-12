@@ -14,6 +14,31 @@ export const VIDEO = {
 
 export const DURATION_IN_FRAMES = VIDEO.durationSeconds * VIDEO.fps;
 
+/**
+ * 릴스/틱톡/쇼츠 UI가 가리는 상·하단 데드존 (화면 높이 비율).
+ * 핵심 요소(자막·제품카드·번호)는 이 영역을 피해 가운데 안전대에 배치한다.
+ *  - top:    상태바 / "Reels" 라벨 / 우상단 카메라
+ *  - bottom: 캡션·계정명·오디오·좋아요/댓글/공유 버튼·진행바
+ */
+export const SAFE_ZONE = {
+  top: 0.12,
+  bottom: 0.2,
+} as const;
+
+/** 요소 세로 배치값 (데드존 반영). "위치가 이상하다" 류 요청은 여기서 조정. */
+export const LAYOUT = {
+  /** 상단 배지 위치(px). 상태바 아래, 상단 중앙(UI가 적은 영역) */
+  topBadgeTop: 130,
+  /** 제품 카드 상단 위치(화면 높이 비율). 위 자막과 붙이고 번호를 안전대 안에 둔다 */
+  productCardTop: 0.3,
+  /** 제품 카드 가로 폭(화면 너비 비율) */
+  productCardWidth: 0.54,
+  /** 제품 장면 상단 자막(장점) 세로 위치 */
+  captionTop: 0.15,
+  /** 하단 대가성 문구 위치(하단에서 px). 하단 데드존 위 경계 */
+  disclosureBottom: Math.round(VIDEO.height * SAFE_ZONE.bottom),
+} as const;
+
 /** 장면 타이밍 (초 단위) */
 export const TIMING = {
   hook: { from: 0, to: 1.5 },

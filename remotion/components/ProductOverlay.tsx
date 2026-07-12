@@ -1,18 +1,30 @@
 import React, { useState } from "react";
 import { Img, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORS, FONT_SIZES, MOTION } from "../config/videoConfig";
+import { COLORS, FONT_SIZES, LAYOUT, MOTION } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /**
  * 제품 카드 오버레이 - 아래에서 부드럽게 올라오며 등장.
  * polaroid=true 면 살짝 기울어진 폴라로이드 느낌 (템플릿 C).
+ * topRatio/widthRatio 로 세로 위치·크기를 템플릿마다 조정(데드존 회피).
  */
 export const ProductOverlay: React.FC<{
   productName: string;
   productImageUrl: string | null;
   displayNumber: number;
   polaroid?: boolean;
-}> = ({ productName, productImageUrl, displayNumber, polaroid = false }) => {
+  /** 카드 상단 세로 위치(화면 높이 비율) */
+  topRatio?: number;
+  /** 카드 가로 폭(화면 너비 비율) */
+  widthRatio?: number;
+}> = ({
+  productName,
+  productImageUrl,
+  displayNumber,
+  polaroid = false,
+  topRatio = LAYOUT.productCardTop,
+  widthRatio = LAYOUT.productCardWidth,
+}) => {
   const frame = useCurrentFrame();
   const { fps, height, width } = useVideoConfig();
   // 상품 이미지가 만료/차단되어 로드에 실패해도 렌더 전체가 죽지 않도록
@@ -25,13 +37,13 @@ export const ProductOverlay: React.FC<{
     config: { damping: MOTION.productDamping },
   });
 
-  const cardWidth = width * 0.62;
+  const cardWidth = width * widthRatio;
 
   return (
     <div
       style={{
         position: "absolute",
-        top: height * 0.5,
+        top: height * topRatio,
         left: (width - cardWidth) / 2,
         width: cardWidth,
         background: COLORS.card,
