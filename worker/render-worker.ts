@@ -53,11 +53,16 @@ const THUMBNAIL_SECOND = 5; // 제품 카드가 보이는 시점
 const STALE_GENERATING_MS = 15 * 60_000;
 
 function hasDriveEnv(): boolean {
-  return Boolean(
-    process.env.GOOGLE_CLIENT_EMAIL &&
-      process.env.GOOGLE_PRIVATE_KEY &&
-      process.env.GOOGLE_DRIVE_FOLDER_ID
+  if (!process.env.GOOGLE_DRIVE_FOLDER_ID) return false;
+  const oauth = Boolean(
+    process.env.GOOGLE_OAUTH_CLIENT_ID &&
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      process.env.GOOGLE_OAUTH_REFRESH_TOKEN
   );
+  const serviceAccount = Boolean(
+    process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+  );
+  return oauth || serviceAccount;
 }
 
 function hasTelegramEnv(): boolean {
@@ -247,27 +252,37 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
     let driveVideoUrl: string | null = null;
     let driveCaptionUrl: string | null = null;
     let driveThumbnailUrl: string | null = null;
+    let driveNote: string | null = null;
 
     if (hasDriveEnv()) {
-      console.log("구글드라이브 업로드 중...");
-      const folderId = await ensureDateFolder(dateFolderName());
-      driveVideoUrl = await uploadFileToDrive(
-        folderId,
-        driveFileName(item.display_number, product.product_name, "video"),
-        "video/mp4",
-        videoPath
-      );
-      driveThumbnailUrl = await uploadFileToDrive(
-        folderId,
-        driveFileName(item.display_number, product.product_name, "thumbnail"),
-        "image/png",
-        thumbnailPath
-      );
-      driveCaptionUrl = await uploadTextToDrive(
-        folderId,
-        driveFileName(item.display_number, product.product_name, "caption"),
-        captionText
-      );
+      // 렌더는 이미 성공했으므로, 업로드가 실패해도 영상 자체는 완료로 남긴다.
+      // (드라이브 설정 문제로 렌더 결과가 통째로 실패 처리되면 안 됨)
+      try {
+        console.log("구글드라이브 업로드 중...");
+        const folderId = await ensureDateFolder(dateFolderName());
+        driveVideoUrl = await uploadFileToDrive(
+          folderId,
+          driveFileName(item.display_number, product.product_name, "video"),
+          "video/mp4",
+          videoPath
+        );
+        driveThumbnailUrl = await uploadFileToDrive(
+          folderId,
+          driveFileName(item.display_number, product.product_name, "thumbnail"),
+          "image/png",
+          thumbnailPath
+        );
+        driveCaptionUrl = await uploadTextToDrive(
+          folderId,
+          driveFileName(item.display_number, product.product_name, "caption"),
+          captionText
+        );
+      } catch (uploadError) {
+        const msg =
+          uploadError instanceof Error ? uploadError.message : String(uploadError);
+        driveNote = `드라이브 업로드 실패(로컬 보관): ${msg.slice(0, 200)}`;
+        console.error(driveNote);
+      }
     } else {
       console.log("[드라이브 미설정] 로컬 파일로 유지:", videoPath);
     }
@@ -280,6 +295,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         drive_caption_url: driveCaptionUrl,
         drive_thumbnail_url: driveThumbnailUrl,
         landing_visible: true,
+        error_message: driveNote,
       })
       .eq("id", item.id);
 
@@ -292,6 +308,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         `후킹: ${item.hook_text ?? "-"}`,
         `링크페이지: ${siteUrl()}/?q=${item.display_number}`,
         `구글드라이브: ${driveVideoUrl ?? `(로컬) ${videoPath}`}`,
+        ...(driveNote ? [`※ ${driveNote}`] : []),
         "",
         "직접 TikTok/Reels/Shorts에 업로드하세요.",
       ].join("\n")

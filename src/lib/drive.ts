@@ -1,13 +1,35 @@
 import { google, drive_v3 } from "googleapis";
 import fs from "fs";
 import { Readable } from "stream";
-import { requireEnv } from "./env";
+import { optionalEnv, requireEnv } from "./env";
 
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+
+/**
+ * Drive 클라이언트.
+ * 1) OAuth 사용자 위임(GOOGLE_OAUTH_*)이 있으면 우선 사용 → 업로드가 사용자
+ *    구글 계정(개인 15GB) 소유로 저장됨. 일반 Gmail에서 유일하게 되는 방식.
+ * 2) 없으면 서비스 계정(GOOGLE_CLIENT_EMAIL/PRIVATE_KEY)으로 폴백.
+ *    단 서비스 계정은 자체 저장 용량이 없어 개인 드라이브 '내 드라이브' 폴더에는
+ *    파일 업로드가 실패한다(공용 드라이브/Workspace 위임에서만 가능).
+ */
 function driveClient(): drive_v3.Drive {
+  const clientId = optionalEnv("GOOGLE_OAUTH_CLIENT_ID");
+  const refreshToken = optionalEnv("GOOGLE_OAUTH_REFRESH_TOKEN");
+
+  if (clientId && refreshToken) {
+    const oauth2 = new google.auth.OAuth2(
+      clientId,
+      requireEnv("GOOGLE_OAUTH_CLIENT_SECRET")
+    );
+    oauth2.setCredentials({ refresh_token: refreshToken });
+    return google.drive({ version: "v3", auth: oauth2 });
+  }
+
   const auth = new google.auth.JWT({
     email: requireEnv("GOOGLE_CLIENT_EMAIL"),
     key: requireEnv("GOOGLE_PRIVATE_KEY").replace(/\\n/g, "\n"),
-    scopes: ["https://www.googleapis.com/auth/drive"],
+    scopes: [DRIVE_SCOPE],
   });
   return google.drive({ version: "v3", auth });
 }

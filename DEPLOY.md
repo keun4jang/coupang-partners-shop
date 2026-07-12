@@ -63,19 +63,32 @@ npm run worker:once   # 대기중인 것만 처리하고 종료
 - `.env.local` 에 Supabase/텔레그램/(드라이브) 값이 있어야 한다.
 - 워커 인스턴스는 **하나만** 실행 (동시 실행 시 드라이브 폴더 중복 가능).
 
-## ⚠️ 구글 드라이브 자동 업로드 (미완 — 조치 필요)
+## 구글 드라이브 자동 업로드 (OAuth 방식)
 
-현재 방식(서비스 계정)은 **일반 Gmail 계정에서는 파일 업로드가 안 된다**
-(`Service Accounts do not have storage quota` 에러 — 서비스계정은 자체 저장공간이 없음).
+일반 Gmail(trussvideo1@gmail.com)에서는 서비스계정으로 업로드가 안 되므로
+(`Service Accounts do not have storage quota`) **OAuth 사용자 위임**을 쓴다.
+`src/lib/drive.ts` 는 `GOOGLE_OAUTH_*` 가 있으면 OAuth, 없으면 서비스계정으로 폴백한다.
 
-해결 방법 (택1):
-1. **OAuth 사용자 위임**: 내 구글 계정으로 OAuth 동의 → refresh token 발급 →
-   업로드가 내 드라이브(15GB) 소유로 저장됨. (일반 Gmail 권장 방식, `src/lib/drive.ts` 수정 필요)
-2. **공용 드라이브(Shared Drive)**: Google Workspace(유료) 계정에서 공용 드라이브 생성 후
-   서비스계정을 멤버로 추가 → 폴더 ID만 그쪽으로 교체.
+### refresh token 발급 (일회성)
 
-이 조치 전까지 워커는 영상을 **로컬 `renders/` 에 저장**하고 완료 처리한다
-(드라이브 업로드 단계만 건너뜀).
+1. Google Cloud Console → **APIs & Services → OAuth consent screen**
+   - User type: **External** → 앱 이름/이메일 입력
+   - **PUBLISH APP** (게시 상태를 "In production"으로) — 안 하면 refresh token 이 7일마다 만료됨
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   - Application type: **Desktop app** → 생성 → `client_id`, `client_secret` 복사
+3. `.env.local` 에 `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` 넣기
+4. 동의 URL 발급 & refresh token 교환:
+   ```bash
+   node scripts/google-oauth.mjs url          # 출력 URL 을 브라우저에서 열어 동의
+   #  → "localhost 연결 실패" 페이지의 주소창에서 code=... 복사
+   node scripts/google-oauth.mjs exchange "<code 또는 전체 URL>"
+   #  → GOOGLE_OAUTH_REFRESH_TOKEN 값을 .env.local 에 추가
+   ```
+   동의 시 "확인되지 않은 앱" 경고 → 고급 → 계속 진행 (본인 앱이라 안전).
+   **반드시 드라이브 폴더 소유 계정(trussvideo1@gmail.com)으로 로그인**해서 동의할 것.
+
+업로드가 실패해도 렌더된 영상은 로컬 `renders/` 에 남고 **완료 처리**된다
+(텔레그램 알림에 실패 사유 표시). 즉 드라이브가 잠깐 안 돼도 영상 생성은 안 멈춘다.
 
 ## 📦 Vercel 프로젝트 참고
 
