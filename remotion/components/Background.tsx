@@ -1,13 +1,33 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   OffthreadVideo,
   interpolate,
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { COLORS, DURATION_IN_FRAMES, MOTION, VIDEO } from "../config/videoConfig";
+import { BGM, COLORS, DURATION_IN_FRAMES, MOTION, VIDEO } from "../config/videoConfig";
 import { FontFaceStyle } from "./FontFaceStyle";
+
+/** 잔잔한 배경음악 - 나레이션을 가리지 않게 작게, 끝에서 페이드아웃 */
+const BgmAudio: React.FC = () => {
+  const fadeFrames = Math.round(BGM.fadeOutSeconds * VIDEO.fps);
+  return (
+    <Audio
+      src={staticFile(BGM.file)}
+      loop
+      volume={(f) =>
+        interpolate(
+          f,
+          [0, 12, DURATION_IN_FRAMES - fadeFrames, DURATION_IN_FRAMES],
+          [0, BGM.volume, BGM.volume, 0],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        )
+      }
+    />
+  );
+};
 
 /** B-roll 없이 쓰는 그라디언트 모션 배경 (부드러운 베이지 블롭이 떠다님) */
 const GradientMotion: React.FC = () => {
@@ -79,6 +99,7 @@ export const Background: React.FC<{ brollFile: string | null }> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.cream }}>
       <FontFaceStyle />
+      <BgmAudio />
       <AbsoluteFill style={{ transform: `scale(${zoom + pulse})` }}>
         {brollSrc ? (
           <OffthreadVideo

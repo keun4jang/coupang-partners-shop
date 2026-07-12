@@ -23,6 +23,7 @@ import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { Disclosure } from "../components/Disclosure";
 import { TopBadge } from "../components/TopBadge";
+import { Narration } from "../components/Narration";
 
 /** 메모 카드의 체크 항목 - startFrame 이후 순서대로 팝인 */
 const MemoLine: React.FC<{ text: string; delayFrames: number }> = ({
@@ -86,6 +87,27 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
       {/* 0~1.5초: 후킹 */}
       <Sequence durationInFrames={f(TIMING.hook.to)}>
         <Subtitle text={props.hookLine} size={FONT_SIZES.hook} y={0.38} />
+        <Narration src={props.narration?.[0]} />
+      </Sequence>
+
+      {/* 나레이션: 메모 체크라인이 적히는 타이밍에 맞춰 재생 */}
+      <Sequence
+        from={f(TIMING.empathy.from)}
+        durationInFrames={f(TIMING.product.from - TIMING.empathy.from)}
+      >
+        <Narration src={props.narration?.[1]} />
+      </Sequence>
+      <Sequence
+        from={f(TIMING.product.from)}
+        durationInFrames={f(TIMING.benefit2.from - TIMING.product.from)}
+      >
+        <Narration src={props.narration?.[2]} />
+      </Sequence>
+      <Sequence
+        from={f(TIMING.benefit2.from)}
+        durationInFrames={ctaFrom - f(TIMING.benefit2.from)}
+      >
+        <Narration src={props.narration?.[3]} />
       </Sequence>
 
       {/* 1.5초~: 메모 카드 (공감/장점이 체크리스트로 하나씩 적힘) */}
@@ -143,6 +165,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
 
       <Sequence from={ctaFrom} durationInFrames={DURATION_IN_FRAMES - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
+        <Narration src={props.narration?.[4]} />
       </Sequence>
 
       <Disclosure />

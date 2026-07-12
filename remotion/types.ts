@@ -16,6 +16,11 @@ export type ShortsProps = {
   category: string;
   /** public/assets/broll/ 아래 B-roll 파일명. 없으면 그라디언트 모션 배경 */
   brollFile: string | null;
+  /**
+   * 장면별 나레이션 오디오 (data URI mp3).
+   * 순서: [후킹, 공감, 장점1, 장점2, CTA]. null 이면 해당 장면 무음.
+   */
+  narration?: (string | null)[] | null;
 };
 
 export const defaultShortsProps: ShortsProps = {
@@ -29,4 +34,5 @@ export const defaultShortsProps: ShortsProps = {
   productImageUrl: null,
   category: "차량용품",
   brollFile: null,
+  narration: null,
 };

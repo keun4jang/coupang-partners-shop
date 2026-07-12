@@ -8,8 +8,8 @@ export const VIDEO = {
   width: 1080,
   height: 1920,
   fps: 30,
-  /** 기본 길이(초). 8~12초 범위 안에서 조정 */
-  durationSeconds: 10,
+  /** 기본 길이(초). 8~12초 범위 안에서 조정 (CTA 나레이션 여유를 위해 11초) */
+  durationSeconds: 11,
 } as const;
 
 export const DURATION_IN_FRAMES = VIDEO.durationSeconds * VIDEO.fps;
@@ -45,7 +45,19 @@ export const TIMING = {
   empathy: { from: 1.5, to: 3.5 },
   product: { from: 3.5, to: 6.5 },
   benefit2: { from: 6.5, to: 8.5 },
-  cta: { from: 8.5, to: 10 },
+  cta: { from: 8.5, to: 11 },
+} as const;
+
+/**
+ * 배경음악 (퍼블릭 도메인: Satie - Gymnopédie No.1, Michael Laucke 기타 연주,
+ * Wikimedia Commons / 상업 이용 제한 없음).
+ * volume 은 나레이션이 잘 들리도록 낮게 유지.
+ */
+export const BGM = {
+  file: "assets/bgm/calm-gymnopedie.mp3",
+  volume: 0.16,
+  /** 끝부분 페이드아웃(초) */
+  fadeOutSeconds: 1.2,
 } as const;
 
 /** 베이지/살구톤 팔레트 (사이트와 톤 일치) */

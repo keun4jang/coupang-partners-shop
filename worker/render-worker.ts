@@ -41,6 +41,7 @@ import {
 } from "../src/lib/format";
 import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine } from "../src/lib/ai";
+import { generateNarration } from "../src/lib/tts";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
 import type { ShortsProps } from "../remotion/types";
@@ -126,6 +127,31 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
   };
 }
 
+/**
+ * 상품 이미지를 미리 받아 data URI 로 변환.
+ * 쿠팡 CDN 등이 헤드리스 브라우저 요청을 차단해도 영상에 사진이 확실히 실리도록,
+ * 브라우저 대신 워커(Node)가 받아서 렌더에 직접 심는다. 실패 시 null (원본 URL 유지).
+ */
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+async function fetchImageAsDataUri(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+      },
+    });
+    if (!res.ok) return null;
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.startsWith("image/")) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0 || buf.length > IMAGE_MAX_BYTES) return null;
+    return `data:${type.split(";")[0]};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 let cachedBundle: string | null = null;
 async function getBundle(): Promise<string> {
   if (cachedBundle) return cachedBundle;
@@ -142,6 +168,33 @@ async function renderVideo(
 ): Promise<{ videoPath: string; thumbnailPath: string }> {
   const serveUrl = await getBundle();
   const inputProps = buildProps(item, product);
+
+  // 상품 이미지 사전 다운로드 (CDN 차단 대비) → data URI 로 교체
+  if (inputProps.productImageUrl?.startsWith("http")) {
+    const dataUri = await fetchImageAsDataUri(inputProps.productImageUrl);
+    if (dataUri) {
+      inputProps.productImageUrl = dataUri;
+      console.log("상품 이미지 내장 완료");
+    } else {
+      console.warn("상품 이미지 다운로드 실패 - 브라우저 로드 시도로 폴백");
+    }
+  }
+
+  // 나레이션 TTS (실패해도 무음으로 진행 - 영상 생성을 막지 않는다)
+  console.log("나레이션 합성 중...");
+  inputProps.narration = await generateNarration([
+    inputProps.hookLine,
+    inputProps.empathyLine,
+    inputProps.benefit1,
+    inputProps.benefit2,
+    inputProps.ctaText,
+  ]);
+  console.log(
+    inputProps.narration
+      ? `나레이션 ${inputProps.narration.filter(Boolean).length}/5줄 합성 완료`
+      : "나레이션 없음 (TTS 실패 또는 비활성) - 무음 진행"
+  );
+
   const compositionId = `Template${item.template_type}`;
 
   const composition = await selectComposition({

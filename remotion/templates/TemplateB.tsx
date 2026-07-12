@@ -14,6 +14,7 @@ import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { Disclosure } from "../components/Disclosure";
 import { TopBadge } from "../components/TopBadge";
+import { Narration } from "../components/Narration";
 
 /**
  * Template B: 아이엄마 공감형
@@ -39,6 +40,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
           variant="bubble"
           y={0.36}
         />
+        <Narration src={props.narration?.[0]} />
       </Sequence>
 
       <Sequence
@@ -46,6 +48,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         durationInFrames={f(TIMING.empathy.to - TIMING.empathy.from)}
       >
         <Subtitle text={props.empathyLine} variant="bubble" y={0.4} />
+        <Narration src={props.narration?.[1]} />
       </Sequence>
 
       <Sequence
@@ -69,6 +72,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
           variant="bubble"
           y={0.15}
         />
+        <Narration src={props.narration?.[2]} />
       </Sequence>
 
       <Sequence
@@ -81,10 +85,12 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
           variant="bubble"
           y={0.15}
         />
+        <Narration src={props.narration?.[3]} />
       </Sequence>
 
       <Sequence from={ctaFrom} durationInFrames={DURATION_IN_FRAMES - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
+        <Narration src={props.narration?.[4]} />
       </Sequence>
 
       <Disclosure />
