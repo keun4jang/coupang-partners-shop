@@ -26,13 +26,13 @@ export function safeProductName(name: string): string {
   );
 }
 
-/** 드라이브 파일명 규칙: {displayNumber}_{safeProductName}(suffix).ext */
+/** 드라이브 파일명 규칙: {displayNumber}번_{safeProductName}(suffix).ext (예: 1번_차량용미니청소기.mp4) */
 export function driveFileName(
   displayNumber: number,
   productName: string,
   kind: "video" | "caption" | "thumbnail"
 ): string {
-  const base = `${displayNumber}_${safeProductName(productName)}`;
+  const base = `${formatDisplayNumber(displayNumber)}_${safeProductName(productName)}`;
   switch (kind) {
     case "video":
       return `${base}.mp4`;
