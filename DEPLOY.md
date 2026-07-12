@@ -51,9 +51,30 @@ node scripts/set-webhook.mjs https://다른도메인.com   # URL 직접 지정
 봇 명령: `영상` `상품목록` `최근영상` `상태`
 (TELEGRAM_ALLOWED_CHAT_ID 에서 온 메시지 + secret 헤더 일치할 때만 처리)
 
-## 🎬 렌더 워커 (로컬에서 실행)
+## 🎬 렌더 워커 — 클라우드(GitHub Actions, PC 불필요) ✨
 
-영상 렌더링은 Vercel(서버리스)에서 불가 → **내 PC나 상시 켜둔 서버**에서 실행.
+영상 렌더링은 Vercel(서버리스)에서 불가하지만, **GitHub Actions 가 클라우드 PC 역할**을 한다.
+public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아래처럼 동작:
+
+- **15분마다** 자동으로 켜져서 대기중(pending) 영상이 있으면 렌더 → 드라이브 업로드 → 텔레그램 알림 → 종료
+- 동시 실행 방지(concurrency) 내장 → 워커 인스턴스는 항상 하나
+- (선택) Vercel 에 `GH_DISPATCH_TOKEN`/`GH_REPOSITORY` 를 넣으면 텔레그램 "영상" 승인 **즉시** 렌더 시작
+
+### 켜려면 (한 번만): GitHub 시크릿 `WORKER_ENV` 등록
+
+1. GitHub 저장소 → **Settings → Secrets and variables → Actions**
+2. **New repository secret** → Name: `WORKER_ENV`
+3. Value 에 워커용 환경변수 전체를 `.env.local` 형식으로 붙여넣기 (필요 키:
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_ALLOWED_CHAT_ID`, `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_OAUTH_CLIENT_ID`,
+   `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `AI_API_KEY`,
+   `NEXT_PUBLIC_SITE_URL`)
+4. Actions 탭에서 `render-worker` → **Run workflow** 로 수동 테스트 가능
+
+> 시크릿이 없으면 워크플로는 아무것도 안 하고 조용히 종료한다(안전).
+> ⚠️ public 저장소이므로 시크릿은 반드시 GitHub Secrets 에만 — 코드/커밋에 절대 금지.
+
+### 로컬 실행 (백업/개발용)
 
 ```bash
 npm run worker        # 상시: pending 영상 감시(30초 간격) → 렌더 → 업로드 → 텔레그램 알림
@@ -61,7 +82,7 @@ npm run worker:once   # 대기중인 것만 처리하고 종료
 ```
 
 - `.env.local` 에 Supabase/텔레그램/(드라이브) 값이 있어야 한다.
-- 워커 인스턴스는 **하나만** 실행 (동시 실행 시 드라이브 폴더 중복 가능).
+- 클라우드 워커와 로컬 워커를 **동시에 돌리지 말 것** (드라이브 폴더 중복 가능).
 
 ## 구글 드라이브 자동 업로드 (OAuth 방식)
 

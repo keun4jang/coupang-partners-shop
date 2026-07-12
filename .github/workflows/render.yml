@@ -1,0 +1,74 @@
+# 클라우드 렌더 워커 (PC 불필요).
+#
+# 15분마다 GitHub 러너가 켜져서 대기중(pending) 영상이 있으면
+# 렌더 → 구글드라이브 업로드 → 텔레그램 알림 후 종료한다.
+# (public 저장소라 GitHub Actions 사용량은 무료)
+#
+# 필요한 것: 저장소 Settings → Secrets and variables → Actions 에
+#   WORKER_ENV  = .env.local 형식의 워커용 환경변수 전체 (한 번만 등록)
+# 이 시크릿이 없으면 아무것도 하지 않고 조용히 종료한다.
+#
+# 수동 실행: Actions 탭 → render-worker → Run workflow
+
+name: render-worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+# 워커는 반드시 한 번에 하나만 (동시 실행 시 드라이브 날짜폴더 중복 위험)
+concurrency:
+  group: render-worker
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 워커 환경변수 확인
+        id: check
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then
+            echo "WORKER_ENV 시크릿이 없어 렌더를 건너뜁니다. (DEPLOY.md 참고)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - name: node_modules 캐시
+        if: steps.check.outputs.ready == 'true'
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true' && steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Remotion 브라우저 준비
+        if: steps.check.outputs.ready == 'true'
+        run: npx remotion browser ensure
+
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+
+      - name: 대기중 영상 렌더
+        if: steps.check.outputs.ready == 'true'
+        run: npm run worker:once
