@@ -46,31 +46,32 @@ function ItemCard({
   highlight?: boolean;
 }) {
   const product: Product = item.products;
+  const price = product.price_text?.trim();
   return (
     <div
       className={`bg-card rounded-2xl p-5 shadow-sm border ${
-        highlight ? "border-primary" : "border-accent-soft"
+        highlight ? "border-primary ring-2 ring-primary/30" : "border-accent-soft"
       }`}
     >
-      {/* 사진 없이 글자만 */}
+      {/* 사진 없이 글자만: 번호 · 제품명 · 가격 · 한 줄 설명 · 버튼 */}
       <div className="inline-block bg-accent-soft text-primary-dark font-bold rounded-full px-3 py-0.5 text-sm">
         {formatDisplayNumber(item.display_number)}
       </div>
-      <h3 className="font-bold text-lg mt-1.5 leading-snug">
+      <h3 className="font-bold text-lg mt-2 leading-snug">
         {product.product_name}
       </h3>
-      {item.hook_text && (
-        <p className="text-sub text-sm mt-1">{item.hook_text}</p>
+      {price && (
+        <p className="text-primary-dark font-extrabold text-lg mt-1.5">{price}</p>
       )}
-      <p className="text-ink/80 text-sm mt-3 leading-relaxed">
+      <p className="text-ink/80 text-sm mt-2 leading-relaxed">
         {shortDescription(item)}
       </p>
       <a
         href={`/api/click?videoItemId=${item.id}`}
         rel="nofollow sponsored"
-        className="block mt-4 text-center bg-primary hover:bg-primary-dark transition-colors text-white font-bold rounded-xl py-3"
+        className="block mt-4 text-center bg-primary hover:bg-primary-dark transition-colors text-white font-bold rounded-xl py-3.5 text-lg"
       >
-        쿠팡에서 보기
+        쿠팡에서 보기 →
       </a>
     </div>
   );
@@ -140,7 +141,12 @@ export default async function Home({
       {q && dbReady && (
         <section className="mt-6">
           {result ? (
-            <ItemCard item={result} highlight />
+            <>
+              <p className="text-center text-primary-dark font-bold mb-3">
+                🔎 {result.display_number}번, 이 제품이에요!
+              </p>
+              <ItemCard item={result} highlight />
+            </>
           ) : (
             <div className="bg-card rounded-2xl p-6 text-center border border-accent-soft">
               <p className="font-semibold">
