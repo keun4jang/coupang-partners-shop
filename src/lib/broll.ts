@@ -170,22 +170,53 @@ export async function fetchStockBroll(
   category: string,
   displayNumber: number
 ): Promise<StockBroll | null> {
+  const list = await fetchStockBrolls(category, displayNumber, 1);
+  return list[0] ?? null;
+}
+
+/**
+ * 서로 다른 스톡 클립 여러 개를 받아온다 (포맷 D 의 4컷 배경용).
+ * displayNumber 를 시드로 서로 다른 후보를 회전 선택.
+ * 구할 수 있는 만큼만 돌려준다 (0개면 블러 배경 폴백).
+ */
+export async function fetchStockBrolls(
+  category: string,
+  displayNumber: number,
+  count: number
+): Promise<StockBroll[]> {
   const query =
     SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
 
-  // Pexels 우선 → 실패/미설정 시 Pixabay → 둘 다 없으면 null(블러 배경 폴백)
-  try {
-    const pexels = await fetchFromPexels(query, displayNumber);
-    if (pexels) return pexels;
-  } catch (e) {
-    console.warn(`Pexels 처리 실패: ${(e as Error).message}`);
+  const out: StockBroll[] = [];
+  const seen = new Set<number>();
+  // Pexels 우선 → 부족하면 Pixabay 로 채움
+  for (let i = 0; i < count * 2 && out.length < count; i++) {
+    try {
+      const clip = await fetchFromPexels(query, displayNumber + i);
+      if (clip && !seen.has(clip.pexelsId)) {
+        seen.add(clip.pexelsId);
+        out.push(clip);
+      }
+    } catch (e) {
+      console.warn(`Pexels 처리 실패: ${(e as Error).message}`);
+      break;
+    }
   }
-  try {
-    const pixabay = await fetchFromPixabay(query, displayNumber);
-    if (pixabay) return pixabay;
-  } catch (e) {
-    console.warn(`Pixabay 처리 실패: ${(e as Error).message}`);
+  for (let i = 0; out.length < count && i < count * 2; i++) {
+    try {
+      const clip = await fetchFromPixabay(query, displayNumber + i);
+      if (clip && !seen.has(clip.pexelsId)) {
+        seen.add(clip.pexelsId);
+        out.push(clip);
+      }
+    } catch (e) {
+      console.warn(`Pixabay 처리 실패: ${(e as Error).message}`);
+      break;
+    }
   }
-  console.warn("스톡 클립 수급 실패 - 블러 상품사진 배경으로 폴백");
-  return null;
+
+  if (out.length === 0) {
+    console.warn("스톡 클립 수급 실패 - 블러 상품사진 배경으로 폴백");
+  }
+  return out;
 }

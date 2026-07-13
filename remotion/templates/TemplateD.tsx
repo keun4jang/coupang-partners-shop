@@ -28,7 +28,13 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
     <AbsoluteFill>
       <Background
         brollFile={props.brollFile}
-        bgImageUrl={props.brollFile ? null : props.productImageUrl}
+        brollFiles={props.brollFiles}
+        cutSeconds={[0, T.empathy.to, T.product.to, T.benefit2.to]}
+        bgImageUrl={
+          props.brollFiles?.length || props.brollFile
+            ? null
+            : props.productImageUrl
+        }
       />
 
       {/* 인트로: 후킹(타겟 호명)+공감 두 문장이 한 화면에 순서대로 쌓임 */}

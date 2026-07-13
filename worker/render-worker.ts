@@ -42,7 +42,7 @@ import {
 import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
-import { fetchStockBroll } from "../src/lib/broll";
+import { fetchStockBrolls } from "../src/lib/broll";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
@@ -206,16 +206,21 @@ async function renderVideo(
 ): Promise<{ videoPath: string; thumbnailPath: string }> {
   const inputProps = buildProps(item, product);
 
-  // 포맷 D: 실사용 스톡 영상 배경 (없으면 블러 상품사진으로 폴백)
+  // 포맷 D: 실사용 스톡 영상 4컷 배경 (없으면 블러 상품사진으로 폴백)
   if (item.template_type === "D") {
-    console.log("실사용 스톡 영상 검색 중...");
-    const broll = await fetchStockBroll(product.category, item.display_number);
-    if (broll) {
-      inputProps.brollFile = broll.file;
+    console.log("실사용 스톡 영상 검색 중 (4컷)...");
+    const brolls = await fetchStockBrolls(
+      product.category,
+      item.display_number,
+      4
+    );
+    if (brolls.length > 0) {
+      inputProps.brollFiles = brolls.map((b) => b.file);
       // 새로 받은 클립이 번들에 포함되도록 번들 캐시 무효화
       cachedBundle = null;
       console.log(
-        `스톡 클립 사용: ${broll.file} (${broll.durationSec}초, Pexels ${broll.pexelsId})`
+        `스톡 클립 ${brolls.length}개 사용: ` +
+          brolls.map((b) => `${b.file}(${b.durationSec}s)`).join(", ")
       );
     }
   }

@@ -30,6 +30,8 @@ export type ShortsProps = {
   category: string;
   /** public/assets/broll/ 아래 B-roll 파일명. 없으면 그라디언트 모션 배경 */
   brollFile: string | null;
+  /** (포맷 D) 4컷 배경용 스톡 클립 파일명 목록 - 장면 경계마다 다음 클립으로 전환 */
+  brollFiles?: string[] | null;
   /**
    * 장면별 나레이션 오디오 (data URI mp3).
    * 순서: [후킹, 공감, 장점1, 장점2, CTA]. null 이면 해당 장면 무음.
@@ -50,6 +52,7 @@ export const defaultShortsProps: ShortsProps = {
   productImageUrl: null,
   category: "차량용품",
   brollFile: null,
+  brollFiles: null,
   narration: null,
   timing: null,
 };

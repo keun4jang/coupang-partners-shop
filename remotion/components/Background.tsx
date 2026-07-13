@@ -4,6 +4,7 @@ import {
   Audio,
   Img,
   OffthreadVideo,
+  Sequence,
   interpolate,
   staticFile,
   useCurrentFrame,
@@ -103,15 +104,35 @@ const BlurredImageLayer: React.FC<{ src: string }> = ({ src }) => {
  * 영상 배경: B-roll(mp4) 이 있으면 줌 모션과 함께 사용, 없으면 그라디언트 모션
  * 위에 상품 사진을 흐리게(블러+저불투명) 깔아 내용과 연결되게 한다.
  * 자막 가독성을 위해 위→아래 따뜻한 틴트를 얹는다.
+ *
+ * brollFiles + cutSeconds 가 있으면(포맷 D) 장면 경계마다 다음 클립으로
+ * 전환되는 멀티컷 배경으로 동작한다.
  */
 export const Background: React.FC<{
   brollFile: string | null;
   /** 흐린 배경으로 깔 상품 이미지 (data URI 권장) */
   bgImageUrl?: string | null;
-}> = ({ brollFile, bgImageUrl }) => {
+  /** 멀티컷 배경 클립 목록 (있으면 brollFile 보다 우선) */
+  brollFiles?: string[] | null;
+  /** 각 컷의 시작 시각(초). 길이 = 컷 수, 첫 값은 0 */
+  cutSeconds?: number[];
+}> = ({ brollFile, bgImageUrl, brollFiles, cutSeconds }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames, fps } = useVideoConfig();
   const brollSrc = brollFile ? staticFile(`assets/broll/${brollFile}`) : null;
+
+  // 멀티컷: 각 컷 구간마다 다른 클립 재생 (클립이 모자라면 순환)
+  const cuts =
+    brollFiles && brollFiles.length > 0 && cutSeconds && cutSeconds.length > 0
+      ? cutSeconds.map((startSec, i) => ({
+          fromFrame: Math.round(startSec * fps),
+          toFrame:
+            i + 1 < cutSeconds.length
+              ? Math.round(cutSeconds[i + 1] * fps)
+              : durationInFrames,
+          file: brollFiles[i % brollFiles.length],
+        }))
+      : null;
 
   const zoom = interpolate(
     frame,
@@ -129,7 +150,23 @@ export const Background: React.FC<{
       <FontFaceStyle />
       <BgmAudio />
       <AbsoluteFill style={{ transform: `scale(${zoom + pulse})` }}>
-        {brollSrc ? (
+        {cuts ? (
+          <>
+            {cuts.map((cut, i) => (
+              <Sequence
+                key={i}
+                from={cut.fromFrame}
+                durationInFrames={cut.toFrame - cut.fromFrame}
+              >
+                <OffthreadVideo
+                  src={staticFile(`assets/broll/${cut.file}`)}
+                  muted
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </Sequence>
+            ))}
+          </>
+        ) : brollSrc ? (
           <OffthreadVideo
             src={brollSrc}
             muted
