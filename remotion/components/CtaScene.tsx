@@ -5,20 +5,15 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import {
-  COLORS,
-  CTA_SUB_TEXT,
-  FONT_SIZES,
-  MOTION,
-  TRUST_TEXT,
-} from "../config/videoConfig";
+import { COLORS, CTA_SUB_TEXT, FONT_SIZES, MOTION } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
-/** 마지막 CTA 화면: 큰 번호 + "영상 속 제품은 N번에 정리해뒀어요" */
+/** 마지막 CTA 화면: 큰 번호 + 행동 안내 한 줄 (문구 최소화 - 내용은 나레이션이 전달) */
 export const CtaScene: React.FC<{
   displayNumber: number;
-  ctaText: string;
-}> = ({ displayNumber, ctaText }) => {
+  /** 나레이션용 문구 - 화면에는 표시하지 않는다 */
+  ctaText?: string;
+}> = ({ displayNumber }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -68,14 +63,15 @@ export const CtaScene: React.FC<{
         </span>
       </div>
 
+      {/* 화면 문구는 행동 안내 한 줄만 - 나머지는 나레이션이 말해준다 */}
       <div
         style={{
-          marginTop: 60,
+          marginTop: 56,
           width: "84%",
           textAlign: "center",
           color: "#FFFFFF",
-          fontWeight: 900,
-          fontSize: FONT_SIZES.ctaText,
+          fontWeight: 800,
+          fontSize: 46,
           lineHeight: 1.4,
           wordBreak: "keep-all",
           transform: `translateY(${(1 - textIn) * 40}px)`,
@@ -83,31 +79,7 @@ export const CtaScene: React.FC<{
           textShadow: "0 2px 12px rgba(0,0,0,0.4)",
         }}
       >
-        {ctaText}
-      </div>
-
-      <div
-        style={{
-          marginTop: 24,
-          color: COLORS.accent,
-          fontWeight: 700,
-          fontSize: 38,
-          opacity: textIn,
-        }}
-      >
         {CTA_SUB_TEXT}
-      </div>
-
-      <div
-        style={{
-          marginTop: 40,
-          color: "rgba(255, 248, 240, 0.75)",
-          fontWeight: 600,
-          fontSize: 32,
-          opacity: textIn,
-        }}
-      >
-        {TRUST_TEXT}
       </div>
     </AbsoluteFill>
   );
