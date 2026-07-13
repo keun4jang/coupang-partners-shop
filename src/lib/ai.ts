@@ -63,7 +63,8 @@ export function composeScriptText(copy: VideoCopy, displayNumber: number): strin
 }
 
 export function ctaLine(displayNumber: number): string {
-  return `영상 속 제품은 ${displayNumber}번에 정리해뒀어요`;
+  // CTA 화면 자막과 나레이션이 완전히 같은 문장을 쓴다
+  return `영상 속 제품은 프로필 링크 ${displayNumber}번에 정리해뒀어요`;
 }
 
 const DISCLOSURE =

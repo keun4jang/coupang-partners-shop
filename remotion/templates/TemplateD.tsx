@@ -101,7 +101,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
 
       {/* CTA */}
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
-        <CtaScene displayNumber={props.displayNumber} />
+        <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
         <Narration src={props.narration?.[4]} />
       </Sequence>
     </AbsoluteFill>

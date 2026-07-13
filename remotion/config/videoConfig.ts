@@ -83,7 +83,7 @@ export function resolveTiming(t?: {
  * opacity 0 = 원본 그대로, 1 = 완전히 가림.
  */
 export const BROLL_VEIL = {
-  opacity: 0.55,
+  opacity: 0.4,
 } as const;
 
 /**
@@ -141,7 +141,7 @@ export const MOTION = {
 
 /** CTA 문구 템플릿 (번호는 "17번"처럼 앞자리 0 없이) */
 export const ctaTemplate = (displayNumber: number): string =>
-  `영상 속 제품은 ${displayNumber}번에 정리해뒀어요`;
+  `영상 속 제품은 프로필 링크 ${displayNumber}번에 정리해뒀어요`;
 
 export const CTA_SUB_TEXT = "프로필 링크에서 번호로 검색";
 
