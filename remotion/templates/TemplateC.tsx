@@ -80,7 +80,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
 
   return (
     <AbsoluteFill>
-      <Background brollFile={props.brollFile} />
+      <Background brollFile={props.brollFile} bgImageUrl={props.productImageUrl} />
 
       <Sequence durationInFrames={ctaFrom}>
         <TopBadge text={TEMPLATE_BADGE.C ?? ""} />
@@ -88,7 +88,12 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
 
       {/* 후킹 */}
       <Sequence durationInFrames={f(T.hook.to)}>
-        <Subtitle text={props.hookLine} size={FONT_SIZES.hook} y={0.38} />
+        <Subtitle
+          text={props.hookLine}
+          size={FONT_SIZES.hook}
+          variant="bubble"
+          y={0.3}
+        />
         <Narration src={props.narration?.[0]} />
       </Sequence>
 

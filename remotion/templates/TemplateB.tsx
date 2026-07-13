@@ -28,7 +28,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
 
   return (
     <AbsoluteFill>
-      <Background brollFile={props.brollFile} />
+      <Background brollFile={props.brollFile} bgImageUrl={props.productImageUrl} />
 
       {/* 상단 감성 배지 - CTA 전까지 유지 */}
       <Sequence durationInFrames={ctaFrom}>

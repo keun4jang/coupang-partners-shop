@@ -25,11 +25,16 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
 
   return (
     <AbsoluteFill>
-      <Background brollFile={props.brollFile} />
+      <Background brollFile={props.brollFile} bgImageUrl={props.productImageUrl} />
 
       {/* 인트로: 후킹(타겟 호명)+공감 두 문장이 한 화면에 순서대로 쌓임 (컷 전환 없음) */}
       <Sequence durationInFrames={f(T.empathy.to)}>
-        <Subtitle text={props.hookLine} size={FONT_SIZES.hook} y={0.28} />
+        <Subtitle
+          text={props.hookLine}
+          size={FONT_SIZES.hook}
+          variant="bubble"
+          y={0.26}
+        />
       </Sequence>
       <Sequence durationInFrames={f(T.hook.to)}>
         <Narration src={props.narration?.[0]} />
@@ -38,7 +43,7 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
         from={f(T.empathy.from)}
         durationInFrames={f(T.empathy.to - T.empathy.from)}
       >
-        <Subtitle text={props.empathyLine} y={0.45} />
+        <Subtitle text={props.empathyLine} variant="bubble" y={0.47} />
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
@@ -56,7 +61,7 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
         from={f(T.product.from)}
         durationInFrames={f(T.product.to - T.product.from)}
       >
-        <Subtitle text={props.benefit1} size={FONT_SIZES.benefit} y={0.16} />
+        <Subtitle text={props.benefit1} size={FONT_SIZES.benefit} variant="bubble" y={0.14} />
         <Narration src={props.narration?.[2]} />
       </Sequence>
 
@@ -65,7 +70,7 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
         from={f(T.benefit2.from)}
         durationInFrames={f(T.benefit2.to - T.benefit2.from)}
       >
-        <Subtitle text={props.benefit2} size={FONT_SIZES.benefit} y={0.16} />
+        <Subtitle text={props.benefit2} size={FONT_SIZES.benefit} variant="bubble" y={0.14} />
         <Narration src={props.narration?.[3]} />
       </Sequence>
 

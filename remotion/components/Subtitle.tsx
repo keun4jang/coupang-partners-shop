@@ -34,8 +34,11 @@ export const Subtitle: React.FC<{
     fontFamily,
     fontWeight: 900,
     fontSize: size,
-    lineHeight: 1.35,
+    lineHeight: 1.32,
+    letterSpacing: "-0.015em",
     wordBreak: "keep-all",
+    // 2줄이 될 때 위/아래 글자 수를 비슷하게 나눠 균형 있게
+    textWrap: "balance",
     transform: `scale(${0.85 + pop * 0.15}) translateY(${(1 - pop) * 30}px)`,
     opacity: pop,
   };

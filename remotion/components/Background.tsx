@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   AbsoluteFill,
   Audio,
+  Img,
   OffthreadVideo,
   interpolate,
   staticFile,
@@ -77,13 +78,37 @@ const GradientMotion: React.FC = () => {
   );
 };
 
+/** 상품 사진을 흐리게 깔아주는 레이어 - 글자만 있는 초반 화면이 허전하지 않게 */
+const BlurredImageLayer: React.FC<{ src: string }> = ({ src }) => {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <AbsoluteFill style={{ opacity: 0.3 }}>
+      <Img
+        src={src}
+        onError={() => setFailed(true)}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          filter: "blur(30px) saturate(0.9)",
+          transform: "scale(1.2)",
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
 /**
- * 영상 배경: B-roll(mp4) 이 있으면 줌 모션과 함께 사용, 없으면 그라디언트 모션.
+ * 영상 배경: B-roll(mp4) 이 있으면 줌 모션과 함께 사용, 없으면 그라디언트 모션
+ * 위에 상품 사진을 흐리게(블러+저불투명) 깔아 내용과 연결되게 한다.
  * 자막 가독성을 위해 위→아래 따뜻한 틴트를 얹는다.
  */
-export const Background: React.FC<{ brollFile: string | null }> = ({
-  brollFile,
-}) => {
+export const Background: React.FC<{
+  brollFile: string | null;
+  /** 흐린 배경으로 깔 상품 이미지 (data URI 권장) */
+  bgImageUrl?: string | null;
+}> = ({ brollFile, bgImageUrl }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   const brollSrc = brollFile ? staticFile(`assets/broll/${brollFile}`) : null;
@@ -113,6 +138,7 @@ export const Background: React.FC<{ brollFile: string | null }> = ({
         ) : (
           <GradientMotion />
         )}
+        {bgImageUrl && <BlurredImageLayer src={bgImageUrl} />}
       </AbsoluteFill>
       <AbsoluteFill
         style={{
