@@ -206,8 +206,12 @@ async function renderVideo(
 ): Promise<{ videoPath: string; thumbnailPath: string }> {
   const inputProps = buildProps(item, product);
 
+  // 렌더할 실제 템플릿. FORCE_TEMPLATE 로 배치 렌더 시 강제 지정 가능
+  // (DB 제약이 아직 'D' 를 안 받을 때 D 포맷을 뽑기 위한 안전장치).
+  const effectiveTemplate = optionalEnv("FORCE_TEMPLATE") ?? item.template_type;
+
   // 포맷 D: 실사용 스톡 영상 4컷 배경 (없으면 블러 상품사진으로 폴백)
-  if (item.template_type === "D") {
+  if (effectiveTemplate === "D") {
     console.log("실사용 스톡 영상 검색 중 (4컷)...");
     const brolls = await fetchStockBrolls(
       product.category,
@@ -263,7 +267,7 @@ async function renderVideo(
     console.log("나레이션 없음 (TTS 실패 또는 비활성) - 고정 15초 타이밍으로 진행");
   }
 
-  const compositionId = `Template${item.template_type}`;
+  const compositionId = `Template${effectiveTemplate}`;
 
   const composition = await selectComposition({
     serveUrl,
