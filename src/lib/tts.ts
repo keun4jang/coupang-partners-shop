@@ -99,8 +99,9 @@ async function synthesizeLineEdge(
 const GOOGLE_SAMPLE_RATE = 24_000;
 /** 선호 순서대로 시도. 앞이 안 되면(미지원 등) 다음으로 넘어간다 */
 const GOOGLE_VOICE_FALLBACKS = [
-  "ko-KR-Chirp3-HD-Kore", // 자연스러운 여성
-  "ko-KR-Neural2-A", // 여성 (구세대지만 안정적)
+  "ko-KR-Chirp3-HD-Sulafat", // 따뜻한 여성 (사장님 선택)
+  "ko-KR-Chirp3-HD-Kore",
+  "ko-KR-Neural2-A",
   "ko-KR-Wavenet-A",
 ];
 
