@@ -9,7 +9,7 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { BGM, COLORS, MOTION, VIDEO } from "../config/videoConfig";
+import { BGM, BROLL_VEIL, COLORS, MOTION, VIDEO } from "../config/videoConfig";
 import { FontFaceStyle } from "./FontFaceStyle";
 import { useVideoConfig } from "remotion";
 
@@ -176,6 +176,12 @@ export const Background: React.FC<{
           <GradientMotion />
         )}
         {bgImageUrl && <BlurredImageLayer src={bgImageUrl} />}
+        {/* 스톡 영상 위 크림 베일 - 배경에 시선이 쏠리지 않게 */}
+        {(cuts || brollSrc) && (
+          <AbsoluteFill
+            style={{ background: COLORS.cream, opacity: BROLL_VEIL.opacity }}
+          />
+        )}
       </AbsoluteFill>
       <AbsoluteFill
         style={{

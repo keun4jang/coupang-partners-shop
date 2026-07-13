@@ -79,6 +79,14 @@ export function resolveTiming(t?: {
 }
 
 /**
+ * 스톡 영상 배경 위에 덮는 크림색 베일 - 배경에 시선이 쏠리지 않게.
+ * opacity 0 = 원본 그대로, 1 = 완전히 가림.
+ */
+export const BROLL_VEIL = {
+  opacity: 0.55,
+} as const;
+
+/**
  * 배경음악 (퍼블릭 도메인: Scott Joplin - The Entertainer, Wikimedia Commons /
  * 상업 이용 제한 없음). 밝고 가벼운 래그타임 피아노.
  * volume 은 나레이션을 가리지 않도록 아주 낮게 유지.
