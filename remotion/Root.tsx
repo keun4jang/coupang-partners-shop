@@ -1,10 +1,17 @@
 import React from "react";
-import { Composition } from "remotion";
+import { CalculateMetadataFunction, Composition } from "remotion";
 import { DURATION_IN_FRAMES, VIDEO } from "./config/videoConfig";
-import { defaultShortsProps } from "./types";
+import { ShortsProps, defaultShortsProps } from "./types";
 import { TemplateA } from "./templates/TemplateA";
 import { TemplateB } from "./templates/TemplateB";
 import { TemplateC } from "./templates/TemplateC";
+
+/** 나레이션 타이밍(timing.ctaTo)이 있으면 영상 길이를 거기에 맞춘다 */
+const calculateMetadata: CalculateMetadataFunction<ShortsProps> = ({ props }) => ({
+  durationInFrames: Math.round(
+    (props.timing?.ctaTo ?? VIDEO.durationSeconds) * VIDEO.fps
+  ),
+});
 
 export const RemotionRoot: React.FC = () => {
   const shared = {
@@ -13,6 +20,7 @@ export const RemotionRoot: React.FC = () => {
     fps: VIDEO.fps,
     durationInFrames: DURATION_IN_FRAMES,
     defaultProps: defaultShortsProps,
+    calculateMetadata,
   };
 
   return (

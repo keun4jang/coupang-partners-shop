@@ -42,6 +42,7 @@ import {
 import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
+import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
 import type { ShortsProps } from "../remotion/types";
@@ -152,6 +153,42 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
   }
 }
 
+/**
+ * 나레이션 실측 길이(초)에 맞춰 장면 컷 타이밍을 만든다.
+ * - 각 장면 = 해당 나레이션 길이 + 짧은 간격(0.45초) → 문장 사이가 늘어지지 않음
+ * - 총 길이가 목표(15초)보다 짧으면 비율대로 늘려 정확히 15초로 맞춤
+ * - 나레이션이 길면 잘리지 않도록 15초를 넘길 수 있음(최대 나레이션 길이만큼)
+ */
+const TARGET_SECONDS = 15;
+const NARRATION_GAP = 0.45;
+function buildSceneTiming(sec: number[]): SceneTiming {
+  const need = (i: number, min: number) =>
+    Math.max(min, (sec[i] ?? 0) + NARRATION_GAP);
+  // 최소 장면 길이: 자막을 읽을 시간 + 카드 등장 모션 여유
+  let scenes = [
+    need(0, 1.6), // 후킹
+    need(1, 1.6), // 공감
+    need(2, 2.6), // 제품 + 장점1 (카드 등장)
+    need(3, 1.8), // 장점2
+    Math.max(2.6, (sec[4] ?? 0) + 1.2), // CTA (마무리 여유)
+  ];
+  const total = scenes.reduce((a, b) => a + b, 0);
+  if (total < TARGET_SECONDS) {
+    const scale = TARGET_SECONDS / total;
+    scenes = scenes.map((s) => s * scale);
+  }
+  const toFrame = (x: number) => Math.round(x * VIDEO.fps) / VIDEO.fps;
+  let acc = 0;
+  const ends = scenes.map((s) => toFrame((acc += s)));
+  return {
+    hookTo: ends[0],
+    empathyTo: ends[1],
+    productTo: ends[2],
+    benefit2To: ends[3],
+    ctaTo: ends[4],
+  };
+}
+
 let cachedBundle: string | null = null;
 async function getBundle(): Promise<string> {
   if (cachedBundle) return cachedBundle;
@@ -182,18 +219,28 @@ async function renderVideo(
 
   // 나레이션 TTS (실패해도 무음으로 진행 - 영상 생성을 막지 않는다)
   console.log("나레이션 합성 중...");
-  inputProps.narration = await generateNarration([
+  const narrationLines = await generateNarration([
     inputProps.hookLine,
     inputProps.empathyLine,
     inputProps.benefit1,
     inputProps.benefit2,
     inputProps.ctaText,
   ]);
-  console.log(
-    inputProps.narration
-      ? `나레이션 ${inputProps.narration.filter(Boolean).length}/5줄 합성 완료`
-      : "나레이션 없음 (TTS 실패 또는 비활성) - 무음 진행"
-  );
+  if (narrationLines) {
+    inputProps.narration = narrationLines.map((l) => l?.uri ?? null);
+    // 장면 컷을 나레이션 실측 길이에 맞춘다 (문장 간격 0.45초, 총 ~15초)
+    inputProps.timing = buildSceneTiming(
+      narrationLines.map((l) => l?.seconds ?? 0)
+    );
+    console.log(
+      `나레이션 ${narrationLines.filter(Boolean).length}/5줄 · ` +
+        `영상 길이 ${inputProps.timing.ctaTo.toFixed(1)}초로 컷 구성`
+    );
+  } else {
+    inputProps.narration = null;
+    inputProps.timing = null;
+    console.log("나레이션 없음 (TTS 실패 또는 비활성) - 고정 15초 타이밍으로 진행");
+  }
 
   const compositionId = `Template${item.template_type}`;
 

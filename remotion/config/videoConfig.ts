@@ -8,8 +8,11 @@ export const VIDEO = {
   width: 1080,
   height: 1920,
   fps: 30,
-  /** 기본 길이(초). 15~20초 범위 안에서 조정 */
-  durationSeconds: 18,
+  /**
+   * 기본 길이(초) - 나레이션 타이밍(timing props)이 없을 때의 폴백.
+   * 실제 길이는 워커가 나레이션 실측 길이로 계산해 15초 안팎으로 맞춘다.
+   */
+  durationSeconds: 15,
 } as const;
 
 export const DURATION_IN_FRAMES = VIDEO.durationSeconds * VIDEO.fps;
@@ -39,23 +42,50 @@ export const LAYOUT = {
   disclosureBottom: Math.round(VIDEO.height * SAFE_ZONE.bottom),
 } as const;
 
-/** 장면 타이밍 (초 단위) - 18초 기준. durationSeconds 바꾸면 여기도 맞춰 조정 */
+/** 고정 장면 타이밍 (초) - 나레이션 timing props 가 없을 때의 폴백 (15초 기준) */
 export const TIMING = {
-  hook: { from: 0, to: 2.5 },
-  empathy: { from: 2.5, to: 5.5 },
-  product: { from: 5.5, to: 10 },
-  benefit2: { from: 10, to: 14 },
-  cta: { from: 14, to: 18 },
+  hook: { from: 0, to: 2.2 },
+  empathy: { from: 2.2, to: 4.8 },
+  product: { from: 4.8, to: 8.8 },
+  benefit2: { from: 8.8, to: 11.8 },
+  cta: { from: 11.8, to: 15 },
 } as const;
 
+/** 장면 구간 형태 (템플릿에서 사용) */
+export type SceneRanges = {
+  hook: { from: number; to: number };
+  empathy: { from: number; to: number };
+  product: { from: number; to: number };
+  benefit2: { from: number; to: number };
+  cta: { from: number; to: number };
+};
+
+/** timing props(누적 종료시각) → 장면 구간. 없으면 고정 TIMING */
+export function resolveTiming(t?: {
+  hookTo: number;
+  empathyTo: number;
+  productTo: number;
+  benefit2To: number;
+  ctaTo: number;
+} | null): SceneRanges {
+  if (!t) return TIMING;
+  return {
+    hook: { from: 0, to: t.hookTo },
+    empathy: { from: t.hookTo, to: t.empathyTo },
+    product: { from: t.empathyTo, to: t.productTo },
+    benefit2: { from: t.productTo, to: t.benefit2To },
+    cta: { from: t.benefit2To, to: t.ctaTo },
+  };
+}
+
 /**
- * 배경음악 (퍼블릭 도메인: Satie - Gymnopédie No.1, Michael Laucke 기타 연주,
- * Wikimedia Commons / 상업 이용 제한 없음).
- * volume 은 나레이션이 잘 들리도록 낮게 유지.
+ * 배경음악 (퍼블릭 도메인: Scott Joplin - The Entertainer, Wikimedia Commons /
+ * 상업 이용 제한 없음). 밝고 가벼운 래그타임 피아노.
+ * volume 은 나레이션을 가리지 않도록 아주 낮게 유지.
  */
 export const BGM = {
-  file: "assets/bgm/calm-gymnopedie.mp3",
-  volume: 0.16,
+  file: "assets/bgm/happy-entertainer.mp3",
+  volume: 0.1,
   /** 끝부분 페이드아웃(초) */
   fadeOutSeconds: 1.2,
 } as const;

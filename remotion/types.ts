@@ -1,3 +1,17 @@
+/**
+ * 장면 컷 타이밍 (초, 누적 종료 시각).
+ * 워커가 나레이션 실측 길이에 맞춰 계산해 전달한다.
+ * 없으면(null) videoConfig 의 고정 TIMING 을 쓴다.
+ */
+export type SceneTiming = {
+  hookTo: number;
+  empathyTo: number;
+  productTo: number;
+  benefit2To: number;
+  /** = 영상 전체 길이(초) */
+  ctaTo: number;
+};
+
 /** 숏폼 렌더링 입력 props (워커가 video_item 에서 만들어 전달) */
 export type ShortsProps = {
   displayNumber: number;
@@ -21,6 +35,8 @@ export type ShortsProps = {
    * 순서: [후킹, 공감, 장점1, 장점2, CTA]. null 이면 해당 장면 무음.
    */
   narration?: (string | null)[] | null;
+  /** 나레이션 길이에 맞춘 장면 컷 타이밍. 없으면 고정 TIMING 사용 */
+  timing?: SceneTiming | null;
 };
 
 export const defaultShortsProps: ShortsProps = {
@@ -35,4 +51,5 @@ export const defaultShortsProps: ShortsProps = {
   category: "차량용품",
   brollFile: null,
   narration: null,
+  timing: null,
 };

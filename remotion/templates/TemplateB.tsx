@@ -1,11 +1,10 @@
 import React from "react";
-import { AbsoluteFill, Sequence } from "remotion";
+import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
 import type { ShortsProps } from "../types";
 import {
-  DURATION_IN_FRAMES,
   FONT_SIZES,
   TEMPLATE_BADGE,
-  TIMING,
+  resolveTiming,
   secondsToFrames as f,
 } from "../config/videoConfig";
 import { Background } from "../components/Background";
@@ -20,9 +19,12 @@ import { Narration } from "../components/Narration";
  * Template B: 아이엄마 공감형
  * 아이 둘 키우는 집의 생활 상황 → 공감 → 제품 등장 → 정리/청소/편의성 → 번호 CTA
  * 상단 배지 + 말풍선 자막으로 더 따뜻한 느낌.
+ * 장면 컷은 나레이션 실측 길이(props.timing)에 맞춰 움직인다.
  */
 export const TemplateB: React.FC<ShortsProps> = (props) => {
-  const ctaFrom = f(TIMING.cta.from);
+  const { durationInFrames } = useVideoConfig();
+  const T = resolveTiming(props.timing);
+  const ctaFrom = f(T.cta.from);
 
   return (
     <AbsoluteFill>
@@ -33,7 +35,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         <TopBadge text={TEMPLATE_BADGE.B ?? ""} />
       </Sequence>
 
-      <Sequence durationInFrames={f(TIMING.hook.to)}>
+      <Sequence durationInFrames={f(T.hook.to)}>
         <Subtitle
           text={props.hookLine}
           size={FONT_SIZES.hook}
@@ -44,16 +46,16 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
       </Sequence>
 
       <Sequence
-        from={f(TIMING.empathy.from)}
-        durationInFrames={f(TIMING.empathy.to - TIMING.empathy.from)}
+        from={f(T.empathy.from)}
+        durationInFrames={f(T.empathy.to - T.empathy.from)}
       >
         <Subtitle text={props.empathyLine} variant="bubble" y={0.4} />
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
       <Sequence
-        from={f(TIMING.product.from)}
-        durationInFrames={ctaFrom - f(TIMING.product.from)}
+        from={f(T.product.from)}
+        durationInFrames={ctaFrom - f(T.product.from)}
       >
         <ProductOverlay
           productName={props.productName}
@@ -63,8 +65,8 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
       </Sequence>
 
       <Sequence
-        from={f(TIMING.product.from)}
-        durationInFrames={f(TIMING.product.to - TIMING.product.from)}
+        from={f(T.product.from)}
+        durationInFrames={f(T.product.to - T.product.from)}
       >
         <Subtitle
           text={props.benefit1}
@@ -76,8 +78,8 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
       </Sequence>
 
       <Sequence
-        from={f(TIMING.benefit2.from)}
-        durationInFrames={f(TIMING.benefit2.to - TIMING.benefit2.from)}
+        from={f(T.benefit2.from)}
+        durationInFrames={f(T.benefit2.to - T.benefit2.from)}
       >
         <Subtitle
           text={props.benefit2}
@@ -88,7 +90,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[3]} />
       </Sequence>
 
-      <Sequence from={ctaFrom} durationInFrames={DURATION_IN_FRAMES - ctaFrom}>
+      <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
         <Narration src={props.narration?.[4]} />
       </Sequence>

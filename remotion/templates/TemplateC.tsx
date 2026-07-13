@@ -9,11 +9,10 @@ import {
 import type { ShortsProps } from "../types";
 import {
   COLORS,
-  DURATION_IN_FRAMES,
   FONT_SIZES,
   MOTION,
   TEMPLATE_BADGE,
-  TIMING,
+  resolveTiming,
   secondsToFrames as f,
 } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
@@ -71,10 +70,13 @@ const MemoLine: React.FC<{ text: string; delayFrames: number }> = ({
  * Template C: 살림 메모형
  * "이런 거 하나 있으면 은근 편해요" 톤 → 메모 카드에 체크리스트가 하나씩 적히고
  * 제품은 폴라로이드 느낌으로 등장 → 번호 CTA
+ * 장면 컷은 나레이션 실측 길이(props.timing)에 맞춰 움직인다.
  */
 export const TemplateC: React.FC<ShortsProps> = (props) => {
-  const ctaFrom = f(TIMING.cta.from);
-  const memoFrom = f(TIMING.empathy.from);
+  const { durationInFrames } = useVideoConfig();
+  const T = resolveTiming(props.timing);
+  const ctaFrom = f(T.cta.from);
+  const memoFrom = f(T.empathy.from);
 
   return (
     <AbsoluteFill>
@@ -84,33 +86,33 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
         <TopBadge text={TEMPLATE_BADGE.C ?? ""} />
       </Sequence>
 
-      {/* 0~1.5초: 후킹 */}
-      <Sequence durationInFrames={f(TIMING.hook.to)}>
+      {/* 후킹 */}
+      <Sequence durationInFrames={f(T.hook.to)}>
         <Subtitle text={props.hookLine} size={FONT_SIZES.hook} y={0.38} />
         <Narration src={props.narration?.[0]} />
       </Sequence>
 
       {/* 나레이션: 메모 체크라인이 적히는 타이밍에 맞춰 재생 */}
       <Sequence
-        from={f(TIMING.empathy.from)}
-        durationInFrames={f(TIMING.product.from - TIMING.empathy.from)}
+        from={f(T.empathy.from)}
+        durationInFrames={f(T.product.from - T.empathy.from)}
       >
         <Narration src={props.narration?.[1]} />
       </Sequence>
       <Sequence
-        from={f(TIMING.product.from)}
-        durationInFrames={f(TIMING.benefit2.from - TIMING.product.from)}
+        from={f(T.product.from)}
+        durationInFrames={f(T.benefit2.from - T.product.from)}
       >
         <Narration src={props.narration?.[2]} />
       </Sequence>
       <Sequence
-        from={f(TIMING.benefit2.from)}
-        durationInFrames={ctaFrom - f(TIMING.benefit2.from)}
+        from={f(T.benefit2.from)}
+        durationInFrames={ctaFrom - f(T.benefit2.from)}
       >
         <Narration src={props.narration?.[3]} />
       </Sequence>
 
-      {/* 1.5초~: 메모 카드 (공감/장점이 체크리스트로 하나씩 적힘) */}
+      {/* 메모 카드 (공감/장점이 체크리스트로 하나씩 적힘) */}
       <Sequence from={memoFrom} durationInFrames={ctaFrom - memoFrom}>
         <div
           style={{
@@ -139,19 +141,19 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
           <MemoLine text={props.empathyLine} delayFrames={0} />
           <MemoLine
             text={props.benefit1}
-            delayFrames={f(TIMING.product.from - TIMING.empathy.from)}
+            delayFrames={f(T.product.from - T.empathy.from)}
           />
           <MemoLine
             text={props.benefit2}
-            delayFrames={f(TIMING.benefit2.from - TIMING.empathy.from)}
+            delayFrames={f(T.benefit2.from - T.empathy.from)}
           />
         </div>
       </Sequence>
 
-      {/* 3.5초~: 제품 폴라로이드 */}
+      {/* 제품 폴라로이드 */}
       <Sequence
-        from={f(TIMING.product.from)}
-        durationInFrames={ctaFrom - f(TIMING.product.from)}
+        from={f(T.product.from)}
+        durationInFrames={ctaFrom - f(T.product.from)}
       >
         <ProductOverlay
           productName={props.productName}
@@ -163,7 +165,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
         />
       </Sequence>
 
-      <Sequence from={ctaFrom} durationInFrames={DURATION_IN_FRAMES - ctaFrom}>
+      <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
         <Narration src={props.narration?.[4]} />
       </Sequence>

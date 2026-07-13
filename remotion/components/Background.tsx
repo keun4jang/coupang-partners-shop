@@ -7,11 +7,13 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { BGM, COLORS, DURATION_IN_FRAMES, MOTION, VIDEO } from "../config/videoConfig";
+import { BGM, COLORS, MOTION, VIDEO } from "../config/videoConfig";
 import { FontFaceStyle } from "./FontFaceStyle";
+import { useVideoConfig } from "remotion";
 
-/** 잔잔한 배경음악 - 나레이션을 가리지 않게 작게, 끝에서 페이드아웃 */
+/** 밝은 배경음악 - 나레이션을 가리지 않게 아주 작게, 끝에서 페이드아웃 */
 const BgmAudio: React.FC = () => {
+  const { durationInFrames } = useVideoConfig();
   const fadeFrames = Math.round(BGM.fadeOutSeconds * VIDEO.fps);
   return (
     <Audio
@@ -20,7 +22,7 @@ const BgmAudio: React.FC = () => {
       volume={(f) =>
         interpolate(
           f,
-          [0, 12, DURATION_IN_FRAMES - fadeFrames, DURATION_IN_FRAMES],
+          [0, 12, durationInFrames - fadeFrames, durationInFrames],
           [0, BGM.volume, BGM.volume, 0],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
         )
@@ -83,11 +85,12 @@ export const Background: React.FC<{ brollFile: string | null }> = ({
   brollFile,
 }) => {
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const brollSrc = brollFile ? staticFile(`assets/broll/${brollFile}`) : null;
 
   const zoom = interpolate(
     frame,
-    [0, DURATION_IN_FRAMES],
+    [0, durationInFrames],
     [MOTION.bgZoomFrom, MOTION.bgZoomTo],
     { extrapolateRight: "clamp" }
   );
