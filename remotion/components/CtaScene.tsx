@@ -5,7 +5,13 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { COLORS, CTA_SUB_TEXT, FONT_SIZES, MOTION } from "../config/videoConfig";
+import {
+  COLORS,
+  CTA_SUB_TEXT,
+  FONT_SIZES,
+  MOTION,
+  TRUST_TEXT,
+} from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /** 마지막 CTA 화면: 큰 번호 + "영상 속 제품은 N번에 정리해뒀어요" */
@@ -90,6 +96,18 @@ export const CtaScene: React.FC<{
         }}
       >
         {CTA_SUB_TEXT}
+      </div>
+
+      <div
+        style={{
+          marginTop: 40,
+          color: "rgba(255, 248, 240, 0.75)",
+          fontWeight: 600,
+          fontSize: 32,
+          opacity: textIn,
+        }}
+      >
+        {TRUST_TEXT}
       </div>
     </AbsoluteFill>
   );

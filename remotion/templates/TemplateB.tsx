@@ -11,7 +11,6 @@ import { Background } from "../components/Background";
 import { Subtitle } from "../components/Subtitle";
 import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
-import { Disclosure } from "../components/Disclosure";
 import { TopBadge } from "../components/TopBadge";
 import { Narration } from "../components/Narration";
 
@@ -97,7 +96,6 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[4]} />
       </Sequence>
 
-      <Disclosure />
     </AbsoluteFill>
   );
 };

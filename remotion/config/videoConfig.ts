@@ -137,6 +137,9 @@ export const ctaTemplate = (displayNumber: number): string =>
 
 export const CTA_SUB_TEXT = "프로필 링크에서 번호로 검색";
 
+/** CTA 화면 신뢰 문구 - 큐레이션 기준을 진실하게 전달 (허위 사용 후기 아님) */
+export const TRUST_TEXT = "가성비 좋고 후기까지 확인한 제품만 골라요";
+
 /** 하단 대가성 문구 (모든 영상에 항상 표시) */
 export const DISCLOSURE_TEXT =
   "쿠팡파트너스 활동으로 수수료를 받을 수 있습니다.";
