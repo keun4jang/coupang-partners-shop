@@ -1,6 +1,7 @@
 import type { Product, TemplateType, VideoItem } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { composeScriptText, generateVideoCopy } from "./ai";
+import { selectProductsForVideos } from "./productSelector";
 
 // 자동 로테이션은 A/B/C. D(실사용 스톡영상 배경)는 텔레그램 "영상D" 로 명시 선택.
 const TEMPLATE_ROTATION: TemplateType[] = ["A", "B", "C"];
@@ -49,6 +50,42 @@ export async function createVideoItem(
   }
 
   throw new Error("video_item 생성 실패: 번호 할당 재시도 초과");
+}
+
+/**
+ * 하루치 영상(기본 3개)을 자동으로 큐에 넣는다 — 완전 자동 파이프라인용.
+ *
+ * - 오늘(UTC 자정 기준) 이미 target 개 이상 만들어졌으면 아무것도 하지 않는다(멱등).
+ *   → cron 이 두 번 울리거나, 수동으로 몇 개 만든 날에도 하루 총량이 target 을 넘지 않음.
+ * - 카테고리가 겹치지 않는 후보 상품을 골라 pending video_item 을 만든다.
+ * - 실제 렌더는 렌더 워커(GitHub Actions)가 포맷 D 로 처리한다
+ *   (WORKER_ENV 에 FORCE_TEMPLATE=D 설정 시).
+ *
+ * @returns 이번에 새로 만든 video_item 목록 (없으면 빈 배열)
+ */
+export async function queueDailyVideos(target = 3): Promise<VideoItem[]> {
+  const db = supabaseAdmin();
+
+  // 오늘(UTC) 이미 만든 영상 수 → 남은 만큼만 채운다(중복 생성 방지)
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const { count: createdToday, error: countError } = await db
+    .from("video_items")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", startOfDay.toISOString());
+  if (countError) throw new Error(`오늘 생성 수 조회 실패: ${countError.message}`);
+
+  const remaining = target - (createdToday ?? 0);
+  if (remaining <= 0) return [];
+
+  const products = await selectProductsForVideos(remaining);
+  const created: VideoItem[] = [];
+  for (const product of products) {
+    // template_type 은 A/B/C 로 저장되지만, 렌더 시 FORCE_TEMPLATE=D 로 포맷 D 로 뽑힌다.
+    const item = await createVideoItem(product);
+    created.push(item);
+  }
+  return created;
 }
 
 /**

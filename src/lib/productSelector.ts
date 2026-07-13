@@ -64,3 +64,64 @@ export async function selectProductForVideo(): Promise<Product | null> {
 
   return sorted[0];
 }
+
+/**
+ * 하루치 영상 제작 대상 여러 개 선택 (완전 자동 파이프라인용).
+ * - status = candidate 이고 아직 영상이 한 번도 안 만들어진 상품만
+ * - 포맷 D 는 제품 카드에 사진이 필요하므로 image_url 있는 것만
+ * - score 높은 순으로 정렬하되, 카테고리를 번갈아(라운드로빈) 뽑아
+ *   배경 스톡영상이 겹치지 않게(청소/주방/육아 …) 다양성을 확보한다.
+ */
+export async function selectProductsForVideos(count: number): Promise<Product[]> {
+  if (count <= 0) return [];
+  const db = supabaseAdmin();
+
+  const { data: products, error } = await db
+    .from("products")
+    .select("*")
+    .eq("status", "candidate");
+  if (error) throw new Error(`상품 조회 실패: ${error.message}`);
+  if (!products || products.length === 0) return [];
+
+  const { data: videoRows, error: vcError } = await db
+    .from("video_items")
+    .select("product_id");
+  if (vcError) throw new Error(`영상 수 조회 실패: ${vcError.message}`);
+  const usedProductIds = new Set((videoRows ?? []).map((r) => r.product_id));
+
+  // 아직 영상이 없고 이미지가 있는 후보만
+  const fresh = (products as Product[]).filter(
+    (p) => !usedProductIds.has(p.id) && p.image_url
+  );
+  if (fresh.length === 0) return [];
+
+  fresh.sort((a, b) => {
+    const scoreDiff = score(b) - score(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return a.created_at.localeCompare(b.created_at);
+  });
+
+  // 카테고리별로 묶고(각 묶음은 이미 score 순), 라운드로빈으로 골라 다양성 확보
+  const byCategory = new Map<string, Product[]>();
+  for (const p of fresh) {
+    const list = byCategory.get(p.category) ?? [];
+    list.push(p);
+    byCategory.set(p.category, list);
+  }
+  const categories = [...byCategory.keys()];
+
+  const picked: Product[] = [];
+  for (let round = 0; picked.length < count; round++) {
+    let progressed = false;
+    for (const cat of categories) {
+      const list = byCategory.get(cat)!;
+      if (round < list.length) {
+        picked.push(list[round]);
+        progressed = true;
+        if (picked.length >= count) break;
+      }
+    }
+    if (!progressed) break; // 더 뽑을 후보가 없음
+  }
+  return picked;
+}
