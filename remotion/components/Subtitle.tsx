@@ -53,19 +53,20 @@ export const Subtitle: React.FC<{
           top: height * y,
           left: 0,
           width: "100%",
-          display: "flex",
-          justifyContent: "center",
           transform: base.transform,
           opacity: pop,
         }}
       >
         <div
           style={{
-            maxWidth: width * 0.86,
+            // 내용 폭에 맞춰 감싸되(좌우 빈칸 최소화), 너무 길면 이 폭에서 줄바꿈
+            width: "fit-content",
+            maxWidth: width * 0.66,
+            margin: "0 auto",
             background: "rgba(255, 248, 240, 0.95)",
             color: COLORS.ink,
-            borderRadius: 22,
-            padding: "14px 24px",
+            borderRadius: 20,
+            padding: "12px 22px",
             boxShadow: `0 8px 28px ${COLORS.subtitleShadow}`,
             textAlign: "center",
             fontFamily,
@@ -74,7 +75,6 @@ export const Subtitle: React.FC<{
             lineHeight: 1.3,
             letterSpacing: "-0.015em",
             wordBreak: "keep-all",
-            textWrap: "balance",
           }}
         >
           {text}
