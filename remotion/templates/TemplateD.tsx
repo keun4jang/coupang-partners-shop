@@ -71,7 +71,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         />
       </Sequence>
 
-      {/* 제품 2차 노출(장점2): 살짝 작은 카드로 다시 팝인 */}
+      {/* 제품 2차 노출(장점2): 크게 유지하며 다시 팝인 */}
       <Sequence
         from={f(T.benefit2.from)}
         durationInFrames={f(T.review.from - T.benefit2.from)}
@@ -80,12 +80,12 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.35}
-          widthRatio={0.56}
+          topRatio={0.26}
+          widthRatio={0.72}
         />
       </Sequence>
 
-      {/* 제품 3차 노출(후기): 중앙 큰 카드로 한 번 더 팝인 */}
+      {/* 제품 3차 노출(후기): 크게 유지하며 한 번 더 팝인 */}
       <Sequence
         from={f(T.review.from)}
         durationInFrames={ctaFrom - f(T.review.from)}
@@ -94,8 +94,8 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.28}
-          widthRatio={0.66}
+          topRatio={0.24}
+          widthRatio={0.72}
         />
       </Sequence>
 

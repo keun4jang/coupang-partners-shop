@@ -44,20 +44,41 @@ export const Subtitle: React.FC<{
   };
 
   if (variant === "bubble") {
+    // 말풍선은 글자 크기에 맞춰 내용을 감싸도록(가운데 정렬 + inline-block).
+    // 여백/모서리를 작게 해 테두리가 두껍지 않게 한다.
     return (
       <div
         style={{
-          ...base,
-          left: width * 0.08,
-          width: width * 0.84,
-          background: "rgba(255, 248, 240, 0.95)",
-          color: COLORS.ink,
-          borderRadius: 36,
-          padding: "36px 32px",
-          boxShadow: `0 12px 40px ${COLORS.subtitleShadow}`,
+          position: "absolute",
+          top: height * y,
+          left: 0,
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          transform: base.transform,
+          opacity: pop,
         }}
       >
-        {text}
+        <div
+          style={{
+            maxWidth: width * 0.86,
+            background: "rgba(255, 248, 240, 0.95)",
+            color: COLORS.ink,
+            borderRadius: 22,
+            padding: "14px 24px",
+            boxShadow: `0 8px 28px ${COLORS.subtitleShadow}`,
+            textAlign: "center",
+            fontFamily,
+            fontWeight: 900,
+            fontSize: size,
+            lineHeight: 1.3,
+            letterSpacing: "-0.015em",
+            wordBreak: "keep-all",
+            textWrap: "balance",
+          }}
+        >
+          {text}
+        </div>
       </div>
     );
   }
