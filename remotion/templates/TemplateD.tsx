@@ -57,7 +57,21 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
-      {/* 장점 1: 실사용 영상이 잘 보이도록 카드는 살짝 늦게, 작게 */}
+      {/* 제품 카드: 2번째 컷(장점)부터 CTA 직전까지 계속 노출 */}
+      <Sequence
+        from={f(T.product.from)}
+        durationInFrames={ctaFrom - f(T.product.from)}
+      >
+        <ProductOverlay
+          productName={props.productName}
+          productImageUrl={props.productImageUrl}
+          displayNumber={props.displayNumber}
+          topRatio={0.32}
+          widthRatio={0.48}
+        />
+      </Sequence>
+
+      {/* 장점 1 */}
       <Sequence
         from={f(T.product.from)}
         durationInFrames={f(T.product.to - T.product.from)}
@@ -71,19 +85,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[2]} />
       </Sequence>
 
-      {/* 후기 언급 + 제품 카드 등장 (영상 위에 컴팩트하게) */}
-      <Sequence
-        from={f(T.benefit2.from)}
-        durationInFrames={ctaFrom - f(T.benefit2.from)}
-      >
-        <ProductOverlay
-          productName={props.productName}
-          productImageUrl={props.productImageUrl}
-          displayNumber={props.displayNumber}
-          topRatio={0.32}
-          widthRatio={0.48}
-        />
-      </Sequence>
+      {/* 후기 언급 */}
       <Sequence
         from={f(T.benefit2.from)}
         durationInFrames={f(T.benefit2.to - T.benefit2.from)}
