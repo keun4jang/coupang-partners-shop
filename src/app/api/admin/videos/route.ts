@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const productId = String(form.get("productId") ?? "").trim();
   const templateRaw = String(form.get("templateType") ?? "").trim();
-  const templateType = (["A", "B", "C"] as const).includes(
+  const templateType = (["A", "B", "C", "D"] as const).includes(
     templateRaw as TemplateType
   )
     ? (templateRaw as TemplateType)

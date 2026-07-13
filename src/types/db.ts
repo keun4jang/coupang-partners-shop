@@ -2,7 +2,7 @@
 
 export type ProductStatus = "candidate" | "paused";
 export type VideoStatus = "pending" | "generating" | "completed" | "failed";
-export type TemplateType = "A" | "B" | "C";
+export type TemplateType = "A" | "B" | "C" | "D";
 
 export interface Product {
   id: string;

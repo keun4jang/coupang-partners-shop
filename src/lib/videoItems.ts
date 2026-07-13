@@ -2,6 +2,7 @@ import type { Product, TemplateType, VideoItem } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { composeScriptText, generateVideoCopy } from "./ai";
 
+// 자동 로테이션은 A/B/C. D(실사용 스톡영상 배경)는 텔레그램 "영상D" 로 명시 선택.
 const TEMPLATE_ROTATION: TemplateType[] = ["A", "B", "C"];
 
 /**

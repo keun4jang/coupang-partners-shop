@@ -5,7 +5,7 @@ import { selectProductForVideo } from "@/lib/productSelector";
 import { createVideoItem, fillVideoCopy } from "@/lib/videoItems";
 import { formatDisplayNumber } from "@/lib/format";
 import { optionalEnv, requireEnv } from "@/lib/env";
-import type { Product, VideoItemWithProduct } from "@/types/db";
+import type { Product, TemplateType, VideoItemWithProduct } from "@/types/db";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -52,7 +52,10 @@ async function triggerRenderWorkflow(): Promise<void> {
   }
 }
 
-async function handleVideoCommand(chatId: number): Promise<void> {
+async function handleVideoCommand(
+  chatId: number,
+  templateType?: TemplateType
+): Promise<void> {
   const product = await selectProductForVideo();
   if (!product) {
     await sendTelegramMessage(
@@ -62,7 +65,7 @@ async function handleVideoCommand(chatId: number): Promise<void> {
     return;
   }
 
-  const item = await createVideoItem(product);
+  const item = await createVideoItem(product, templateType);
   const filled = await fillVideoCopy(item, product);
   const number = formatDisplayNumber(filled.display_number);
 
@@ -212,11 +215,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // "영상" 또는 "영상A"~"영상D" (템플릿 지정: D = 실사용 스톡영상 배경 포맷)
+  const videoMatch = text.match(/^영상\s*([ABCDabcd])?$/);
+
   try {
+    if (videoMatch) {
+      const t = videoMatch[1]?.toUpperCase() as TemplateType | undefined;
+      await handleVideoCommand(chatId, t);
+      return NextResponse.json({ ok: true });
+    }
     switch (text) {
-      case "영상":
-        await handleVideoCommand(chatId);
-        break;
       case "상품목록":
         await handleProductListCommand(chatId);
         break;
@@ -231,7 +239,8 @@ export async function POST(request: NextRequest) {
           [
             "사용할 수 있는 명령이에요:",
             "",
-            "영상 - 상품 선택 후 새 번호로 영상 생성",
+            "영상 - 상품 선택 후 새 번호로 영상 생성 (A/B/C 자동 로테이션)",
+            "영상D - 실사용 스톡영상 배경 포맷으로 생성",
             "상품목록 - 후보 상품 보기",
             "최근영상 - 최근 생성된 영상과 드라이브 링크",
             "상태 - 전체 현황 요약",

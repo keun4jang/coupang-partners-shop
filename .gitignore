@@ -45,3 +45,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 스톡 영상 캐시 (자동 다운로드)
+public/assets/broll/pexels-*.mp4

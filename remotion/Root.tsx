@@ -5,6 +5,7 @@ import { ShortsProps, defaultShortsProps } from "./types";
 import { TemplateA } from "./templates/TemplateA";
 import { TemplateB } from "./templates/TemplateB";
 import { TemplateC } from "./templates/TemplateC";
+import { TemplateD } from "./templates/TemplateD";
 
 /** 나레이션 타이밍(timing.ctaTo)이 있으면 영상 길이를 거기에 맞춘다 */
 const calculateMetadata: CalculateMetadataFunction<ShortsProps> = ({ props }) => ({
@@ -28,6 +29,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition id="TemplateA" component={TemplateA} {...shared} />
       <Composition id="TemplateB" component={TemplateB} {...shared} />
       <Composition id="TemplateC" component={TemplateC} {...shared} />
+      <Composition id="TemplateD" component={TemplateD} {...shared} />
     </>
   );
 };

@@ -31,7 +31,7 @@ create table if not exists video_items (
   hook_text text,
   script_text text,
   caption_text text,
-  template_type text not null default 'A' check (template_type in ('A', 'B', 'C')),
+  template_type text not null default 'A' check (template_type in ('A', 'B', 'C', 'D')),
   video_status text not null default 'pending'
     check (video_status in ('pending', 'generating', 'completed', 'failed')),
   drive_video_url text,
