@@ -97,13 +97,20 @@ async function synthesizeLineEdge(
 /* ── Google Cloud TTS (자연스러운 Chirp3-HD 음성) ───────────────────── */
 
 const GOOGLE_SAMPLE_RATE = 24_000;
-/** 선호 순서대로 시도. 앞이 안 되면(미지원 등) 다음으로 넘어간다 */
+/**
+ * 선호 순서대로 시도. 앞이 안 되면(미지원 등) 다음으로 넘어간다.
+ * "동네 아줌마"처럼 따뜻하고 편안한 톤을 위해 warm/gentle 계열을 앞에 둔다.
+ */
 const GOOGLE_VOICE_FALLBACKS = [
-  "ko-KR-Chirp3-HD-Aoede", // 산뜻한 여성 (사장님 선택)
-  "ko-KR-Chirp3-HD-Sulafat",
+  "ko-KR-Chirp3-HD-Sulafat", // Warm - 따뜻하고 푸근한 여성
+  "ko-KR-Chirp3-HD-Vindemiatrix", // Gentle - 부드러운 여성
+  "ko-KR-Chirp3-HD-Callirrhoe", // Easy-going - 편안한 여성
+  "ko-KR-Chirp3-HD-Aoede", // Breezy (예전 기본값)
   "ko-KR-Chirp3-HD-Kore",
   "ko-KR-Neural2-A",
 ];
+/** 나레이션 말 속도 - 아나운서처럼 빠르지 않게, 옆집 언니가 편하게 말하듯 살짝 느긋하게 */
+const GOOGLE_SPEAKING_RATE = 0.94;
 
 async function synthesizeLineGoogle(
   apiKey: string,
@@ -121,7 +128,7 @@ async function synthesizeLineGoogle(
         audioConfig: {
           audioEncoding: "LINEAR16",
           sampleRateHertz: GOOGLE_SAMPLE_RATE,
-          speakingRate: 1.05,
+          speakingRate: GOOGLE_SPEAKING_RATE,
         },
       }),
     }

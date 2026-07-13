@@ -125,10 +125,11 @@ export const COLORS = {
 } as const;
 
 export const FONT_SIZES = {
-  hook: 64,
-  subtitle: 48,
+  // 자막(후킹·공감·장점·후기)은 모두 같은 크기로 통일 (제각각 방지, 크지 않게)
+  hook: 46,
+  subtitle: 46,
   productName: 44,
-  benefit: 44,
+  benefit: 46,
   ctaNumber: 150,
   ctaText: 58,
   disclosure: 28,

@@ -38,6 +38,7 @@ import {
   driveFileName,
   formatDisplayNumber,
   safeProductName,
+  shortenProductName,
 } from "../src/lib/format";
 import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine } from "../src/lib/ai";
@@ -117,8 +118,8 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
 
   return {
     displayNumber: item.display_number,
-    productName: product.product_name,
-    hookLine: item.hook_text ?? lines[0] ?? product.product_name,
+    productName: shortenProductName(product.product_name),
+    hookLine: item.hook_text ?? lines[0] ?? shortenProductName(product.product_name),
     empathyLine: lines[1] ?? "은근 신경 쓰이잖아요",
     benefit1: lines[2] ?? product.main_benefit ?? "하나 있으면 은근 편해 보여요",
     benefit2: lines[3] ?? "쓰기도 간편해 보이고요",
