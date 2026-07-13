@@ -150,7 +150,19 @@ export async function generateNarration(
   if (optionalEnv("TTS_DISABLED") === "1") return null;
 
   // 1) Google Cloud TTS 시도
-  const googleKey = optionalEnv("GOOGLE_TTS_API_KEY");
+  // [결제 안전장치] 영상당 합성 글자 수 상한. 무료 한도(월 100만 자) 대비
+  // 하루 10편을 만들어도 월 60만 자를 넘을 수 없는 수준으로 제한한다.
+  const GOOGLE_CHAR_CAP_PER_VIDEO = 2000;
+  const totalChars = lines.join("").length;
+  const googleKey =
+    totalChars <= GOOGLE_CHAR_CAP_PER_VIDEO
+      ? optionalEnv("GOOGLE_TTS_API_KEY")
+      : undefined;
+  if (totalChars > GOOGLE_CHAR_CAP_PER_VIDEO) {
+    console.warn(
+      `나레이션 ${totalChars}자 > 상한 ${GOOGLE_CHAR_CAP_PER_VIDEO}자 - 구글 TTS 건너뜀(무료 한도 보호)`
+    );
+  }
   if (googleKey) {
     const preferred = optionalEnv("GOOGLE_TTS_VOICE");
     const voices = preferred
