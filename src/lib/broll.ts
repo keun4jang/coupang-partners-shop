@@ -138,7 +138,7 @@ async function fetchFromPexels(
 
   const url =
     `${PEXELS_SEARCH}?query=${encodeURIComponent(query)}` +
-    `&orientation=portrait&size=medium&per_page=15`;
+    `&orientation=portrait&size=medium&per_page=50`;
   const res = await fetch(url, { headers: { Authorization: apiKey } });
   if (!res.ok) {
     console.warn(`Pexels 검색 실패 (${res.status})`);
