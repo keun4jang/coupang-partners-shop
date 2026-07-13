@@ -120,7 +120,7 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     hookLine: item.hook_text ?? lines[0] ?? product.product_name,
     empathyLine: lines[1] ?? "은근 신경 쓰이잖아요",
     benefit1: lines[2] ?? product.main_benefit ?? "하나 있으면 은근 편해 보여요",
-    benefit2: lines[3] ?? "집에 두면 생각보다 자주 쓸 것 같아요",
+    benefit2: lines[3] ?? "후기 많은 제품이라 한번 볼만해요",
     ctaText: ctaLine(item.display_number),
     productImageUrl: product.image_url,
     category: product.category,
