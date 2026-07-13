@@ -94,7 +94,7 @@ export function resolveTiming(t?: {
  * opacity 0 = 원본 그대로, 1 = 완전히 가림.
  */
 export const BROLL_VEIL = {
-  opacity: 0.25,
+  opacity: 0,
 } as const;
 
 /**
@@ -125,10 +125,10 @@ export const COLORS = {
 } as const;
 
 export const FONT_SIZES = {
-  hook: 82,
-  subtitle: 62,
+  hook: 64,
+  subtitle: 48,
   productName: 44,
-  benefit: 56,
+  benefit: 44,
   ctaNumber: 150,
   ctaText: 58,
   disclosure: 28,

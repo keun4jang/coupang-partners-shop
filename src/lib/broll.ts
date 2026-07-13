@@ -31,6 +31,41 @@ const SEARCH_QUERY_BY_CATEGORY: Record<string, string> = {
   캠핑: "camping outdoor",
 };
 
+/**
+ * 상품명 키워드 → 더 구체적인 Pexels 영어 검색어.
+ * 카테고리보다 우선 적용해 "최대한 제품과 관련있는" 배경 영상을 고른다.
+ * (위에서부터 먼저 매칭되는 것을 사용)
+ */
+const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
+  [/기저귀/, "baby diaper changing"],
+  [/물티슈/, "wiping cleaning hands baby"],
+  [/턱받이|이유식|아기\s*식판/, "baby feeding highchair"],
+  [/욕조|목욕/, "baby bath water"],
+  [/유모차/, "stroller walk baby"],
+  [/세탁|세제|캡슐|섬유유연제/, "laundry washing machine clothes"],
+  [/건조대|빨래/, "laundry drying clothes rack"],
+  [/밀대|물걸레|대걸레|걸레/, "mopping floor cleaning home"],
+  [/테이프\s*클리너|롤러|먼지떨이|먼지/, "lint roller cleaning sofa"],
+  [/청소솔|브러쉬|브러시|수세미/, "scrubbing cleaning brush"],
+  [/락스|폼스프레이|욕실|변기|타일/, "bathroom cleaning spray tiles"],
+  [/청소기/, "vacuum cleaning floor home"],
+  [/선반|거치대|정리함|수납|리빙\s*박스|리빙박스|옷정리|정리|박스/, "organizing storage boxes home"],
+  [/전자레인지|밥솥|에어프라이어/, "kitchen counter appliance home"],
+  [/주걱|국자|뒤집개|조리도구|프라이팬|후라이팬|냄비|도마|칼/, "cooking kitchen utensils home"],
+  [/드라이기|헤어/, "hair dryer bathroom vanity"],
+  [/텀블러|물병|컵/, "pouring water drink kitchen"],
+  [/차량|자동차|차\s/, "car interior clean"],
+];
+
+/** 상품명·카테고리로 가장 관련성 높은 검색어를 고른다 (상품명 키워드 우선) */
+function queryForProduct(productName: string, category: string): string {
+  const name = productName ?? "";
+  for (const [re, q] of PRODUCT_QUERY_KEYWORDS) {
+    if (re.test(name)) return q;
+  }
+  return SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
+}
+
 interface PexelsVideoFile {
   id: number;
   quality: string;
@@ -182,36 +217,47 @@ export async function fetchStockBroll(
 export async function fetchStockBrolls(
   category: string,
   displayNumber: number,
-  count: number
+  count: number,
+  productName = ""
 ): Promise<StockBroll[]> {
-  const query =
+  // 상품명 키워드 검색어를 먼저 쓰고, 부족하면 카테고리 검색어로 채운다.
+  const primary = queryForProduct(productName, category);
+  const categoryQuery =
     SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
+  const queries = primary === categoryQuery ? [primary] : [primary, categoryQuery];
+  console.log(
+    `스톡 검색어: ${queries.map((q) => `"${q}"`).join(" → ")} (상품: ${productName || category})`
+  );
 
   const out: StockBroll[] = [];
   const seen = new Set<number>();
-  // Pexels 우선 → 부족하면 Pixabay 로 채움
-  for (let i = 0; i < count * 2 && out.length < count; i++) {
-    try {
-      const clip = await fetchFromPexels(query, displayNumber + i);
-      if (clip && !seen.has(clip.pexelsId)) {
-        seen.add(clip.pexelsId);
-        out.push(clip);
+  // Pexels 우선(검색어 순서대로) → 부족하면 Pixabay 로 채움
+  for (const query of queries) {
+    for (let i = 0; i < count * 2 && out.length < count; i++) {
+      try {
+        const clip = await fetchFromPexels(query, displayNumber + i);
+        if (clip && !seen.has(clip.pexelsId)) {
+          seen.add(clip.pexelsId);
+          out.push(clip);
+        }
+      } catch (e) {
+        console.warn(`Pexels 처리 실패: ${(e as Error).message}`);
+        break;
       }
-    } catch (e) {
-      console.warn(`Pexels 처리 실패: ${(e as Error).message}`);
-      break;
     }
   }
-  for (let i = 0; out.length < count && i < count * 2; i++) {
-    try {
-      const clip = await fetchFromPixabay(query, displayNumber + i);
-      if (clip && !seen.has(clip.pexelsId)) {
-        seen.add(clip.pexelsId);
-        out.push(clip);
+  for (const query of queries) {
+    for (let i = 0; out.length < count && i < count * 2; i++) {
+      try {
+        const clip = await fetchFromPixabay(query, displayNumber + i);
+        if (clip && !seen.has(clip.pexelsId)) {
+          seen.add(clip.pexelsId);
+          out.push(clip);
+        }
+      } catch (e) {
+        console.warn(`Pixabay 처리 실패: ${(e as Error).message}`);
+        break;
       }
-    } catch (e) {
-      console.warn(`Pixabay 처리 실패: ${(e as Error).message}`);
-      break;
     }
   }
 

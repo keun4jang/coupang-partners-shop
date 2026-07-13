@@ -220,7 +220,8 @@ async function renderVideo(
     const brolls = await fetchStockBrolls(
       product.category,
       item.display_number,
-      4
+      4,
+      product.product_name
     );
     if (brolls.length > 0) {
       inputProps.brollFiles = brolls.map((b) => b.file);

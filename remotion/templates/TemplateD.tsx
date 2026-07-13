@@ -66,8 +66,8 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.28}
-          widthRatio={0.62}
+          topRatio={0.24}
+          widthRatio={0.72}
         />
       </Sequence>
 
@@ -80,8 +80,8 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.36}
-          widthRatio={0.46}
+          topRatio={0.33}
+          widthRatio={0.58}
         />
       </Sequence>
 
