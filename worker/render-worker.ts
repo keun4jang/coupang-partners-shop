@@ -109,9 +109,9 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  if (lines.length > 0 && lines.length !== 5) {
+  if (lines.length > 0 && lines.length !== 6) {
     console.warn(
-      `script_text 줄 수가 예상(5)과 다릅니다 (${lines.length}줄) - display_number=${item.display_number}`
+      `script_text 줄 수가 예상(6)과 다릅니다 (${lines.length}줄) - display_number=${item.display_number}`
     );
   }
 
@@ -121,7 +121,8 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     hookLine: item.hook_text ?? lines[0] ?? product.product_name,
     empathyLine: lines[1] ?? "은근 신경 쓰이잖아요",
     benefit1: lines[2] ?? product.main_benefit ?? "하나 있으면 은근 편해 보여요",
-    benefit2: lines[3] ?? "후기 많은 제품이라 한번 볼만해요",
+    benefit2: lines[3] ?? "쓰기도 간편해 보이고요",
+    reviewLine: lines[4] ?? "후기 많은 제품이라 한번 볼만해요",
     ctaText: ctaLine(item.display_number),
     productImageUrl: product.image_url,
     category: product.category,
@@ -160,18 +161,20 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
  * - 총 길이가 목표(15초)보다 짧으면 비율대로 늘려 정확히 15초로 맞춤
  * - 나레이션이 길면 잘리지 않도록 15초를 넘길 수 있음(최대 나레이션 길이만큼)
  */
-const TARGET_SECONDS = 15;
+const TARGET_SECONDS = 18;
 const NARRATION_GAP = 0.45;
 function buildSceneTiming(sec: number[]): SceneTiming {
   const need = (i: number, min: number) =>
     Math.max(min, (sec[i] ?? 0) + NARRATION_GAP);
   // 최소 장면 길이: 자막을 읽을 시간 + 카드 등장 모션 여유
+  // 순서: 후킹 · 공감 · 장점1(카드 등장) · 장점2 · 후기 · CTA
   let scenes = [
     need(0, 1.6), // 후킹
     need(1, 1.6), // 공감
-    need(2, 2.6), // 제품 + 장점1 (카드 등장)
-    need(3, 1.8), // 장점2
-    Math.max(2.6, (sec[4] ?? 0) + 1.2), // CTA (마무리 여유)
+    need(2, 2.6), // 장점1 (제품 카드 등장)
+    need(3, 2.2), // 장점2
+    need(4, 2.2), // 후기
+    Math.max(2.6, (sec[5] ?? 0) + 1.2), // CTA (마무리 여유)
   ];
   const total = scenes.reduce((a, b) => a + b, 0);
   if (total < TARGET_SECONDS) {
@@ -184,9 +187,10 @@ function buildSceneTiming(sec: number[]): SceneTiming {
   return {
     hookTo: ends[0],
     empathyTo: ends[1],
-    productTo: ends[2],
+    benefit1To: ends[2],
     benefit2To: ends[3],
-    ctaTo: ends[4],
+    reviewTo: ends[4],
+    ctaTo: ends[5],
   };
 }
 
@@ -249,6 +253,7 @@ async function renderVideo(
     inputProps.empathyLine,
     inputProps.benefit1,
     inputProps.benefit2,
+    inputProps.reviewLine,
     inputProps.ctaText,
   ]);
   if (narrationLines) {
@@ -258,7 +263,7 @@ async function renderVideo(
       narrationLines.map((l) => l?.seconds ?? 0)
     );
     console.log(
-      `나레이션 ${narrationLines.filter(Boolean).length}/5줄 · ` +
+      `나레이션 ${narrationLines.filter(Boolean).length}/6줄 · ` +
         `영상 길이 ${inputProps.timing.ctaTo.toFixed(1)}초로 컷 구성`
     );
   } else {

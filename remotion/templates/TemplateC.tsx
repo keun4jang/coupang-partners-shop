@@ -111,9 +111,15 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
       </Sequence>
       <Sequence
         from={f(T.benefit2.from)}
-        durationInFrames={ctaFrom - f(T.benefit2.from)}
+        durationInFrames={f(T.review.from - T.benefit2.from)}
       >
         <Narration src={props.narration?.[3]} />
+      </Sequence>
+      <Sequence
+        from={f(T.review.from)}
+        durationInFrames={ctaFrom - f(T.review.from)}
+      >
+        <Narration src={props.narration?.[4]} />
       </Sequence>
 
       {/* 메모 카드 (공감/장점이 체크리스트로 하나씩 적힘) */}
@@ -151,6 +157,10 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
             text={props.benefit2}
             delayFrames={f(T.benefit2.from - T.empathy.from)}
           />
+          <MemoLine
+            text={props.reviewLine}
+            delayFrames={f(T.review.from - T.empathy.from)}
+          />
         </div>
       </Sequence>
 
@@ -171,7 +181,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
 
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
-        <Narration src={props.narration?.[4]} />
+        <Narration src={props.narration?.[5]} />
       </Sequence>
 
     </AbsoluteFill>

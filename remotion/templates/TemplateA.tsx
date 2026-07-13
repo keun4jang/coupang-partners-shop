@@ -64,7 +64,7 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[2]} />
       </Sequence>
 
-      {/* 장점 2 / 사용 상황 */}
+      {/* 장점 2 */}
       <Sequence
         from={f(T.benefit2.from)}
         durationInFrames={f(T.benefit2.to - T.benefit2.from)}
@@ -73,10 +73,19 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[3]} />
       </Sequence>
 
+      {/* 후기 언급 */}
+      <Sequence
+        from={f(T.review.from)}
+        durationInFrames={f(T.review.to - T.review.from)}
+      >
+        <Subtitle text={props.reviewLine} size={FONT_SIZES.benefit} variant="bubble" y={0.14} />
+        <Narration src={props.narration?.[4]} />
+      </Sequence>
+
       {/* CTA */}
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
-        <Narration src={props.narration?.[4]} />
+        <Narration src={props.narration?.[5]} />
       </Sequence>
 
     </AbsoluteFill>

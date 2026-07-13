@@ -57,17 +57,31 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
-      {/* 제품 카드: 2번째 컷(장점)부터 CTA 직전까지 계속 노출 */}
+      {/* 제품 1차 노출(장점1 장면): 크게 '히어로' 샷으로 제품을 확실히 보여준다 */}
       <Sequence
         from={f(T.product.from)}
-        durationInFrames={ctaFrom - f(T.product.from)}
+        durationInFrames={f(T.benefit2.from - T.product.from)}
       >
         <ProductOverlay
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.32}
-          widthRatio={0.48}
+          topRatio={0.28}
+          widthRatio={0.62}
+        />
+      </Sequence>
+
+      {/* 제품 2차 노출(장점2~후기): 번호 배지가 있는 표준 카드로 한 번 더 */}
+      <Sequence
+        from={f(T.benefit2.from)}
+        durationInFrames={ctaFrom - f(T.benefit2.from)}
+      >
+        <ProductOverlay
+          productName={props.productName}
+          productImageUrl={props.productImageUrl}
+          displayNumber={props.displayNumber}
+          topRatio={0.36}
+          widthRatio={0.46}
         />
       </Sequence>
 
@@ -85,7 +99,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[2]} />
       </Sequence>
 
-      {/* 후기 언급 */}
+      {/* 장점 2 */}
       <Sequence
         from={f(T.benefit2.from)}
         durationInFrames={f(T.benefit2.to - T.benefit2.from)}
@@ -99,10 +113,24 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[3]} />
       </Sequence>
 
+      {/* 후기 언급 */}
+      <Sequence
+        from={f(T.review.from)}
+        durationInFrames={f(T.review.to - T.review.from)}
+      >
+        <Subtitle
+          text={props.reviewLine}
+          size={FONT_SIZES.benefit}
+          variant="bubble"
+          y={0.13}
+        />
+        <Narration src={props.narration?.[4]} />
+      </Sequence>
+
       {/* CTA */}
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
-        <Narration src={props.narration?.[4]} />
+        <Narration src={props.narration?.[5]} />
       </Sequence>
     </AbsoluteFill>
   );

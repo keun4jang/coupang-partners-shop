@@ -91,9 +91,22 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[3]} />
       </Sequence>
 
+      <Sequence
+        from={f(T.review.from)}
+        durationInFrames={f(T.review.to - T.review.from)}
+      >
+        <Subtitle
+          text={props.reviewLine}
+          size={FONT_SIZES.benefit}
+          variant="bubble"
+          y={0.15}
+        />
+        <Narration src={props.narration?.[4]} />
+      </Sequence>
+
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
-        <Narration src={props.narration?.[4]} />
+        <Narration src={props.narration?.[5]} />
       </Sequence>
 
     </AbsoluteFill>

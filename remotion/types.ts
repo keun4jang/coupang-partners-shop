@@ -6,8 +6,12 @@
 export type SceneTiming = {
   hookTo: number;
   empathyTo: number;
-  productTo: number;
+  /** 장점1 장면 종료 */
+  benefit1To: number;
+  /** 장점2 장면 종료 */
   benefit2To: number;
+  /** 후기 장면 종료 */
+  reviewTo: number;
   /** = 영상 전체 길이(초) */
   ctaTo: number;
 };
@@ -16,15 +20,17 @@ export type SceneTiming = {
 export type ShortsProps = {
   displayNumber: number;
   productName: string;
-  /** 0~1.5초 후킹 문구 */
+  /** 후킹 문구(타겟 호명) */
   hookLine: string;
-  /** 1.5~3.5초 공감 문장 */
+  /** 공감 문장(문제) */
   empathyLine: string;
-  /** 3.5~6.5초 장점 1 */
+  /** 장점 1 */
   benefit1: string;
-  /** 6.5~8.5초 장점 2 / 사용 상황 */
+  /** 장점 2 (다른 각도의 장점) */
   benefit2: string;
-  /** 8.5~10초 CTA (예: 영상 속 제품은 17번에 정리해뒀어요) */
+  /** 후기 언급(사회적 증거) */
+  reviewLine: string;
+  /** CTA (예: 영상 속 제품은 17번에 정리해뒀어요) */
   ctaText: string;
   productImageUrl: string | null;
   category: string;
@@ -34,7 +40,7 @@ export type ShortsProps = {
   brollFiles?: string[] | null;
   /**
    * 장면별 나레이션 오디오 (data URI mp3).
-   * 순서: [후킹, 공감, 장점1, 장점2, CTA]. null 이면 해당 장면 무음.
+   * 순서: [후킹, 공감, 장점1, 장점2, 후기, CTA]. null 이면 해당 장면 무음.
    */
   narration?: (string | null)[] | null;
   /** 나레이션 길이에 맞춘 장면 컷 타이밍. 없으면 고정 TIMING 사용 */
@@ -48,6 +54,7 @@ export const defaultShortsProps: ShortsProps = {
   empathyLine: "치우기 은근 번거롭잖아요",
   benefit1: "차에 하나 놔주면 괜찮아 보여요",
   benefit2: "작아서 신랑도 부담 없이 쓸 것 같고요",
+  reviewLine: "후기도 많고 평이 괜찮아 보이더라고요",
   ctaText: "영상 속 제품은 17번에 정리해뒀어요",
   productImageUrl: null,
   category: "차량용품",

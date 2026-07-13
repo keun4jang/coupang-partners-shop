@@ -58,10 +58,12 @@ export interface VideoCopy {
   hookText: string;
   /** 문제 공감 문장 (예: "차 안 부스러기 은근 신경 쓰이잖아요") */
   empathyLine: string;
-  /** 핵심 장점 (예: "차에 하나 두면 바로 치울 수 있어 보여요") */
+  /** 핵심 장점 1 (예: "차에 하나 두면 바로 치울 수 있어 보여요") */
   benefit1: string;
-  /** 긍정 후기 언급 - 남들의 반응 톤 (예: "후기도 많고 평이 괜찮아 보이더라고요") */
+  /** 핵심 장점 2 - 다른 각도의 장점(크기/사용 편의/다용도 등) */
   benefit2: string;
+  /** 긍정 후기 언급 - 남들의 반응 톤 (예: "후기도 많고 평이 괜찮아 보이더라고요") */
+  reviewLine: string;
   /** SNS 업로드용 캡션 전문 */
   captionText: string;
 }

@@ -10,9 +10,10 @@ export const VIDEO = {
   fps: 30,
   /**
    * 기본 길이(초) - 나레이션 타이밍(timing props)이 없을 때의 폴백.
-   * 실제 길이는 워커가 나레이션 실측 길이로 계산해 15초 안팎으로 맞춘다.
+   * 고정 TIMING(아래) 의 cta.to 와 일치해야 폴백 시 마지막 장면이 잘리지 않는다.
+   * 실제 길이는 워커가 나레이션 실측 길이로 계산해 18초 안팎으로 맞춘다.
    */
-  durationSeconds: 15,
+  durationSeconds: 18,
 } as const;
 
 export const DURATION_IN_FRAMES = VIDEO.durationSeconds * VIDEO.fps;
@@ -42,21 +43,29 @@ export const LAYOUT = {
   disclosureBottom: Math.round(VIDEO.height * SAFE_ZONE.bottom),
 } as const;
 
-/** 고정 장면 타이밍 (초) - 나레이션 timing props 가 없을 때의 폴백 (15초 기준) */
+/**
+ * 고정 장면 타이밍 (초) - 나레이션 timing props 가 없을 때의 폴백 (약 18초 기준).
+ * product = 장점1 장면(제품 카드 등장). benefit2 = 장점2. review = 후기.
+ */
 export const TIMING = {
   hook: { from: 0, to: 2.2 },
-  empathy: { from: 2.2, to: 4.8 },
-  product: { from: 4.8, to: 8.8 },
-  benefit2: { from: 8.8, to: 11.8 },
-  cta: { from: 11.8, to: 15 },
+  empathy: { from: 2.2, to: 4.6 },
+  product: { from: 4.6, to: 8.0 },
+  benefit2: { from: 8.0, to: 11.0 },
+  review: { from: 11.0, to: 14.0 },
+  cta: { from: 14.0, to: 17.5 },
 } as const;
 
 /** 장면 구간 형태 (템플릿에서 사용) */
 export type SceneRanges = {
   hook: { from: number; to: number };
   empathy: { from: number; to: number };
+  /** 장점1 (제품 카드 등장 장면) */
   product: { from: number; to: number };
+  /** 장점2 */
   benefit2: { from: number; to: number };
+  /** 후기 */
+  review: { from: number; to: number };
   cta: { from: number; to: number };
 };
 
@@ -64,17 +73,19 @@ export type SceneRanges = {
 export function resolveTiming(t?: {
   hookTo: number;
   empathyTo: number;
-  productTo: number;
+  benefit1To: number;
   benefit2To: number;
+  reviewTo: number;
   ctaTo: number;
 } | null): SceneRanges {
   if (!t) return TIMING;
   return {
     hook: { from: 0, to: t.hookTo },
     empathy: { from: t.hookTo, to: t.empathyTo },
-    product: { from: t.empathyTo, to: t.productTo },
-    benefit2: { from: t.productTo, to: t.benefit2To },
-    cta: { from: t.benefit2To, to: t.ctaTo },
+    product: { from: t.empathyTo, to: t.benefit1To },
+    benefit2: { from: t.benefit1To, to: t.benefit2To },
+    review: { from: t.benefit2To, to: t.reviewTo },
+    cta: { from: t.reviewTo, to: t.ctaTo },
   };
 }
 
@@ -83,7 +94,7 @@ export function resolveTiming(t?: {
  * opacity 0 = 원본 그대로, 1 = 완전히 가림.
  */
 export const BROLL_VEIL = {
-  opacity: 0.4,
+  opacity: 0.25,
 } as const;
 
 /**
