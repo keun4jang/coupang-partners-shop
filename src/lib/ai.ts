@@ -75,33 +75,35 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   const pain = product.pain_point?.trim();
   const benefit = product.main_benefit?.trim();
 
+  // 후킹은 타겟을 콕 집어 부른다 (첫 화면에서 "내 얘기네" 하고 멈추게).
+  // 공감 문장과 같은 화면에 쌓여서 나오므로 둘이 자연스럽게 이어지게 쓴다.
   const presets: Record<string, { hook: string; empathy: string; b1: string; b2: string }> = {
     차량용품: {
-      hook: "신랑 차에 부스러기 자꾸 쌓이면",
-      empathy: "치우기 은근 번거롭잖아요",
+      hook: "아이 태우고 다니는 집이라면",
+      empathy: "차 안 부스러기 은근 신경 쓰이잖아요",
       b1: "차에 하나 놔주면 괜찮아 보여요",
       b2: "작아서 신랑도 부담 없이 쓸 것 같고요",
     },
     청소템: {
-      hook: "가족들 쓰는 욕실이라",
-      empathy: "물때는 더 신경 쓰이잖아요",
+      hook: "욕실 청소 자꾸 미루게 되는 분?",
+      empathy: "물때는 며칠만 지나도 티 나잖아요",
       b1: "하나쯤 있으면 편해 보여요",
       b2: "구석구석 청소할 때 은근 쓸 일 많고요",
     },
     수납템: {
-      hook: "아이 둘 키우다 보면",
-      empathy: "물건이 금방 늘어나잖아요",
+      hook: "아이 물건에 파묻혀 사는 집이라면",
+      empathy: "정리해도 금방 다시 쌓이잖아요",
       b1: "아이들 물건 정리할 때 괜찮아 보여요",
       b2: "작은 집에도 부담 없어 보이고요",
     },
     주방템: {
-      hook: "매일 가족 밥 차리다 보면",
-      empathy: "주방에 정리할 게 쌓이잖아요",
+      hook: "매일 세 끼 차리는 주부님들",
+      empathy: "주방엔 정리할 게 끝이 없잖아요",
       b1: "살림할 때 이런 게 은근 필요하잖아요",
       b2: "하나 두면 자주 손이 갈 것 같아요",
     },
     육아생활템: {
-      hook: "아이들 키우는 집은",
+      hook: "아기 키우는 집이라면 공감할 거예요",
       empathy: "이런 상황 정말 많죠",
       b1: "아이들 챙기다 보면 은근 필요하잖아요",
       b2: "집에 두면 생각보다 자주 쓸 것 같아요",
@@ -109,11 +111,17 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   };
 
   const preset = presets[category] ?? {
-    hook: pain ? `${pain}` : "가족들 챙기다 보면 이런 게",
+    hook: pain ? `${pain}` : "살림하는 분들이라면 공감할 거예요",
     empathy: "은근 신경 쓰이잖아요",
     b1: benefit ?? "하나 있으면 은근 편해 보여요",
     b2: "집에 두면 생각보다 자주 쓸 것 같아요",
   };
+
+  // 상품에 타겟이 명시돼 있으면 후킹을 타겟 호명으로 교체 (예: "자취생이라면")
+  const target = product.target_user?.trim();
+  if (target && target.length <= 14) {
+    preset.hook = `${target.replace(/[을를이가은는]$/, "")}이라면 주목`;
+  }
 
   const copy: VideoCopy = {
     hookText: pain && pain.length <= 24 ? pain : preset.hook,
@@ -142,7 +150,8 @@ const COPY_SCHEMA = {
   properties: {
     hookText: {
       type: "string",
-      description: "첫 1초에 크게 보이는 후킹 문구. 문제 상황 제시. 20자 내외, 1줄.",
+      description:
+        "첫 화면 후킹. 이 물건이 필요할 타겟을 콕 집어 부르거나(예: '아이 태우고 다니는 집이라면') 타겟이 뜨끔할 상황 제시. 18자 내외, 1줄.",
     },
     empathyLine: {
       type: "string",
@@ -172,6 +181,11 @@ const SYSTEM_PROMPT = `너는 아이 2명을 키우는 30~40대 한국인 엄마
 - 항상 "가족을 챙기는 주부"의 시선으로 쓴다. 신랑, 우리 아이(들), 가족을 위하는 마음이 문구에 자연스럽게 배어나게.
 - 예) 신랑 챙겨주고 싶은 마음, 아이들 생각해서 신경 쓰이는 마음, 가족 쓰는 물건이라 더 눈이 가는 마음.
 - 단, "가족을 위한다"는 마음을 담되 실제로 사서 써봤다는 후기/경험 주장은 금지(아래 규칙).
+
+후킹 규칙(중요):
+- hookText 는 반드시 이 물건이 필요할 "타겟"을 콕 집어 시작한다.
+  예) "아이 태우고 다니는 집이라면", "욕실 청소 미루게 되는 분?", "매일 세 끼 차리는 주부님들"
+- hookText 와 empathyLine 은 같은 화면에 위아래로 쌓여 나오므로 두 문장이 자연스럽게 이어지게.
 
 말투 규칙:
 - 과장하지 않고 자연스럽고 짧게. 따뜻하고 생활감 있게.

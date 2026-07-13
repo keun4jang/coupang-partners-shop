@@ -27,18 +27,18 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
     <AbsoluteFill>
       <Background brollFile={props.brollFile} />
 
-      {/* 후킹 문구 크게 */}
+      {/* 인트로: 후킹(타겟 호명)+공감 두 문장이 한 화면에 순서대로 쌓임 (컷 전환 없음) */}
+      <Sequence durationInFrames={f(T.empathy.to)}>
+        <Subtitle text={props.hookLine} size={FONT_SIZES.hook} y={0.28} />
+      </Sequence>
       <Sequence durationInFrames={f(T.hook.to)}>
-        <Subtitle text={props.hookLine} size={FONT_SIZES.hook} y={0.38} />
         <Narration src={props.narration?.[0]} />
       </Sequence>
-
-      {/* 공감 (배경은 계속 줌인) */}
       <Sequence
         from={f(T.empathy.from)}
         durationInFrames={f(T.empathy.to - T.empathy.from)}
       >
-        <Subtitle text={props.empathyLine} y={0.42} />
+        <Subtitle text={props.empathyLine} y={0.45} />
         <Narration src={props.narration?.[1]} />
       </Sequence>
 

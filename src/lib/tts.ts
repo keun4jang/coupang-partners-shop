@@ -2,15 +2,20 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { optionalEnv } from "./env";
 
 /**
- * 나레이션 TTS (Microsoft Edge 무료 음성).
- * 자막 줄(후킹/공감/장점1/장점2/CTA)을 각각 mp3 로 합성해
+ * 나레이션 TTS.
+ * 자막 줄(후킹/공감/장점1/장점2/CTA)을 각각 오디오로 합성해
  * data URI + 실측 길이(초)로 돌려준다.
  * → Remotion <Audio src=data:...> 로 장면별 재생하고,
  *   길이는 워커가 장면 컷 타이밍을 나레이션에 맞추는 데 쓴다.
  *
+ * 음성 품질 체인:
+ *  1) GOOGLE_TTS_API_KEY 가 있으면 Google Cloud TTS (Chirp3-HD, 훨씬 자연스러움)
+ *     - 프로젝트에서 Text-to-Speech API 를 활성화해야 동작. 미활성/오류 시 자동 폴백.
+ *  2) Microsoft Edge 무료 음성 (ko-KR-SunHiNeural)
+ *
  * - 실패해도 영상 생성은 멈추지 않는다: 실패한 줄은 null(무음).
  * - TTS_DISABLED=1 이면 전체 비활성화.
- * - 목소리는 TTS_VOICE 로 변경 가능 (기본: ko-KR-SunHiNeural, 따뜻한 여성 톤).
+ * - GOOGLE_TTS_VOICE / TTS_VOICE 로 각각 목소리 변경 가능.
  */
 
 const DEFAULT_VOICE = "ko-KR-SunHiNeural";
@@ -64,7 +69,7 @@ export function ttsReadable(text: string): string {
   return text.replace(/(\d+)\s*번/g, (_, d: string) => `${sinoKorean(parseInt(d, 10))}번`);
 }
 
-async function synthesizeLine(
+async function synthesizeLineEdge(
   tts: MsEdgeTTS,
   text: string
 ): Promise<NarrationLine | null> {
@@ -84,20 +89,96 @@ async function synthesizeLine(
       seconds: Math.max(0.5, rawSeconds - TRAILING_SILENCE_SECONDS),
     };
   } catch (e) {
-    console.warn(`TTS 합성 실패 (무음으로 진행): ${(e as Error).message}`);
+    console.warn(`Edge TTS 합성 실패 (무음으로 진행): ${(e as Error).message}`);
     return null;
   }
 }
 
+/* ── Google Cloud TTS (자연스러운 Chirp3-HD 음성) ───────────────────── */
+
+const GOOGLE_SAMPLE_RATE = 24_000;
+/** 선호 순서대로 시도. 앞이 안 되면(미지원 등) 다음으로 넘어간다 */
+const GOOGLE_VOICE_FALLBACKS = [
+  "ko-KR-Chirp3-HD-Kore", // 자연스러운 여성
+  "ko-KR-Neural2-A", // 여성 (구세대지만 안정적)
+  "ko-KR-Wavenet-A",
+];
+
+async function synthesizeLineGoogle(
+  apiKey: string,
+  voice: string,
+  text: string
+): Promise<NarrationLine> {
+  const res = await fetch(
+    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: { text: ttsReadable(text) },
+        voice: { languageCode: "ko-KR", name: voice },
+        audioConfig: {
+          audioEncoding: "LINEAR16",
+          sampleRateHertz: GOOGLE_SAMPLE_RATE,
+          speakingRate: 1.05,
+        },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`구글 TTS ${res.status}: ${body.slice(0, 160)}`);
+  }
+  const { audioContent } = (await res.json()) as { audioContent?: string };
+  if (!audioContent) throw new Error("구글 TTS 빈 응답");
+  const buf = Buffer.from(audioContent, "base64");
+  // LINEAR16 응답은 WAV 헤더(44바이트) 포함 → 정확한 길이 계산 가능
+  const seconds = Math.max(0, buf.length - 44) / (GOOGLE_SAMPLE_RATE * 2);
+  return {
+    uri: `data:audio/wav;base64,${audioContent}`,
+    seconds: Math.max(0.5, seconds - 0.15),
+  };
+}
+
 /**
  * 여러 줄을 순서대로 합성. 전부 실패하면 null (나레이션 없음).
- * 한 번의 연결 실패가 전체를 막지 않도록 줄 단위로 처리한다.
+ * 구글 TTS(자연스러움) 우선 → 실패 시 Edge 무료 음성 폴백.
  */
 export async function generateNarration(
   lines: string[]
 ): Promise<(NarrationLine | null)[] | null> {
   if (optionalEnv("TTS_DISABLED") === "1") return null;
 
+  // 1) Google Cloud TTS 시도
+  const googleKey = optionalEnv("GOOGLE_TTS_API_KEY");
+  if (googleKey) {
+    const preferred = optionalEnv("GOOGLE_TTS_VOICE");
+    const voices = preferred
+      ? [preferred, ...GOOGLE_VOICE_FALLBACKS]
+      : GOOGLE_VOICE_FALLBACKS;
+    for (const voice of voices) {
+      try {
+        const out: (NarrationLine | null)[] = [];
+        for (const line of lines) {
+          out.push(
+            line.trim()
+              ? await synthesizeLineGoogle(googleKey, voice, line.trim())
+              : null
+          );
+        }
+        console.log(`구글 TTS 사용 (${voice})`);
+        return out.some((x) => x !== null) ? out : null;
+      } catch (e) {
+        const msg = (e as Error).message;
+        console.warn(`구글 TTS(${voice}) 실패: ${msg.slice(0, 120)}`);
+        // API 미활성/권한 문제면 다른 목소리를 시도해도 소용없음 → Edge 로
+        if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) break;
+      }
+    }
+    console.warn("구글 TTS 사용 불가 → Edge 음성으로 폴백");
+  }
+
+  // 2) Edge 무료 음성 폴백
   const voice = optionalEnv("TTS_VOICE") ?? DEFAULT_VOICE;
   try {
     const tts = new MsEdgeTTS();
@@ -105,7 +186,7 @@ export async function generateNarration(
 
     const out: (NarrationLine | null)[] = [];
     for (const line of lines) {
-      out.push(line.trim() ? await synthesizeLine(tts, line.trim()) : null);
+      out.push(line.trim() ? await synthesizeLineEdge(tts, line.trim()) : null);
     }
     return out.some((x) => x !== null) ? out : null;
   } catch (e) {

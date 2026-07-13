@@ -35,21 +35,23 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         <TopBadge text={TEMPLATE_BADGE.B ?? ""} />
       </Sequence>
 
-      <Sequence durationInFrames={f(T.hook.to)}>
+      {/* 인트로: 후킹(타겟 호명)+공감 말풍선이 한 화면에 순서대로 쌓임 (컷 전환 없음) */}
+      <Sequence durationInFrames={f(T.empathy.to)}>
         <Subtitle
           text={props.hookLine}
           size={FONT_SIZES.hook}
           variant="bubble"
-          y={0.36}
+          y={0.26}
         />
+      </Sequence>
+      <Sequence durationInFrames={f(T.hook.to)}>
         <Narration src={props.narration?.[0]} />
       </Sequence>
-
       <Sequence
         from={f(T.empathy.from)}
         durationInFrames={f(T.empathy.to - T.empathy.from)}
       >
-        <Subtitle text={props.empathyLine} variant="bubble" y={0.4} />
+        <Subtitle text={props.empathyLine} variant="bubble" y={0.47} />
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
