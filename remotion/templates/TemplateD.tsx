@@ -57,7 +57,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
-      {/* 제품 1차 노출(장점1 장면): 크게 '히어로' 샷으로 제품을 확실히 보여준다 */}
+      {/* 제품 1차 노출(장점1): 크게 '히어로' 샷으로 제품을 확실히 보여준다 */}
       <Sequence
         from={f(T.product.from)}
         durationInFrames={f(T.benefit2.from - T.product.from)}
@@ -71,17 +71,31 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         />
       </Sequence>
 
-      {/* 제품 2차 노출(장점2~후기): 번호 배지가 있는 표준 카드로 한 번 더 */}
+      {/* 제품 2차 노출(장점2): 살짝 작은 카드로 다시 팝인 */}
       <Sequence
         from={f(T.benefit2.from)}
-        durationInFrames={ctaFrom - f(T.benefit2.from)}
+        durationInFrames={f(T.review.from - T.benefit2.from)}
       >
         <ProductOverlay
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.33}
-          widthRatio={0.58}
+          topRatio={0.35}
+          widthRatio={0.56}
+        />
+      </Sequence>
+
+      {/* 제품 3차 노출(후기): 중앙 큰 카드로 한 번 더 팝인 */}
+      <Sequence
+        from={f(T.review.from)}
+        durationInFrames={ctaFrom - f(T.review.from)}
+      >
+        <ProductOverlay
+          productName={props.productName}
+          productImageUrl={props.productImageUrl}
+          displayNumber={props.displayNumber}
+          topRatio={0.28}
+          widthRatio={0.66}
         />
       </Sequence>
 
