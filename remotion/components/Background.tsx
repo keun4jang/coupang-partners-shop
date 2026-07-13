@@ -9,7 +9,7 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { BGM, BROLL_VEIL, COLORS, MOTION, VIDEO } from "../config/videoConfig";
+import { BGM, BROLL_VEIL, COLORS, VIDEO } from "../config/videoConfig";
 import { FontFaceStyle } from "./FontFaceStyle";
 import { useVideoConfig } from "remotion";
 
@@ -117,7 +117,6 @@ export const Background: React.FC<{
   /** 각 컷의 시작 시각(초). 길이 = 컷 수, 첫 값은 0 */
   cutSeconds?: number[];
 }> = ({ brollFile, bgImageUrl, brollFiles, cutSeconds }) => {
-  const frame = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
   const brollSrc = brollFile ? staticFile(`assets/broll/${brollFile}`) : null;
 
@@ -134,22 +133,12 @@ export const Background: React.FC<{
         }))
       : null;
 
-  const zoom = interpolate(
-    frame,
-    [0, durationInFrames],
-    [MOTION.bgZoomFrom, MOTION.bgZoomTo],
-    { extrapolateRight: "clamp" }
-  );
-  // 0.8~1.5초마다 시각 변화: 미세한 줌 펄스
-  const pulse =
-    Math.sin((frame / VIDEO.fps / MOTION.pulseSeconds) * Math.PI * 2) *
-    MOTION.pulseScale;
-
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.cream }}>
       <FontFaceStyle />
       <BgmAudio />
-      <AbsoluteFill style={{ transform: `scale(${zoom + pulse})` }}>
+      {/* 배경은 줌 없이 고정 - 스톡 영상 자체 움직임만 보이게(줌 인/아웃은 정신없어서 제거) */}
+      <AbsoluteFill>
         {cuts ? (
           <>
             {cuts.map((cut, i) => (

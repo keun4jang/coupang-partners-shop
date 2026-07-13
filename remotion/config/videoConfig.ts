@@ -137,15 +137,9 @@ export const FONT_SIZES = {
 
 /** 모션 속도/강도 */
 export const MOTION = {
-  /** 배경 줌 시작→끝 배율 */
-  bgZoomFrom: 1.0,
-  bgZoomTo: 1.12,
   /** 자막 팝인 스프링 */
   springDamping: 12,
   springMass: 0.8,
-  /** 줌 펄스 주기(초) - 0.8~1.5초마다 시각 변화 요구사항 */
-  pulseSeconds: 1.2,
-  pulseScale: 0.02,
   /** 제품 카드 등장 스프링 */
   productDamping: 14,
 } as const;
