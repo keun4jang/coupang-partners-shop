@@ -67,9 +67,13 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
 3. Value 에 워커용 환경변수 전체를 `.env.local` 형식으로 붙여넣기 (필요 키:
    `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`,
    `TELEGRAM_ALLOWED_CHAT_ID`, `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_OAUTH_CLIENT_ID`,
-   `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `AI_API_KEY`,
-   `NEXT_PUBLIC_SITE_URL`)
+   `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `NEXT_PUBLIC_SITE_URL`,
+   `GOOGLE_TTS_API_KEY`(자연스러운 나레이션), `PEXELS_API_KEY`(포맷 D 스톡영상),
+   `FORCE_TEMPLATE=D`(모든 렌더를 포맷 D 로 고정), (선택)`AI_API_KEY`)
 4. Actions 탭에서 `render-worker` → **Run workflow** 로 수동 테스트 가능
+
+> 🎬 **포맷 D 고정**: `FORCE_TEMPLATE=D` 를 넣으면 DB template_type 과 무관하게
+> 모든 영상을 포맷 D(실사용 스톡영상 배경)로 렌더한다. 빼면 저장된 A/B/C 로 렌더됨.
 
 > 시크릿이 없으면 워크플로는 아무것도 안 하고 조용히 종료한다(안전).
 > ⚠️ public 저장소이므로 시크릿은 반드시 GitHub Secrets 에만 — 코드/커밋에 절대 금지.
@@ -117,10 +121,13 @@ npm run worker:once   # 대기중인 것만 처리하고 종료
 
 | 경로 | 스케줄(UTC) | KST | 하는 일 |
 |---|---|---|---|
-| `/api/cron/scout` | `0 23 * * *` | 아침 08:00 | 쿠팡에서 주부 인기 상품 후보 자동 등록 + 텔레그램 알림 |
+| `/api/cron/scout` | `0 23 * * *` | 아침 08:00 | ① 쿠팡에서 주부 인기 상품 후보 자동 등록 → ② 카테고리가 겹치지 않는 상품으로 **하루 3개 영상 자동 큐잉**(pending) + 텔레그램 알림 |
 | `/api/cron/report` | `0 11 * * *` | 저녁 20:00 | click_logs 집계 → 오늘/이번주 클릭·인기 번호 리포트 |
 
-> 승인 게이트: 스카우트는 **후보만** 올린다(영상 자동 제작 안 함). 영상은 사람이 승인 후.
+> 🔁 **완전 자동 흐름**: 매일 아침 scout 이 상품을 찾아 **영상 3개를 pending 으로** 만든다
+> → 15분마다 도는 렌더 워커(GitHub Actions)가 포맷 D 로 렌더 → 드라이브 업로드.
+> 사람은 드라이브에서 완성 영상을 받아 Reels/TikTok/Shorts 에 올리기만 하면 된다.
+> 멱등 처리: 하루에 3개를 넘겨 만들지 않는다(수동으로 몇 개 만든 날은 3개까지만 채움).
 
 ### 켜려면 — Vercel 환경변수 3개 필요 (한 번만)
 
