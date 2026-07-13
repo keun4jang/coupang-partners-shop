@@ -74,7 +74,7 @@ async function synthesizeLineEdge(
   text: string
 ): Promise<NarrationLine | null> {
   try {
-    const { audioStream } = await tts.toStream(ttsReadable(text), {
+    const { audioStream } = await tts.toStream(naturalizePhrasing(ttsReadable(text)), {
       rate: DEFAULT_RATE,
     });
     const chunks: Buffer[] = [];
@@ -102,15 +102,31 @@ const GOOGLE_SAMPLE_RATE = 24_000;
  * "동네 아줌마"처럼 따뜻하고 편안한 톤을 위해 warm/gentle 계열을 앞에 둔다.
  */
 const GOOGLE_VOICE_FALLBACKS = [
-  "ko-KR-Chirp3-HD-Sulafat", // Warm - 따뜻하고 푸근한 여성
-  "ko-KR-Chirp3-HD-Vindemiatrix", // Gentle - 부드러운 여성
+  "ko-KR-Chirp3-HD-Vindemiatrix", // Gentle - 부드러운 여성 (사장님 선택)
   "ko-KR-Chirp3-HD-Callirrhoe", // Easy-going - 편안한 여성
-  "ko-KR-Chirp3-HD-Aoede", // Breezy (예전 기본값)
+  "ko-KR-Chirp3-HD-Sulafat", // Warm
+  "ko-KR-Chirp3-HD-Aoede", // Breezy
   "ko-KR-Chirp3-HD-Kore",
   "ko-KR-Neural2-A",
 ];
 /** 나레이션 말 속도 - 아나운서처럼 빠르지 않게, 옆집 언니가 편하게 말하듯 살짝 느긋하게 */
 const GOOGLE_SPEAKING_RATE = 0.94;
+
+/**
+ * 억양 안정화용 텍스트 정리.
+ * - 문장 끝에 종결 부호가 없으면 붙여 종결 억양(내림/올림)을 또렷하게 만든다.
+ * - 쉼표 뒤 공백을 정리해 호흡(짧은 쉼)이 자연스럽게 들어가게 한다.
+ * Chirp3-HD 는 SSML 을 못 받으므로, 문장부호로 유도할 수 있는 범위에서 다듬는다.
+ */
+export function naturalizePhrasing(text: string): string {
+  let t = text.trim().replace(/\s*,\s*/g, ", ");
+  if (t && !/[.?!…~]$/.test(t)) {
+    const isQuestion =
+      /[?]/.test(t) || /(까요?|나요|ㄹ까요?|을까요?|가요|어때요?)\s*$/.test(t);
+    t += isQuestion ? "?" : ".";
+  }
+  return t;
+}
 
 async function synthesizeLineGoogle(
   apiKey: string,
@@ -123,7 +139,7 @@ async function synthesizeLineGoogle(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        input: { text: ttsReadable(text) },
+        input: { text: naturalizePhrasing(ttsReadable(text)) },
         voice: { languageCode: "ko-KR", name: voice },
         audioConfig: {
           audioEncoding: "LINEAR16",
