@@ -66,67 +66,126 @@ function pickFile(video: PexelsVideo): PexelsVideoFile | null {
   return portrait[0] ?? null;
 }
 
+async function downloadClip(
+  link: string,
+  filename: string
+): Promise<string | null> {
+  fs.mkdirSync(BROLL_DIR, { recursive: true });
+  const dest = path.join(BROLL_DIR, filename);
+  if (fs.existsSync(dest)) return filename;
+  const dl = await fetch(link);
+  if (!dl.ok) return null;
+  const buf = Buffer.from(await dl.arrayBuffer());
+  if (buf.length > 80 * 1024 * 1024) return null;
+  fs.writeFileSync(dest, buf);
+  return filename;
+}
+
+/**
+ * Pixabay 대안 소스 (PIXABAY_API_KEY).
+ * 세로 필터가 없어 가로 클립도 나올 수 있지만 배경이 cover 크롭이라 문제 없음.
+ * 라이선스: 상업 무료·출처표기 불필요 (pixabay.com/service/license-summary)
+ */
+async function fetchFromPixabay(
+  query: string,
+  displayNumber: number
+): Promise<StockBroll | null> {
+  const apiKey = optionalEnv("PIXABAY_API_KEY");
+  if (!apiKey) return null;
+  const url =
+    `https://pixabay.com/api/videos/?key=${apiKey}` +
+    `&q=${encodeURIComponent(query)}&per_page=20&safesearch=true`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.warn(`Pixabay 검색 실패 (${res.status})`);
+    return null;
+  }
+  const data = (await res.json()) as {
+    hits?: Array<{
+      id: number;
+      duration: number;
+      videos: Record<string, { url: string; width: number; height: number }>;
+    }>;
+  };
+  const candidates = (data.hits ?? []).filter(
+    (v) => v.duration >= MIN_DURATION_SEC && v.duration <= MAX_DURATION_SEC
+  );
+  if (candidates.length === 0) return null;
+  const video = candidates[displayNumber % candidates.length];
+  // 세로 파일 우선, 없으면 큰 해상도(가로여도 cover 크롭)
+  const files = Object.values(video.videos).filter((f) => f.url);
+  const portrait = files.filter((f) => f.height > f.width);
+  const pick =
+    portrait.sort((a, b) => Math.abs(a.width - 1080) - Math.abs(b.width - 1080))[0] ??
+    files.sort((a, b) => b.height - a.height)[0];
+  if (!pick) return null;
+  const filename = await downloadClip(pick.url, `pixabay-${video.id}.mp4`);
+  if (!filename) return null;
+  return { file: filename, durationSec: video.duration, pexelsId: video.id };
+}
+
 /**
  * 카테고리에 맞는 스톡 실사용 클립을 받아온다.
- * 같은 카테고리를 여러 번 만들어도 다른 클립이 나오도록 검색 결과에서
- * displayNumber 를 시드로 골라 회전시킨다.
+ * Pexels 우선, 없으면 Pixabay. 같은 카테고리를 여러 번 만들어도
+ * 다른 클립이 나오도록 displayNumber 를 시드로 회전시킨다.
  */
-export async function fetchStockBroll(
-  category: string,
+async function fetchFromPexels(
+  query: string,
   displayNumber: number
 ): Promise<StockBroll | null> {
   const apiKey = optionalEnv("PEXELS_API_KEY");
   if (!apiKey) return null;
 
+  const url =
+    `${PEXELS_SEARCH}?query=${encodeURIComponent(query)}` +
+    `&orientation=portrait&size=medium&per_page=15`;
+  const res = await fetch(url, { headers: { Authorization: apiKey } });
+  if (!res.ok) {
+    console.warn(`Pexels 검색 실패 (${res.status})`);
+    return null;
+  }
+  const data = (await res.json()) as { videos?: PexelsVideo[] };
+  const candidates = (data.videos ?? []).filter(
+    (v) =>
+      v.duration >= MIN_DURATION_SEC &&
+      v.duration <= MAX_DURATION_SEC &&
+      pickFile(v)
+  );
+  if (candidates.length === 0) {
+    console.warn(`Pexels: '${query}' 조건에 맞는 클립 없음`);
+    return null;
+  }
+
+  const video = candidates[displayNumber % candidates.length];
+  const file = pickFile(video)!;
+  const filename = await downloadClip(file.link, `pexels-${video.id}.mp4`);
+  if (!filename) {
+    console.warn("Pexels 다운로드 실패/용량 초과");
+    return null;
+  }
+  return { file: filename, durationSec: video.duration, pexelsId: video.id };
+}
+
+export async function fetchStockBroll(
+  category: string,
+  displayNumber: number
+): Promise<StockBroll | null> {
   const query =
     SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
 
+  // Pexels 우선 → 실패/미설정 시 Pixabay → 둘 다 없으면 null(블러 배경 폴백)
   try {
-    const url =
-      `${PEXELS_SEARCH}?query=${encodeURIComponent(query)}` +
-      `&orientation=portrait&size=medium&per_page=15`;
-    const res = await fetch(url, { headers: { Authorization: apiKey } });
-    if (!res.ok) {
-      console.warn(`Pexels 검색 실패 (${res.status}) - 블러 배경으로 폴백`);
-      return null;
-    }
-    const data = (await res.json()) as { videos?: PexelsVideo[] };
-    const candidates = (data.videos ?? []).filter(
-      (v) =>
-        v.duration >= MIN_DURATION_SEC &&
-        v.duration <= MAX_DURATION_SEC &&
-        pickFile(v)
-    );
-    if (candidates.length === 0) {
-      console.warn(`Pexels: '${query}' 조건에 맞는 클립 없음 - 블러 배경으로 폴백`);
-      return null;
-    }
-
-    const video = candidates[displayNumber % candidates.length];
-    const file = pickFile(video)!;
-
-    fs.mkdirSync(BROLL_DIR, { recursive: true });
-    const filename = `pexels-${video.id}.mp4`;
-    const dest = path.join(BROLL_DIR, filename);
-
-    if (!fs.existsSync(dest)) {
-      const dl = await fetch(file.link);
-      if (!dl.ok) {
-        console.warn(`Pexels 다운로드 실패 (${dl.status}) - 블러 배경으로 폴백`);
-        return null;
-      }
-      const buf = Buffer.from(await dl.arrayBuffer());
-      // 비정상적으로 크면(>80MB) 렌더 부담이 크니 스킵
-      if (buf.length > 80 * 1024 * 1024) {
-        console.warn("Pexels 클립이 너무 큼 - 블러 배경으로 폴백");
-        return null;
-      }
-      fs.writeFileSync(dest, buf);
-    }
-
-    return { file: filename, durationSec: video.duration, pexelsId: video.id };
+    const pexels = await fetchFromPexels(query, displayNumber);
+    if (pexels) return pexels;
   } catch (e) {
-    console.warn(`Pexels 처리 실패: ${(e as Error).message} - 블러 배경으로 폴백`);
-    return null;
+    console.warn(`Pexels 처리 실패: ${(e as Error).message}`);
   }
+  try {
+    const pixabay = await fetchFromPixabay(query, displayNumber);
+    if (pixabay) return pixabay;
+  } catch (e) {
+    console.warn(`Pixabay 처리 실패: ${(e as Error).message}`);
+  }
+  console.warn("스톡 클립 수급 실패 - 블러 상품사진 배경으로 폴백");
+  return null;
 }
