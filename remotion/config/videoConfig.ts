@@ -8,8 +8,8 @@ export const VIDEO = {
   width: 1080,
   height: 1920,
   fps: 30,
-  /** 기본 길이(초). 8~12초 범위 안에서 조정 (CTA 나레이션 여유를 위해 11초) */
-  durationSeconds: 11,
+  /** 기본 길이(초). 15~20초 범위 안에서 조정 */
+  durationSeconds: 18,
 } as const;
 
 export const DURATION_IN_FRAMES = VIDEO.durationSeconds * VIDEO.fps;
@@ -39,13 +39,13 @@ export const LAYOUT = {
   disclosureBottom: Math.round(VIDEO.height * SAFE_ZONE.bottom),
 } as const;
 
-/** 장면 타이밍 (초 단위) */
+/** 장면 타이밍 (초 단위) - 18초 기준. durationSeconds 바꾸면 여기도 맞춰 조정 */
 export const TIMING = {
-  hook: { from: 0, to: 1.5 },
-  empathy: { from: 1.5, to: 3.5 },
-  product: { from: 3.5, to: 6.5 },
-  benefit2: { from: 6.5, to: 8.5 },
-  cta: { from: 8.5, to: 11 },
+  hook: { from: 0, to: 2.5 },
+  empathy: { from: 2.5, to: 5.5 },
+  product: { from: 5.5, to: 10 },
+  benefit2: { from: 10, to: 14 },
+  cta: { from: 14, to: 18 },
 } as const;
 
 /**
