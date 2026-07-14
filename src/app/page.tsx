@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Product, VideoItemWithProduct } from "@/types/db";
 import { supabaseAdmin } from "@/lib/supabase";
-import { formatDisplayNumber } from "@/lib/format";
+import { formatDisplayNumber, shortenProductName } from "@/lib/format";
 import { APP_VERSION } from "@/lib/appVersion";
 
 export const dynamic = "force-dynamic";
@@ -50,27 +50,27 @@ function ItemCard({
   const product: Product = item.products;
   return (
     <div
-      className={`bg-card rounded-2xl p-5 shadow-sm border ${
+      className={`bg-card rounded-2xl px-4 py-3.5 shadow-sm border ${
         highlight ? "border-primary ring-2 ring-primary/30" : "border-accent-soft"
       }`}
     >
       {/* 사진 없이 글자만: 번호 · 제품명 · 한 줄 설명 · 가격보기 버튼 */}
-      <div className="inline-block bg-accent-soft text-primary-dark font-bold rounded-full px-3 py-0.5 text-sm">
+      <div className="inline-block bg-accent-soft text-primary-dark font-semibold rounded-full px-2.5 py-0.5 text-xs">
         {formatDisplayNumber(item.display_number)}
       </div>
-      <h3 className="font-bold text-lg mt-2 leading-snug">
-        {product.product_name}
+      <h3 className="font-bold text-base mt-1.5 leading-snug">
+        {shortenProductName(product.product_name, 24)}
       </h3>
-      <p className="text-ink/80 text-sm mt-2 leading-relaxed">
+      <p className="text-ink/70 text-sm mt-1 leading-relaxed">
         {shortDescription(item)}
       </p>
       {/* 실시간 가격은 쿠팡에서 - 이 클릭이 파트너스 수수료로 연결된다 */}
       <a
         href={`/api/click?videoItemId=${item.id}`}
         rel="nofollow sponsored"
-        className="block mt-4 text-center bg-primary hover:bg-primary-dark transition-colors text-white font-bold rounded-xl py-3.5 text-lg"
+        className="flex items-center justify-center gap-1 mt-2.5 bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg py-2 text-sm"
       >
-        가격 보기 →
+        가격 보기 <span aria-hidden>→</span>
       </a>
     </div>
   );
@@ -182,22 +182,22 @@ export default async function Home({
       </header>
 
       {/* 번호 검색 */}
-      <section className="bg-card rounded-2xl p-5 shadow-sm border border-accent-soft">
-        <p className="font-semibold text-[15px]">
+      <section className="bg-card rounded-2xl p-4 shadow-sm border border-accent-soft">
+        <p className="font-semibold text-sm">
           영상에서 본 생활템 번호를 입력해보세요.
         </p>
-        <form method="GET" action="/" className="flex gap-2 mt-3">
+        <form method="GET" action="/" className="flex gap-2 mt-2.5">
           <input
             type="text"
             name="q"
             inputMode="numeric"
             defaultValue={q ?? ""}
             placeholder="예: 17"
-            className="flex-1 min-w-0 rounded-xl border border-accent px-4 py-3 text-lg bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 min-w-0 rounded-lg border border-accent px-3.5 py-2.5 text-base bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <button
             type="submit"
-            className="bg-primary hover:bg-primary-dark transition-colors text-white font-bold rounded-xl px-5"
+            className="bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg px-4 text-sm"
           >
             찾아보기
           </button>
@@ -235,9 +235,9 @@ export default async function Home({
 
       {/* 전체 목록 (5개씩 페이지로) */}
       {dbReady && listItems.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-bold text-xl mb-4">정리해둔 생활템 전체</h2>
-          <div className="flex flex-col gap-4">
+        <section className="mt-8">
+          <h2 className="font-bold text-lg mb-3">정리해둔 생활템 전체</h2>
+          <div className="flex flex-col gap-2.5">
             {pageItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
