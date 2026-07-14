@@ -74,8 +74,7 @@ export function ctaLine(displayNumber: number): string {
   return `영상 속 제품은 프로필 링크 ${displayNumber}번에 정리해뒀어요`;
 }
 
-const DISCLOSURE =
-  "쿠팡파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다.";
+// 대가성 고지는 웹사이트(랜딩)에만 두고 SNS 캡션/영상에는 넣지 않는다(사장님 결정).
 
 /** AI 미설정/실패 시 사용하는 카테고리 기반 기본 문구 */
 export function fallbackCopy(product: Product, displayNumber: number): VideoCopy {
@@ -157,8 +156,6 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
     "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요.",
     `영상 속 제품은 프로필 링크에서 ${displayNumber}번으로 찾아보시면 돼요.`,
     "",
-    DISCLOSURE,
-    "",
     "#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템",
   ].join("\n");
 
@@ -195,7 +192,7 @@ const COPY_SCHEMA = {
     captionText: {
       type: "string",
       description:
-        "SNS 업로드용 캡션 전문. 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크에서 N번으로 찾아보시면 돼요.' + 빈 줄 + 대가성 문구 + 해시태그.",
+        "SNS 업로드용 캡션 전문. 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크에서 N번으로 찾아보시면 돼요.' + 빈 줄 + 해시태그.",
     },
   },
   required: [
@@ -247,7 +244,6 @@ const SYSTEM_PROMPT = `너는 아이 키우는 40대 한국인 아줌마다. "�
 - "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요." 같은 큐레이션 기준 문장 포함
   (직접 사용해봤다는 표현은 금지 - 고른 기준만 말한다).
 - 반드시 "영상 속 제품은 프로필 링크에서 {번호}번으로 찾아보시면 돼요." 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
-- 반드시 "쿠팡파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다." 포함.
 - 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;
 
 /**
