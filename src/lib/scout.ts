@@ -158,11 +158,7 @@ export function formatScoutMessage(result: ScoutResult): string {
     const base = "🔎 오늘 스카우트: 새 후보가 없어요 (이미 있는 상품이거나 필터 제외).";
     return result.errors.length ? `${base}\n\n⚠️ ${result.errors.join("\n")}` : base;
   }
-  const lines = result.registered.map(
-    (c, i) => `${i + 1}. [${c.category}] ${c.product_name} · ${c.price_text}`
-  );
-  const tail =
-    "\n\n영상 만들 후보를 고르려면 관리자 페이지에서 확인하거나, 텔레그램 '영상' 을 보내주세요.";
+  // 전부 자동으로 골라 만들어지므로 후보 목록은 나열하지 않는다 (요약만).
   const warn = result.errors.length ? `\n\n⚠️ 일부 카테고리 오류:\n${result.errors.join("\n")}` : "";
-  return `🔎 오늘의 상품 후보 ${result.registered.length}개 올라왔어요\n\n${lines.join("\n")}${tail}${warn}`;
+  return `🔎 오늘 상품 후보 ${result.registered.length}개 수집 완료${warn}`;
 }
