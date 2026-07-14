@@ -103,6 +103,22 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[3]} />
       </Sequence>
 
+      {/* 사용팁 (구버전 대본이면 구간이 0초라 자연히 스킵) */}
+      {props.usageTip && (
+        <Sequence
+          from={f(T.tip.from)}
+          durationInFrames={Math.max(1, f(T.tip.to - T.tip.from))}
+        >
+          <Subtitle
+            text={props.usageTip}
+            size={FONT_SIZES.benefit}
+            variant="bubble"
+            y={0.13}
+          />
+          <Narration src={props.narration?.[4]} />
+        </Sequence>
+      )}
+
       {/* 후기 언급 */}
       <Sequence
         from={f(T.review.from)}
@@ -114,13 +130,13 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           variant="bubble"
           y={0.13}
         />
-        <Narration src={props.narration?.[4]} />
+        <Narration src={props.narration?.[5]} />
       </Sequence>
 
       {/* CTA */}
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
-        <Narration src={props.narration?.[5]} />
+        <Narration src={props.narration?.[6]} />
       </Sequence>
 
       {/* 첫 프레임 썸네일용 커버 - 맨 위 레이어라 1프레임 동안 다른 요소를 전부 가림 */}

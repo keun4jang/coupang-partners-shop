@@ -113,15 +113,23 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
       </Sequence>
       <Sequence
         from={f(T.benefit2.from)}
-        durationInFrames={f(T.review.from - T.benefit2.from)}
+        durationInFrames={f(T.tip.from - T.benefit2.from)}
       >
         <Narration src={props.narration?.[3]} />
       </Sequence>
+      {props.usageTip && (
+        <Sequence
+          from={f(T.tip.from)}
+          durationInFrames={Math.max(1, f(T.review.from - T.tip.from))}
+        >
+          <Narration src={props.narration?.[4]} />
+        </Sequence>
+      )}
       <Sequence
         from={f(T.review.from)}
         durationInFrames={ctaFrom - f(T.review.from)}
       >
-        <Narration src={props.narration?.[4]} />
+        <Narration src={props.narration?.[5]} />
       </Sequence>
 
       {/* 메모 카드 (공감/장점이 체크리스트로 하나씩 적힘) */}
@@ -159,6 +167,12 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
             text={props.benefit2}
             delayFrames={f(T.benefit2.from - T.empathy.from)}
           />
+          {props.usageTip && (
+            <MemoLine
+              text={props.usageTip}
+              delayFrames={f(T.tip.from - T.empathy.from)}
+            />
+          )}
           <MemoLine
             text={props.reviewLine}
             delayFrames={f(T.review.from - T.empathy.from)}
@@ -183,7 +197,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
 
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
-        <Narration src={props.narration?.[5]} />
+        <Narration src={props.narration?.[6]} />
       </Sequence>
 
       {/* 첫 프레임 썸네일용 커버 */}

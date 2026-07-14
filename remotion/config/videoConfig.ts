@@ -11,9 +11,9 @@ export const VIDEO = {
   /**
    * 기본 길이(초) - 나레이션 타이밍(timing props)이 없을 때의 폴백.
    * 고정 TIMING(아래) 의 cta.to 와 일치해야 폴백 시 마지막 장면이 잘리지 않는다.
-   * 실제 길이는 워커가 나레이션 실측 길이로 계산해 18초 안팎으로 맞춘다.
+   * 실제 길이는 워커가 나레이션 실측 길이로 계산한다 (7장면 대본 기준 22~28초 안팎).
    */
-  durationSeconds: 18,
+  durationSeconds: 21,
 } as const;
 
 export const DURATION_IN_FRAMES = VIDEO.durationSeconds * VIDEO.fps;
@@ -44,16 +44,17 @@ export const LAYOUT = {
 } as const;
 
 /**
- * 고정 장면 타이밍 (초) - 나레이션 timing props 가 없을 때의 폴백 (약 18초 기준).
- * product = 장점1 장면(제품 카드 등장). benefit2 = 장점2. review = 후기.
+ * 고정 장면 타이밍 (초) - 나레이션 timing props 가 없을 때의 폴백 (약 21초 기준).
+ * product = 장점1 장면(제품 카드 등장). benefit2 = 장점2. tip = 사용팁. review = 후기.
  */
 export const TIMING = {
   hook: { from: 0, to: 2.2 },
   empathy: { from: 2.2, to: 4.6 },
   product: { from: 4.6, to: 8.0 },
-  benefit2: { from: 8.0, to: 11.0 },
-  review: { from: 11.0, to: 14.0 },
-  cta: { from: 14.0, to: 17.5 },
+  benefit2: { from: 8.0, to: 10.8 },
+  tip: { from: 10.8, to: 13.6 },
+  review: { from: 13.6, to: 16.4 },
+  cta: { from: 16.4, to: 21.0 },
 } as const;
 
 /** 장면 구간 형태 (템플릿에서 사용) */
@@ -64,6 +65,8 @@ export type SceneRanges = {
   product: { from: number; to: number };
   /** 장점2 */
   benefit2: { from: number; to: number };
+  /** 사용팁 */
+  tip: { from: number; to: number };
   /** 후기 */
   review: { from: number; to: number };
   cta: { from: number; to: number };
@@ -75,6 +78,7 @@ export function resolveTiming(t?: {
   empathyTo: number;
   benefit1To: number;
   benefit2To: number;
+  tipTo: number;
   reviewTo: number;
   ctaTo: number;
 } | null): SceneRanges {
@@ -84,7 +88,8 @@ export function resolveTiming(t?: {
     empathy: { from: t.hookTo, to: t.empathyTo },
     product: { from: t.empathyTo, to: t.benefit1To },
     benefit2: { from: t.benefit1To, to: t.benefit2To },
-    review: { from: t.benefit2To, to: t.reviewTo },
+    tip: { from: t.benefit2To, to: t.tipTo },
+    review: { from: t.tipTo, to: t.reviewTo },
     cta: { from: t.reviewTo, to: t.ctaTo },
   };
 }

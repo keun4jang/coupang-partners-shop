@@ -37,6 +37,7 @@ function sanitizeCopy(copy: VideoCopy): VideoCopy {
     empathyLine: singleLine(copy.empathyLine),
     benefit1: singleLine(copy.benefit1),
     benefit2: singleLine(copy.benefit2),
+    usageTip: singleLine(copy.usageTip),
     reviewLine: singleLine(copy.reviewLine),
     captionText: copy.captionText,
   };
@@ -48,6 +49,7 @@ function containsBannedPhrase(copy: VideoCopy): boolean {
     copy.empathyLine,
     copy.benefit1,
     copy.benefit2,
+    copy.usageTip,
     copy.reviewLine,
     copy.captionText,
   ].join("\n");
@@ -56,7 +58,7 @@ function containsBannedPhrase(copy: VideoCopy): boolean {
 
 /**
  * 스크립트 전문(줄 단위, 워커가 그대로 장면으로 사용):
- * 후킹 → 공감 → 장점1 → 장점2 → 후기 → 번호 CTA (6줄)
+ * 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 후기 → 번호 CTA (7줄)
  */
 export function composeScriptText(copy: VideoCopy, displayNumber: number): string {
   return [
@@ -64,6 +66,7 @@ export function composeScriptText(copy: VideoCopy, displayNumber: number): strin
     copy.empathyLine,
     copy.benefit1,
     copy.benefit2,
+    copy.usageTip,
     copy.reviewLine,
     ctaLine(displayNumber),
   ].join("\n");
@@ -83,55 +86,70 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   const benefit = product.main_benefit?.trim();
 
   // 구성: 후킹(문제·욕구 자극) → 공감(문제 심화) → 장점1(핵심 해결) → 장점2(추가 매력·가성비)
-  //       → 긍정 후기 언급(사회적 증거) → CTA.
-  // 동네 친한 언니가 알려주듯 따뜻하고 솔직한 말투. 후기 줄은 "남들 반응"만 전한다(허위 후기 금지).
+  //       → 사용팁(생활 속 활용법) → 긍정 후기 언급(사회적 증거) → CTA. (7장면, 22~28초)
+  // 동네 친한 언니가 알려주듯 따뜻하고 솔직하되, 문장은 구체적이고 생생하게.
+  // 후기 줄은 "남들 반응"만 전한다(허위 후기 금지).
   const presets: Record<
     string,
-    { hook: string; empathy: string; b1: string; b2: string; review: string }
+    { hook: string; empathy: string; b1: string; b2: string; tip: string; review: string }
   > = {
     차량용품: {
-      hook: "차 안 지저분한 거 은근 스트레스죠",
-      empathy: "세차장 갈 때마다 돈 쓰긴 아깝고요",
-      b1: "이거 하나 두면 그때그때 직접 싹 관리돼서 차가 늘 깔끔해요",
-      b2: "크기도 작아 자리 안 차지하고, 값도 착해서 부담 없어요",
-      review: "차 있는 집들 재구매 후기가 유독 많더라고요",
+      hook: "차 탈 때마다 발밑 부스러기 밟히는 집?",
+      empathy: "세차장 가자니 돈 아깝고, 그냥 두자니 눈에 밟히잖아요",
+      b1: "이거 하나 차에 두면 신호 대기 중에도 쓱 정리가 돼요",
+      b2: "크기가 작아서 자리도 안 차지하고 가격도 부담 없는 수준이에요",
+      tip: "시트 틈새랑 컵홀더처럼 손 안 닿는 데 위주로 쓰면 진짜 요긴해요",
+      review: "차 있는 집들 재구매 후기가 유독 많은 제품이더라고요",
     },
     청소템: {
-      hook: "집안 먼지랑 머리카락, 진짜 답 없죠",
-      empathy: "쓸고 닦아도 돌아서면 금방 또 쌓이잖아요",
-      b1: "이건 손 안 대고 쓱 밀기만 해도 눈에 띄게 깨끗해져요",
-      b2: "매일 청소기 돌릴 일이 확 줄어서 시간까지 아껴져요",
-      review: "괜히 재구매 후기가 쌓이는 게 아니더라고요",
+      hook: "닦아도 닦아도 먼지 또 쌓이는 집?",
+      empathy: "허리 숙여서 쓸고 닦다 보면 하루가 다 가잖아요",
+      b1: "이건 손에 물 한 방울 안 묻히고 쓱 밀기만 해도 눈에 띄게 깨끗해져요",
+      b2: "청소기 돌리는 횟수가 확 줄어서 그 시간에 커피 한 잔 할 수 있어요",
+      tip: "자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 다르더라고요",
+      review: "괜히 재구매 후기가 수백 개씩 쌓이는 게 아니더라고요",
     },
     수납템: {
-      hook: "물건은 느는데 둘 데는 없고, 답답하죠",
-      empathy: "정리해도 며칠이면 도로 엉망 되잖아요",
-      b1: "이거 몇 개면 안 쓰던 공간까지 싹 정리돼 집이 넓어 보여요",
-      b2: "접었다 폈다 되니까 안 쓸 땐 자리도 안 차지해요",
-      review: "후기 보면 다들 진작 살걸 하시더라고요",
+      hook: "옷이랑 물건은 느는데 둘 데가 없는 집?",
+      empathy: "주말에 큰맘 먹고 정리해도 며칠이면 도로 엉망 되잖아요",
+      b1: "이거 몇 개면 침대 밑, 장롱 위처럼 놀던 공간이 다 수납장이 돼요",
+      b2: "접었다 폈다 돼서 안 쓸 땐 납작하게 접어두면 그만이에요",
+      tip: "계절 지난 옷이랑 이불부터 넣어보세요, 옷장이 반은 비어요",
+      review: "후기 보면 다들 하나만 산 걸 후회하고 추가 주문하시더라고요",
     },
     주방템: {
-      hook: "매일 밥에 설거지에, 끝이 없죠",
-      empathy: "조금이라도 손 덜 가는 게 최고잖아요",
-      b1: "이게 있으면 조리부터 뒷정리까지 확 편해져요",
-      b2: "튼튼하고 관리도 쉬워서 오래 두고 쓰기 딱이에요",
-      review: "주방템 중에 후기 많기로 소문났더라고요",
+      hook: "하루 세 번 밥하고 설거지하는 주부님들?",
+      empathy: "주방일은 해도 해도 티가 안 나서 더 힘 빠지잖아요",
+      b1: "이게 있으면 조리부터 뒷정리까지 걸리는 시간이 눈에 띄게 줄어요",
+      b2: "튼튼하고 세척도 간단해서 몇 년은 두고 쓸 수 있는 물건이에요",
+      tip: "저녁 준비할 때 제일 손 많이 가는 일에 먼저 써보세요, 차이가 확 나요",
+      review: "주방템 중에 후기 많기로 소문난 제품이더라고요",
     },
     육아생활템: {
-      hook: "애 키우는 집은 하루가 전쟁이죠",
-      empathy: "손이 두 개론 늘 모자라잖아요",
-      b1: "이거 하나면 아이 챙기는 게 눈에 띄게 수월해져요",
-      b2: "외출할 때도 가볍게 챙길 수 있어 부담 없고요",
-      review: "엄마들 사이에 입소문 난 데는 다 이유가 있더라고요",
+      hook: "애 키우느라 내 시간 1분이 아쉬운 엄마들?",
+      empathy: "아이 챙기다 보면 손이 두 개로는 늘 모자라잖아요",
+      b1: "이거 하나면 아이 챙기는 일이 한 손으로도 될 만큼 수월해져요",
+      b2: "가볍고 부피도 작아서 외출 가방에 그냥 쏙 들어가요",
+      tip: "기저귀 가방이랑 거실에 하나씩 두면 급할 때 허둥댈 일이 없어요",
+      review: "엄마들 커뮤니티에서 입소문 난 데는 다 이유가 있더라고요",
+    },
+    생활템: {
+      hook: "살림하다 보면 이런 거 하나 꼭 아쉽죠?",
+      empathy: "없을 땐 몰랐는데 한번 쓰면 매일 손이 가는 게 이런 물건이잖아요",
+      b1: "이거 하나 두면 생각보다 훨씬 자주, 요긴하게 쓰게 돼요",
+      b2: "가격도 착해서 실패해도 부담 없다 싶은 수준이에요",
+      tip: "제일 자주 쓰는 자리에 아예 놔두세요, 그래야 진짜 매일 쓰게 돼요",
+      review: "가성비 좋다는 후기가 쭉 달려 있는 제품이더라고요",
     },
   };
 
   const preset = presets[category] ?? {
-    hook: pain ? `${pain}` : "살림하다 보면 이런 거 꼭 아쉽죠",
-    empathy: "없을 땐 몰라도 있으면 매일 손 가잖아요",
-    b1: benefit ?? "이거 하나 두면 생각보다 훨씬 자주, 요긴하게 써요",
-    b2: "가격도 착해서 부담 없이 들이기 좋아요",
-    review: "가성비 좋다고 후기가 쭉 달려 있더라고요",
+    hook: pain ? `${pain}` : presets["생활템"].hook,
+    empathy: presets["생활템"].empathy,
+    b1: benefit ?? presets["생활템"].b1,
+    b2: presets["생활템"].b2,
+    tip: presets["생활템"].tip,
+    review: presets["생활템"].review,
   };
 
   // 상품에 타겟이 명시돼 있으면 후킹을 타겟 호명으로 교체 (예: "자취생이라면")
@@ -141,10 +159,11 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   }
 
   const copy: VideoCopy = {
-    hookText: pain && pain.length <= 24 ? pain : preset.hook,
+    hookText: pain && pain.length <= 28 ? pain : preset.hook,
     empathyLine: preset.empathy,
-    benefit1: benefit && benefit.length <= 28 ? benefit : preset.b1,
+    benefit1: benefit && benefit.length <= 34 ? benefit : preset.b1,
     benefit2: preset.b2,
+    usageTip: preset.tip,
     reviewLine: preset.review,
     captionText: "",
   };
@@ -152,6 +171,7 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   copy.captionText = [
     `${copy.hookText} ${copy.empathyLine}.`,
     `${shortenProductName(product.product_name)}, ${copy.benefit1}. ${copy.benefit2}.`,
+    copy.usageTip,
     "",
     "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요.",
     `영상 속 제품은 프로필 링크에서 ${displayNumber}번으로 찾아보시면 돼요.`,
@@ -184,6 +204,11 @@ const COPY_SCHEMA = {
       description:
         "핵심 장점 2. benefit1 과 다른 각도의 장점(크기·사용 편의·다용도·관리 편함 등)을 하나 더. 후기 언급이 아니라 '제품의 장점'이어야 함. 25자 내외.",
     },
+    usageTip: {
+      type: "string",
+      description:
+        "생활 속 활용팁. 이 제품을 언제/어디서/어떻게 쓰면 좋은지 구체적인 장면 하나를 제안 (예: '자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 달라요'). 30자 내외.",
+    },
     reviewLine: {
       type: "string",
       description:
@@ -200,6 +225,7 @@ const COPY_SCHEMA = {
     "empathyLine",
     "benefit1",
     "benefit2",
+    "usageTip",
     "reviewLine",
     "captionText",
   ],
@@ -218,16 +244,18 @@ const SYSTEM_PROMPT = `너는 아이 키우는 40대 한국인 아줌마다. "�
 - 장점은 "이걸 쓰면 내 삶이 이렇게 편해진다"를 구체적·생생하게(시간 절약, 힘 덜 듦, 집이 깔끔해짐 등).
 - 가성비/부담 없는 가격도 슬쩍 언급해 "사도 되겠다" 마음을 만든다.
 
-영상 구성(중요) - 6줄이 이 순서로 나온다:
+영상 구성(중요) - 7줄이 이 순서로 나온다:
 1. hookText: 이 물건이 필요할 "타겟"을 콕 집어 부른다.
    예) "아이 태우고 다니는 집이라면", "욕실 청소 미루게 되는 분?", "매일 세 끼 차리는 주부님들"
 2. empathyLine: 그 타겟이 겪는 "문제"를 공감하며 짚어준다.
 3. benefit1: 제품이 그 문제를 어떻게 덜어주는지 핵심 장점을 소개한다.
 4. benefit2: 다른 각도의 장점을 하나 더 소개한다(크기·사용 편의·다용도·관리 편함 등).
    benefit1 과 겹치지 않는 새로운 장점이어야 한다. 여전히 "제품의 장점"이지 후기가 아니다.
-5. reviewLine: 긍정적 후기를 언급한다(사회적 증거). "후기가 꽤 많더라고요",
+5. usageTip: 생활 속 활용팁. 언제/어디서/어떻게 쓰면 좋은지 구체적 장면 하나를 그려준다.
+   예) "자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 달라요"
+6. reviewLine: 긍정적 후기를 언급한다(사회적 증거). "후기가 꽤 많더라고요",
    "평이 괜찮아 보여요"처럼 남들의 반응을 전하는 톤. 절대 본인이 써봤다고 하지 않는다.
-6. (CTA 는 시스템이 자동 생성)
+7. (CTA 는 시스템이 자동 생성)
 - hookText 와 empathyLine 은 같은 화면에 위아래로 쌓여 나오므로 자연스럽게 이어지게.
 - benefit1 → benefit2 는 제품의 장점을 충분히 소개하는 구간이니 서로 다른 매력을 짚어준다.
 

@@ -68,6 +68,8 @@ export interface VideoCopy {
   benefit1: string;
   /** 핵심 장점 2 - 다른 각도의 장점(크기/사용 편의/다용도 등) */
   benefit2: string;
+  /** 사용팁/활용법 - 생활 속에서 구체적으로 어떻게 쓰면 좋은지 */
+  usageTip: string;
   /** 긍정 후기 언급 - 남들의 반응 톤 (예: "후기도 많고 평이 괜찮아 보이더라고요") */
   reviewLine: string;
   /** SNS 업로드용 캡션 전문 */

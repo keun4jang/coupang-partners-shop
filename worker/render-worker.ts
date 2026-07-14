@@ -123,9 +123,11 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  if (lines.length > 0 && lines.length !== 6) {
+  // 신버전 대본은 7줄(사용팁 포함), 구버전은 6줄 - 둘 다 지원한다.
+  const isLegacy6 = lines.length === 6;
+  if (lines.length > 0 && lines.length !== 7 && lines.length !== 6) {
     console.warn(
-      `script_text 줄 수가 예상(6)과 다릅니다 (${lines.length}줄) - display_number=${item.display_number}`
+      `script_text 줄 수가 예상(7 또는 6)과 다릅니다 (${lines.length}줄) - display_number=${item.display_number}`
     );
   }
 
@@ -136,7 +138,8 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     empathyLine: lines[1] ?? "은근 신경 쓰이잖아요",
     benefit1: lines[2] ?? product.main_benefit ?? "하나 있으면 은근 편해 보여요",
     benefit2: lines[3] ?? "쓰기도 간편해 보이고요",
-    reviewLine: lines[4] ?? "후기 많은 제품이라 한번 볼만해요",
+    usageTip: isLegacy6 ? null : lines[4] ?? null,
+    reviewLine: (isLegacy6 ? lines[4] : lines[5]) ?? "후기 많은 제품이라 한번 볼만해요",
     ctaText: ctaLine(item.display_number),
     productImageUrl: product.image_url,
     category: product.category,
@@ -170,26 +173,28 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
 }
 
 /**
- * 나레이션 실측 길이(초)에 맞춰 장면 컷 타이밍을 만든다.
- * - 각 장면 = 해당 나레이션 길이 + 아주 짧은 간격(0.22초) → 문장이 뚝뚝 끊기지 않고 자연스럽게 이어짐
- * - 총 길이가 최소(13초)보다 짧을 때만 비율로 늘림 → 짧은 나레이션도 과하게 늘어지지 않음
- *   (대개 나레이션 자체가 13초를 넘기므로 원래 속도 그대로 재생돼 호흡이 자연스럽다)
+ * 나레이션 실측 길이(초)에 맞춰 장면 컷 타이밍을 만든다 (7장면).
+ * - 각 장면 = 해당 나레이션 길이 + 아주 짧은 간격(0.22초) → 문장이 뚝뚝 끊기지 않음
+ * - 총 길이가 최소(15초)보다 짧을 때만 비율로 늘림
+ *   (7장면 대본은 대개 나레이션 자체가 20초를 넘겨 원래 호흡 그대로 재생된다)
  * - 나레이션이 길면 잘리지 않도록 그 길이만큼 영상이 길어진다.
+ * - hasTip=false(구버전 6줄 대본)면 사용팁 장면을 0초로 접는다.
  */
-const TARGET_SECONDS = 13;
+const TARGET_SECONDS = 15;
 const NARRATION_GAP = 0.22;
-function buildSceneTiming(sec: number[]): SceneTiming {
+function buildSceneTiming(sec: number[], hasTip: boolean): SceneTiming {
   const need = (i: number, min: number) =>
     Math.max(min, (sec[i] ?? 0) + NARRATION_GAP);
   // 최소 장면 길이: 자막을 읽을 시간 + 카드 등장 모션 여유
-  // 순서: 후킹 · 공감 · 장점1(카드 등장) · 장점2 · 후기 · CTA
+  // 순서: 후킹 · 공감 · 장점1(카드 등장) · 장점2 · 사용팁 · 후기 · CTA
   let scenes = [
     need(0, 1.5), // 후킹
     need(1, 1.5), // 공감
     need(2, 2.4), // 장점1 (제품 카드 등장)
     need(3, 2.1), // 장점2
-    need(4, 2.1), // 후기
-    Math.max(2.4, (sec[5] ?? 0) + 0.8), // CTA (마무리 여유)
+    hasTip ? need(4, 2.1) : 0, // 사용팁 (구버전 대본이면 생략)
+    need(5, 2.1), // 후기
+    Math.max(2.4, (sec[6] ?? 0) + 0.8), // CTA (마무리 여유)
   ];
   const total = scenes.reduce((a, b) => a + b, 0);
   if (total < TARGET_SECONDS) {
@@ -204,8 +209,9 @@ function buildSceneTiming(sec: number[]): SceneTiming {
     empathyTo: ends[1],
     benefit1To: ends[2],
     benefit2To: ends[3],
-    reviewTo: ends[4],
-    ctaTo: ends[5],
+    tipTo: ends[4],
+    reviewTo: ends[5],
+    ctaTo: ends[6],
   };
 }
 
@@ -269,17 +275,19 @@ async function renderVideo(
     inputProps.empathyLine,
     inputProps.benefit1,
     inputProps.benefit2,
+    inputProps.usageTip ?? "", // 구버전 대본이면 빈 줄 → 무음(0초 장면)
     inputProps.reviewLine,
     inputProps.ctaText,
   ]);
   if (narrationLines) {
     inputProps.narration = narrationLines.map((l) => l?.uri ?? null);
-    // 장면 컷을 나레이션 실측 길이에 맞춘다 (문장 간격 0.45초, 총 ~15초)
+    // 장면 컷을 나레이션 실측 길이에 맞춘다
     inputProps.timing = buildSceneTiming(
-      narrationLines.map((l) => l?.seconds ?? 0)
+      narrationLines.map((l) => l?.seconds ?? 0),
+      Boolean(inputProps.usageTip)
     );
     console.log(
-      `나레이션 ${narrationLines.filter(Boolean).length}/6줄 · ` +
+      `나레이션 ${narrationLines.filter(Boolean).length}/7줄 · ` +
         `영상 길이 ${inputProps.timing.ctaTo.toFixed(1)}초로 컷 구성`
     );
   } else {

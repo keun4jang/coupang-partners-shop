@@ -10,6 +10,8 @@ export type SceneTiming = {
   benefit1To: number;
   /** 장점2 장면 종료 */
   benefit2To: number;
+  /** 사용팁 장면 종료 */
+  tipTo: number;
   /** 후기 장면 종료 */
   reviewTo: number;
   /** = 영상 전체 길이(초) */
@@ -28,6 +30,8 @@ export type ShortsProps = {
   benefit1: string;
   /** 장점 2 (다른 각도의 장점) */
   benefit2: string;
+  /** 사용팁/활용법 - 생활 속에서 어떻게 쓰면 좋은지 (구버전 대본엔 없어서 null 허용) */
+  usageTip: string | null;
   /** 후기 언급(사회적 증거) */
   reviewLine: string;
   /** CTA (예: 영상 속 제품은 17번에 정리해뒀어요) */
@@ -40,7 +44,8 @@ export type ShortsProps = {
   brollFiles?: string[] | null;
   /**
    * 장면별 나레이션 오디오 (data URI mp3).
-   * 순서: [후킹, 공감, 장점1, 장점2, 후기, CTA]. null 이면 해당 장면 무음.
+   * 순서: [후킹, 공감, 장점1, 장점2, 사용팁, 후기, CTA] (7개, 사용팁 없으면 null).
+   * null 이면 해당 장면 무음.
    */
   narration?: (string | null)[] | null;
   /** 나레이션 길이에 맞춘 장면 컷 타이밍. 없으면 고정 TIMING 사용 */
@@ -54,6 +59,7 @@ export const defaultShortsProps: ShortsProps = {
   empathyLine: "치우기 은근 번거롭잖아요",
   benefit1: "차에 하나 놔주면 괜찮아 보여요",
   benefit2: "작아서 신랑도 부담 없이 쓸 것 같고요",
+  usageTip: "시트 틈새랑 컵홀더까지 구석구석 밀어주면 돼요",
   reviewLine: "후기도 많고 평이 괜찮아 보이더라고요",
   ctaText: "영상 속 제품은 17번에 정리해뒀어요",
   productImageUrl: null,
