@@ -521,8 +521,86 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
   }
 }
 
+/* ── 업로드 슬롯 게이트: 하루 3개를 아침/점심/저녁에 나눠 올리기 ──────────
+ * UPLOAD_SCHEDULE 환경변수("08:40,13:00,19:00" - KST 기준)가 있으면
+ * 각 슬롯에 날짜별 랜덤 지터(±30분)를 더한 "오늘의 업로드 시각"을 계산하고,
+ * (지금까지 지난 슬롯 수 - 오늘 이미 완료된 영상 수)개만 처리한다.
+ * 지터는 날짜+슬롯 번호에서 결정되는 의사난수라 15분마다 깨어나는 워커가
+ * 매번 같은 값을 얻는다(별도 상태 저장 불필요). 매일 시각이 조금씩 달라져
+ * "봇처럼 정각에 몰아 올리는" 패턴을 피한다. 미설정 시 기존처럼 즉시 전부 처리.
+ */
+const KST_OFFSET_MS = 9 * 3600_000;
+const SLOT_JITTER_MINUTES = 30;
+
+function todaysUploadSlots(schedule: string, now: Date): Date[] {
+  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
+  const y = kstNow.getUTCFullYear();
+  const m = kstNow.getUTCMonth();
+  const d = kstNow.getUTCDate();
+  const dayNum = y * 10000 + (m + 1) * 100 + d;
+  return schedule
+    .split(",")
+    .map((raw, i) => {
+      const [hh, mm = 0] = raw.trim().split(":").map(Number);
+      // 날짜·슬롯별 고정 지터: -30 ~ +30분
+      const jitter =
+        ((dayNum * 7919 + (i + 1) * 104729) % (SLOT_JITTER_MINUTES * 2 + 1)) -
+        SLOT_JITTER_MINUTES;
+      return new Date(Date.UTC(y, m, d, hh, mm + jitter) - KST_OFFSET_MS);
+    })
+    .sort((a, b) => a.getTime() - b.getTime());
+}
+
+/** 이번 실행에서 처리할 최대 개수. null = 게이트 없음(전부 처리) */
+async function allowedUploadCount(now = new Date()): Promise<number | null> {
+  const schedule = optionalEnv("UPLOAD_SCHEDULE");
+  if (!schedule) return null;
+
+  const slots = todaysUploadSlots(schedule, now);
+  const passed = slots.filter((s) => now >= s).length;
+  const next = slots.find((s) => now < s);
+  if (passed === 0) {
+    console.log(
+      `슬롯 대기: 오늘 첫 업로드는 ${next ? fmtKst(next) : "-"} (KST) 예정`
+    );
+    return 0;
+  }
+
+  // 오늘(KST 자정 이후) 이미 완료된 영상 수 → 지난 슬롯 수만큼만 채운다
+  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
+  const kstMidnightUtc = new Date(
+    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
+      KST_OFFSET_MS
+  );
+  const db = supabaseAdmin();
+  const { count, error } = await db
+    .from("video_items")
+    .select("id", { count: "exact", head: true })
+    .eq("video_status", "completed")
+    .gte("updated_at", kstMidnightUtc.toISOString());
+  if (error) {
+    console.error("오늘 완료 수 조회 실패(안전하게 대기):", error.message);
+    return 0;
+  }
+  const allowed = Math.max(0, passed - (count ?? 0));
+  if (allowed === 0 && next) {
+    console.log(`슬롯 충족: 다음 업로드는 ${fmtKst(next)} (KST) 예정`);
+  }
+  return allowed;
+}
+
+function fmtKst(d: Date): string {
+  const k = new Date(d.getTime() + KST_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(k.getUTCHours())}:${pad(k.getUTCMinutes())}`;
+}
+
 async function processPending(): Promise<number> {
   await reclaimStaleGenerating();
+
+  // 슬롯 게이트: 이번 실행에서 처리할 개수 제한 (UPLOAD_SCHEDULE 설정 시)
+  const allowed = await allowedUploadCount();
+  if (allowed !== null && allowed <= 0) return 0;
 
   const db = supabaseAdmin();
   const { data, error } = await db
@@ -539,6 +617,7 @@ async function processPending(): Promise<number> {
   const candidateIds = (data ?? []).map((row) => row.id as string);
   let processed = 0;
   for (const id of candidateIds) {
+    if (allowed !== null && processed >= allowed) break;
     // pending 조건이 걸린 원자적 UPDATE로 점유를 시도한다.
     // 다른 워커 프로세스가 먼저 점유했다면 null 이 반환되어 자연히 건너뛴다.
     const claimed = await claimItem(id);

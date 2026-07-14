@@ -72,6 +72,7 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
    `FORCE_TEMPLATE=D`(모든 렌더를 포맷 D 로 고정),
    `YOUTUBE_OAUTH_CLIENT_ID`/`YOUTUBE_OAUTH_CLIENT_SECRET`/`YOUTUBE_OAUTH_REFRESH_TOKEN`(유튜브 쇼츠 자동 업로드),
    `INSTAGRAM_BUSINESS_ACCOUNT_ID`/`INSTAGRAM_ACCESS_TOKEN`(인스타 릴스 자동 게시),
+   `UPLOAD_SCHEDULE=08:40,13:00,19:00`(하루 3개를 아침/점심/저녁 슬롯에 ±30분 랜덤 지터로 분산 업로드 - KST),
    (선택)`AI_API_KEY`)
 4. Actions 탭에서 `render-worker` → **Run workflow** 로 수동 테스트 가능
 
