@@ -71,12 +71,14 @@ export async function createVideoItem(
 export async function queueDailyVideos(target = 3): Promise<VideoItem[]> {
   const db = supabaseAdmin();
 
-  // 오늘(UTC) 이미 만든 영상 수 → 남은 만큼만 채운다(중복 생성 방지)
+  // 오늘(UTC) 이미 만든 "자동" 영상 수 → 남은 만큼만 채운다(중복 생성 방지)
+  // 수동(텔레그램 업로드) 항목은 세지 않는다 - 수동으로 올려도 자동 3개는 그대로 나가야 함
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const { count: createdToday, error: countError } = await db
     .from("video_items")
     .select("id", { count: "exact", head: true })
+    .eq("manual", false)
     .gte("created_at", startOfDay.toISOString());
   if (countError) throw new Error(`오늘 생성 수 조회 실패: ${countError.message}`);
 
