@@ -29,31 +29,7 @@ export const CoverFrame: React.FC<{
         />
       )}
 
-      {/* 번호 배지 - 상단 안전대 */}
-      <div
-        style={{
-          position: "absolute",
-          top: VIDEO.height * SAFE_ZONE.top + 16,
-          left: 40,
-          background: COLORS.cream,
-          border: `5px solid ${COLORS.accent}`,
-          borderRadius: 999,
-          padding: "12px 28px",
-          boxShadow: "0 8px 30px rgba(63, 52, 44, 0.3)",
-        }}
-      >
-        <span
-          style={{
-            color: COLORS.primaryDark,
-            fontWeight: 900,
-            fontSize: FONT_SIZES.coverBadge,
-          }}
-        >
-          {displayNumber}번
-        </span>
-      </div>
-
-      {/* 후킹 문구 - 하단 안전대. 사진 위든 여백 위든 항상 읽히도록 말풍선 카드로 */}
+      {/* 번호 배지 + 후킹 문구 - 하단 안전대에 세로로 쌓아서 번호가 문구 바로 위에 오게 */}
       <div
         style={{
           position: "absolute",
@@ -61,9 +37,31 @@ export const CoverFrame: React.FC<{
           right: "6%",
           bottom: VIDEO.height * SAFE_ZONE.bottom + 36,
           display: "flex",
-          justifyContent: "center",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
         }}
       >
+        <div
+          style={{
+            background: COLORS.cream,
+            border: `6px solid ${COLORS.accent}`,
+            borderRadius: 999,
+            padding: "14px 36px",
+            boxShadow: "0 8px 30px rgba(63, 52, 44, 0.3)",
+          }}
+        >
+          <span
+            style={{
+              color: COLORS.primaryDark,
+              fontWeight: 900,
+              fontSize: FONT_SIZES.coverBadge,
+            }}
+          >
+            {displayNumber}번
+          </span>
+        </div>
+
         <div
           style={{
             maxWidth: "100%",

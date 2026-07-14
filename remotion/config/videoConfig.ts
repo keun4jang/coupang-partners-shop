@@ -135,7 +135,7 @@ export const FONT_SIZES = {
   disclosure: 28,
   badge: 34,
   // 첫 프레임 썸네일용 - 화면 꽉 채운 사진 위라 일반 자막보다 크고 굵게
-  coverBadge: 56,
+  coverBadge: 76,
   coverHook: 64,
 } as const;
 
