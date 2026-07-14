@@ -45,7 +45,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           text={props.hookLine}
           size={FONT_SIZES.hook}
           variant="bubble"
-          y={0.24}
+          y={0.28}
         />
       </Sequence>
       <Sequence durationInFrames={f(T.hook.to)}>
@@ -55,7 +55,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         from={f(T.empathy.from)}
         durationInFrames={f(T.empathy.to - T.empathy.from)}
       >
-        <Subtitle text={props.empathyLine} variant="bubble" y={0.45} />
+        <Subtitle text={props.empathyLine} variant="bubble" y={0.4} />
         <Narration src={props.narration?.[1]} />
       </Sequence>
 

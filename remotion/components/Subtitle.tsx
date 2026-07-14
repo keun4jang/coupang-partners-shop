@@ -75,6 +75,8 @@ export const Subtitle: React.FC<{
             lineHeight: 1.3,
             letterSpacing: "-0.015em",
             wordBreak: "keep-all",
+            // 2줄이 될 때 위/아래 글자 수를 비슷하게 나눠 균형 있게(어절 단위)
+            textWrap: "balance",
           }}
         >
           {text}

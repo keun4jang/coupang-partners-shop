@@ -167,24 +167,25 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
 
 /**
  * 나레이션 실측 길이(초)에 맞춰 장면 컷 타이밍을 만든다.
- * - 각 장면 = 해당 나레이션 길이 + 짧은 간격(0.45초) → 문장 사이가 늘어지지 않음
- * - 총 길이가 목표(15초)보다 짧으면 비율대로 늘려 정확히 15초로 맞춤
- * - 나레이션이 길면 잘리지 않도록 15초를 넘길 수 있음(최대 나레이션 길이만큼)
+ * - 각 장면 = 해당 나레이션 길이 + 아주 짧은 간격(0.22초) → 문장이 뚝뚝 끊기지 않고 자연스럽게 이어짐
+ * - 총 길이가 최소(13초)보다 짧을 때만 비율로 늘림 → 짧은 나레이션도 과하게 늘어지지 않음
+ *   (대개 나레이션 자체가 13초를 넘기므로 원래 속도 그대로 재생돼 호흡이 자연스럽다)
+ * - 나레이션이 길면 잘리지 않도록 그 길이만큼 영상이 길어진다.
  */
-const TARGET_SECONDS = 18;
-const NARRATION_GAP = 0.45;
+const TARGET_SECONDS = 13;
+const NARRATION_GAP = 0.22;
 function buildSceneTiming(sec: number[]): SceneTiming {
   const need = (i: number, min: number) =>
     Math.max(min, (sec[i] ?? 0) + NARRATION_GAP);
   // 최소 장면 길이: 자막을 읽을 시간 + 카드 등장 모션 여유
   // 순서: 후킹 · 공감 · 장점1(카드 등장) · 장점2 · 후기 · CTA
   let scenes = [
-    need(0, 1.6), // 후킹
-    need(1, 1.6), // 공감
-    need(2, 2.6), // 장점1 (제품 카드 등장)
-    need(3, 2.2), // 장점2
-    need(4, 2.2), // 후기
-    Math.max(2.6, (sec[5] ?? 0) + 1.2), // CTA (마무리 여유)
+    need(0, 1.5), // 후킹
+    need(1, 1.5), // 공감
+    need(2, 2.4), // 장점1 (제품 카드 등장)
+    need(3, 2.1), // 장점2
+    need(4, 2.1), // 후기
+    Math.max(2.4, (sec[5] ?? 0) + 0.8), // CTA (마무리 여유)
   ];
   const total = scenes.reduce((a, b) => a + b, 0);
   if (total < TARGET_SECONDS) {
