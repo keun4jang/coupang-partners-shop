@@ -15,27 +15,19 @@ export const CoverFrame: React.FC<{
   hookLine: string;
 }> = ({ productImageUrl, displayNumber, hookLine }) => {
   return (
-    <AbsoluteFill style={{ fontFamily, backgroundColor: COLORS.cream }}>
-      {productImageUrl ? (
+    <AbsoluteFill
+      style={{
+        fontFamily,
+        background: `linear-gradient(160deg, ${COLORS.cream} 0%, ${COLORS.accentSoft} 100%)`,
+      }}
+    >
+      {/* 사진을 자르지 않고(contain) 그대로 보여준다 - 빈 공간은 배경색 그대로 */}
+      {productImageUrl && (
         <Img
           src={productImageUrl}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : (
-        <AbsoluteFill
-          style={{
-            background: `linear-gradient(160deg, ${COLORS.cream} 0%, ${COLORS.accent} 100%)`,
-          }}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
         />
       )}
-
-      {/* 하단 문구 가독성용 어두운 그라디언트 */}
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(0,0,0,0.75) 100%)",
-        }}
-      />
 
       {/* 번호 배지 - 상단 안전대 */}
       <div
@@ -47,7 +39,7 @@ export const CoverFrame: React.FC<{
           border: `5px solid ${COLORS.accent}`,
           borderRadius: 999,
           padding: "12px 28px",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+          boxShadow: "0 8px 30px rgba(63, 52, 44, 0.3)",
         }}
       >
         <span
@@ -61,23 +53,34 @@ export const CoverFrame: React.FC<{
         </span>
       </div>
 
-      {/* 후킹 문구 - 하단 안전대 */}
+      {/* 후킹 문구 - 하단 안전대. 사진 위든 여백 위든 항상 읽히도록 말풍선 카드로 */}
       <div
         style={{
           position: "absolute",
           left: "6%",
           right: "6%",
           bottom: VIDEO.height * SAFE_ZONE.bottom + 36,
-          color: "#FFFFFF",
-          fontWeight: 900,
-          fontSize: FONT_SIZES.coverHook,
-          lineHeight: 1.3,
-          textAlign: "center",
-          wordBreak: "keep-all",
-          textShadow: "0 4px 20px rgba(0,0,0,0.55)",
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        {hookLine}
+        <div
+          style={{
+            maxWidth: "100%",
+            background: "rgba(255, 248, 240, 0.95)",
+            color: COLORS.ink,
+            fontWeight: 900,
+            fontSize: FONT_SIZES.coverHook,
+            lineHeight: 1.3,
+            textAlign: "center",
+            wordBreak: "keep-all",
+            borderRadius: 24,
+            padding: "16px 28px",
+            boxShadow: `0 10px 34px ${COLORS.subtitleShadow}`,
+          }}
+        >
+          {hookLine}
+        </div>
       </div>
     </AbsoluteFill>
   );
