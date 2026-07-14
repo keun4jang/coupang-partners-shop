@@ -19,8 +19,8 @@ import { optionalEnv } from "./env";
  */
 
 const DEFAULT_VOICE = "ko-KR-SunHiNeural";
-/** 자막 장면 길이에 맞추기 위해 살짝 빠르게 */
-const DEFAULT_RATE = "+8%";
+/** 쇼츠 톤에 맞게 경쾌하게 (구글 TTS 폴백용 Edge 음성도 동일 체감 속도로) */
+const DEFAULT_RATE = "+15%";
 /** OUTPUT_FORMAT 이 48kbps CBR mp3 → 길이(초) ≈ bytes*8/48000 */
 const MP3_BITRATE = 48_000;
 /**
@@ -109,8 +109,8 @@ const GOOGLE_VOICE_FALLBACKS = [
   "ko-KR-Chirp3-HD-Kore",
   "ko-KR-Neural2-A",
 ];
-/** 나레이션 말 속도 - 아나운서처럼 빠르지 않게, 옆집 언니가 편하게 말하듯 살짝 느긋하게 */
-const GOOGLE_SPEAKING_RATE = 0.94;
+/** 나레이션 말 속도 - 쇼츠 시청자가 지루하지 않게 경쾌하게 (1.0=기본, 사장님 피드백: 느리다 → 상향) */
+const GOOGLE_SPEAKING_RATE = 1.08;
 
 /**
  * 억양 안정화용 텍스트 정리.
