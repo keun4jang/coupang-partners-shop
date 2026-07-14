@@ -570,7 +570,8 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
     return 0;
   }
 
-  // 오늘(KST 자정 이후) 이미 완료된 영상 수 → 지난 슬롯 수만큼만 채운다
+  // 오늘(KST 자정 이후) 이미 완료된 "자동" 영상 수 → 지난 슬롯 수만큼만 채운다
+  // (수동 업로드는 슬롯과 무관하므로 세지 않는다 - 수동으로 올려도 자동 3개는 그대로 나감)
   const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
   const kstMidnightUtc = new Date(
     Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
@@ -581,6 +582,7 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
     .from("video_items")
     .select("id", { count: "exact", head: true })
     .eq("video_status", "completed")
+    .eq("manual", false)
     .gte("updated_at", kstMidnightUtc.toISOString());
   if (error) {
     console.error("오늘 완료 수 조회 실패(안전하게 대기):", error.message);
@@ -605,14 +607,10 @@ async function processPending(): Promise<number> {
   // 인스타 장기 토큰 자동 갱신 (7일 주기, 하루 1회 시도 - 60일 만료 방지)
   await maybeRefreshInstagramToken();
 
-  // 슬롯 게이트: 이번 실행에서 처리할 개수 제한 (UPLOAD_SCHEDULE 설정 시)
-  const allowed = await allowedUploadCount();
-  if (allowed !== null && allowed <= 0) return 0;
-
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("video_items")
-    .select("id")
+    .select("id, manual")
     .eq("video_status", "pending")
     .order("display_number", { ascending: true });
 
@@ -621,16 +619,26 @@ async function processPending(): Promise<number> {
     return 0;
   }
 
-  const candidateIds = (data ?? []).map((row) => row.id as string);
+  const rows = (data ?? []) as Array<{ id: string; manual: boolean | null }>;
+  // 수동 요청(텔레그램 "업로드")은 슬롯 게이트를 우회해 항상 즉시 처리한다.
+  const manualIds = rows.filter((r) => r.manual).map((r) => r.id);
+  const autoIds = rows.filter((r) => !r.manual).map((r) => r.id);
+
+  // 슬롯 게이트: 자동 항목만 제한 (UPLOAD_SCHEDULE 설정 시)
+  const allowed = autoIds.length > 0 ? await allowedUploadCount() : 0;
+
   let processed = 0;
-  for (const id of candidateIds) {
-    if (allowed !== null && processed >= allowed) break;
+  let autoProcessed = 0;
+  for (const id of [...manualIds, ...autoIds]) {
+    const isAuto = !manualIds.includes(id);
+    if (isAuto && allowed !== null && autoProcessed >= (allowed ?? 0)) break;
     // pending 조건이 걸린 원자적 UPDATE로 점유를 시도한다.
     // 다른 워커 프로세스가 먼저 점유했다면 null 이 반환되어 자연히 건너뛴다.
     const claimed = await claimItem(id);
     if (!claimed) continue;
     await processItem(claimed);
     processed++;
+    if (isAuto) autoProcessed++;
   }
   return processed;
 }
@@ -655,7 +663,17 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => {
+main().catch(async (e) => {
   console.error(e);
+  // 워커 자체가 죽는 오류(환경변수 누락, DB 연결 실패 등)도 텔레그램으로 알린다.
+  // 텔레그램 환경변수마저 없으면 조용히 포기 (GitHub Actions 실패 알림이 2차 안전망).
+  try {
+    const msg = e instanceof Error ? e.message : String(e);
+    await sendTelegramMessage(
+      `🚨 렌더 워커 오류 (프로세스 중단)\n\n어디서: 렌더 워커 시작/설정 단계\n오류: ${msg.slice(0, 300)}`
+    );
+  } catch {
+    // 무시
+  }
   process.exit(1);
 });

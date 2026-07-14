@@ -78,3 +78,21 @@ jobs:
           vercel alias set "https://$URL" "$VERCEL_DOMAIN" \
             --token="$VERCEL_TOKEN" --scope="$VERCEL_TEAM_SCOPE"
           echo "✅ $VERCEL_DOMAIN → $URL 연결 완료"
+
+      # 실패 시 텔레그램 알림 (웹사이트가 옛 버전에 멈추는 문제 조기 감지)
+      - name: 실패 시 텔레그램 알림
+        if: failure()
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          BOT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_BOT_TOKEN=' | cut -d= -f2-)
+          CHAT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_ALLOWED_CHAT_ID=' | cut -d= -f2-)
+          if [ -n "$BOT" ] && [ -n "$CHAT" ]; then
+            curl -s -o /dev/null -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+              --data-urlencode "chat_id=${CHAT}" \
+              --data-urlencode "text=🚨 시스템 문제 발생
+
+          어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
+          무엇이: momitemmom.vercel.app 이 최신 배포에 연결되지 않았을 수 있음
+          로그: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi

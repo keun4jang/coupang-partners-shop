@@ -42,6 +42,13 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.check.outputs.ready == 'true'
 
+      # 실패 알림 단계에서도 쓸 수 있도록 환경파일을 최대한 일찍 만든다
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+
       - uses: actions/setup-node@v4
         if: steps.check.outputs.ready == 'true'
         with:
@@ -63,12 +70,23 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         run: npx remotion browser ensure
 
-      - name: .env.local 생성 (시크릿에서)
-        if: steps.check.outputs.ready == 'true'
-        env:
-          WORKER_ENV: ${{ secrets.WORKER_ENV }}
-        run: printf '%s\n' "$WORKER_ENV" > .env.local
-
       - name: 대기중 영상 렌더
         if: steps.check.outputs.ready == 'true'
         run: npm run worker:once
+
+      # 어느 단계에서든 실패하면 텔레그램으로 알린다 (렌더/의존성/브라우저 등)
+      - name: 실패 시 텔레그램 알림
+        if: failure() && steps.check.outputs.ready == 'true'
+        run: |
+          [ -f .env.local ] || exit 0
+          BOT=$(grep '^TELEGRAM_BOT_TOKEN=' .env.local | cut -d= -f2-)
+          CHAT=$(grep '^TELEGRAM_ALLOWED_CHAT_ID=' .env.local | cut -d= -f2-)
+          if [ -n "$BOT" ] && [ -n "$CHAT" ]; then
+            curl -s -o /dev/null -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+              --data-urlencode "chat_id=${CHAT}" \
+              --data-urlencode "text=🚨 시스템 문제 발생
+
+          어디서: 렌더 워커 (GitHub Actions)
+          무엇이: 영상 생성/업로드 실행 실패
+          로그: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi

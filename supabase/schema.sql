@@ -43,6 +43,8 @@ create table if not exists video_items (
   instagram_url text,
   instagram_error text,
   landing_visible boolean not null default false,
+  -- 텔레그램 "업로드" 등 수동 요청 여부. 수동 항목은 업로드 슬롯 게이트를 우회한다.
+  manual boolean not null default false,
   error_message text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

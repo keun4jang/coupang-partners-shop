@@ -13,7 +13,11 @@ const TEMPLATE_ROTATION: TemplateType[] = ["A", "B", "C"];
  */
 export async function createVideoItem(
   product: Product,
-  templateType?: TemplateType
+  templateType?: TemplateType,
+  opts?: {
+    /** 수동 요청(텔레그램 "업로드" 등) - 업로드 슬롯 게이트를 우회해 즉시 처리된다 */
+    manual?: boolean;
+  }
 ): Promise<VideoItem> {
   const db = supabaseAdmin();
 
@@ -38,6 +42,7 @@ export async function createVideoItem(
         template_type: template,
         video_status: "pending",
         landing_visible: false,
+        manual: opts?.manual ?? false,
       })
       .select("*")
       .single();

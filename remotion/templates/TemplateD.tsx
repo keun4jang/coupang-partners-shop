@@ -59,38 +59,12 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
-      {/* 제품 1차 노출(장점1): 크게 '히어로' 샷으로 제품을 확실히 보여준다 */}
+      {/* 제품 노출: 장점1에서 한 번 등장한 뒤 CTA 직전까지 화면 전환 없이 쭉 유지.
+          (같은 상품 사진이 장면마다 다시 팝인되면 3번 전환되는 것처럼 보여서
+           하나의 연속 노출로 합침 - 자막만 장점1→장점2→후기로 바뀐다) */}
       <Sequence
         from={f(T.product.from)}
-        durationInFrames={f(T.benefit2.from - T.product.from)}
-      >
-        <ProductOverlay
-          productName={props.productName}
-          productImageUrl={props.productImageUrl}
-          displayNumber={props.displayNumber}
-          topRatio={0.24}
-          widthRatio={0.72}
-        />
-      </Sequence>
-
-      {/* 제품 2차 노출(장점2): 크게 유지하며 다시 팝인 */}
-      <Sequence
-        from={f(T.benefit2.from)}
-        durationInFrames={f(T.review.from - T.benefit2.from)}
-      >
-        <ProductOverlay
-          productName={props.productName}
-          productImageUrl={props.productImageUrl}
-          displayNumber={props.displayNumber}
-          topRatio={0.26}
-          widthRatio={0.72}
-        />
-      </Sequence>
-
-      {/* 제품 3차 노출(후기): 크게 유지하며 한 번 더 팝인 */}
-      <Sequence
-        from={f(T.review.from)}
-        durationInFrames={ctaFrom - f(T.review.from)}
+        durationInFrames={ctaFrom - f(T.product.from)}
       >
         <ProductOverlay
           productName={props.productName}

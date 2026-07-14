@@ -65,7 +65,8 @@ async function handleVideoCommand(
     return;
   }
 
-  const item = await createVideoItem(product, templateType);
+  // 수동 요청이므로 manual=true → 업로드 슬롯 게이트를 우회해 즉시 처리된다.
+  const item = await createVideoItem(product, templateType, { manual: true });
   const filled = await fillVideoCopy(item, product);
   const number = formatDisplayNumber(filled.display_number);
 
@@ -80,10 +81,9 @@ async function handleVideoCommand(
       "",
       `번호: ${number}`,
       `상품: ${product.product_name}`,
-      `템플릿: ${filled.template_type}`,
       `후킹: ${filled.hook_text ?? "-"}`,
       "",
-      "영상 렌더링은 워커가 처리해요. 완료되면 링크페이지와 구글드라이브 링크를 보내드릴게요.",
+      "완료되면 웹사이트에 등록되고 유튜브·인스타에 업로드된 뒤 링크를 보내드릴게요.",
     ].join("\n"),
     chatId
   );
@@ -215,8 +215,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // "영상" 또는 "영상A"~"영상D" (템플릿 지정: D = 실사용 스톡영상 배경 포맷)
-  const videoMatch = text.match(/^영상\s*([ABCDabcd])?$/);
+  // "업로드"/"영상" 또는 "영상A"~"영상D" (템플릿 지정: D = 실사용 스톡영상 배경 포맷)
+  const videoMatch = text.match(/^(?:영상|업로드)\s*([ABCDabcd])?$/);
 
   try {
     if (videoMatch) {
@@ -239,8 +239,8 @@ export async function POST(request: NextRequest) {
           [
             "사용할 수 있는 명령이에요:",
             "",
-            "영상 - 상품 선택 후 새 번호로 영상 생성 (A/B/C 자동 로테이션)",
-            "영상D - 실사용 스톡영상 배경 포맷으로 생성",
+            "업로드 - 새 상품 하나 골라 웹사이트 등록 + 영상 생성·업로드 (즉시)",
+            "영상 - 업로드와 같음 (영상D 처럼 템플릿 지정 가능)",
             "상품목록 - 후보 상품 보기",
             "최근영상 - 최근 생성된 영상과 드라이브 링크",
             "상태 - 전체 현황 요약",
