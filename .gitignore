@@ -48,3 +48,6 @@ next-env.d.ts
 
 # 스톡 영상 캐시 (자동 다운로드)
 public/assets/broll/pexels-*.mp4
+
+# 자동 생성 버전 파일 (scripts/gen-version.mjs 가 빌드/개발 서버 시작 시마다 새로 만듦)
+src/lib/appVersion.ts

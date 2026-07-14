@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "pretypecheck": "node scripts/gen-version.mjs",
     "typecheck": "tsc --noEmit",
     "deploy": "vercel deploy --prod --yes",
     "webhook:set": "node scripts/set-webhook.mjs",
