@@ -39,7 +39,7 @@ import {
   makeFilePublic,
   driveDirectDownloadUrl,
 } from "../src/lib/drive";
-import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle } from "../src/lib/youtube";
+import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription } from "../src/lib/youtube";
 import { hasInstagramEnv, publishReelToInstagram } from "../src/lib/instagram";
 import {
   dateFolderName,
@@ -444,7 +444,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         const result = await uploadShortToYoutube({
           localPath: videoPath,
           title: youtubeTitle(item.display_number, shortenProductName(product.product_name)),
-          description: captionText,
+          description: youtubeDescription(item.display_number, shortenProductName(product.product_name)),
           tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
         });
         youtubeUrl = result.url;

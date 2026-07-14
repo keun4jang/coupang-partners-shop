@@ -74,3 +74,17 @@ export async function uploadShortToYoutube(params: {
 export function youtubeTitle(displayNumber: number, shortProductName: string): string {
   return `${displayNumber}번 | ${shortProductName} 살림템 추천 #Shorts`;
 }
+
+/** 유튜브 설명: 간단하게. 제품명 + 번호 안내 + 해시태그만 (대가성 문구 없음). */
+export function youtubeDescription(
+  displayNumber: number,
+  shortProductName: string
+): string {
+  return [
+    shortProductName,
+    "",
+    `영상 속 제품은 프로필 링크 ${displayNumber}번에서 확인하세요.`,
+    "",
+    "#Shorts #살림템 #생활템 #쿠팡추천템",
+  ].join("\n");
+}
