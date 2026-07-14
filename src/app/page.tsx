@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Product, VideoItemWithProduct } from "@/types/db";
 import { supabaseAdmin } from "@/lib/supabase";
 import { formatDisplayNumber } from "@/lib/format";
+import { APP_VERSION } from "@/lib/appVersion";
 
 export const dynamic = "force-dynamic";
 
@@ -247,9 +248,10 @@ export default async function Home({
         </section>
       )}
 
-      {/* 대가성 문구 */}
+      {/* 대가성 문구 + 버전 (수정할 때마다 자동으로 올라감) */}
       <footer className="mt-12 text-center text-sub text-xs leading-relaxed">
         쿠팡파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다.
+        <span className="block mt-2 text-sub/50">v{APP_VERSION}</span>
       </footer>
     </main>
   );
