@@ -16,6 +16,10 @@ export interface Product {
   image_url: string | null;
   source_memo: string | null;
   status: ProductStatus;
+  /** 자동 소싱된 상품 영상 캐시 (알리 매칭 등) */
+  source_video_url: string | null;
+  source_video_origin: string | null;
+  source_video_checked_at: string | null;
   created_at: string;
   updated_at: string;
 }

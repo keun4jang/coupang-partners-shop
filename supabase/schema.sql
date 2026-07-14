@@ -18,6 +18,10 @@ create table if not exists products (
   image_url text,
   source_memo text,
   status text not null default 'candidate' check (status in ('candidate', 'paused')),
+  -- 자동 소싱된 상품 영상 캐시 (알리 매칭 등). 같은 상품 재렌더 시 재검색 없이 재사용.
+  source_video_url text,
+  source_video_origin text,
+  source_video_checked_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

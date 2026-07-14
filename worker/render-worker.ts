@@ -56,6 +56,7 @@ import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls } from "../src/lib/broll";
+import { sourceProductClips } from "../src/lib/videoSource";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
@@ -228,30 +229,41 @@ async function getBundle(): Promise<string> {
 async function renderVideo(
   item: VideoItem,
   product: Product
-): Promise<{ videoPath: string; thumbnailPath: string }> {
+): Promise<{ videoPath: string; thumbnailPath: string; brollOrigin: string }> {
   const inputProps = buildProps(item, product);
 
   // 렌더할 실제 템플릿. FORCE_TEMPLATE 로 배치 렌더 시 강제 지정 가능
   // (DB 제약이 아직 'D' 를 안 받을 때 D 포맷을 뽑기 위한 안전장치).
   const effectiveTemplate = optionalEnv("FORCE_TEMPLATE") ?? item.template_type;
 
-  // 포맷 D: 실사용 스톡 영상 4컷 배경 (없으면 블러 상품사진으로 폴백)
+  // 포맷 D 배경: ① 상품 영상 자동 소싱(캐시→알리 매칭) → ② 스톡 → ③ 블러 상품사진
+  let brollOrigin = "배경 없음(블러 사진)";
   if (effectiveTemplate === "D") {
-    console.log("실사용 스톡 영상 검색 중 (4컷)...");
-    const brolls = await fetchStockBrolls(
-      product.category,
-      item.display_number,
-      4,
-      product.product_name
-    );
-    if (brolls.length > 0) {
-      inputProps.brollFiles = brolls.map((b) => b.file);
-      // 새로 받은 클립이 번들에 포함되도록 번들 캐시 무효화
+    console.log("상품 영상 자동 소싱 중...");
+    const sourced = await sourceProductClips(product, item.display_number, 4);
+    if (sourced.files.length > 0) {
+      inputProps.brollFiles = sourced.files;
       cachedBundle = null;
-      console.log(
-        `스톡 클립 ${brolls.length}개 사용: ` +
-          brolls.map((b) => `${b.file}(${b.durationSec}s)`).join(", ")
+      brollOrigin = sourced.origin;
+      console.log(`상품 영상 사용 (${sourced.origin}): ${sourced.files.join(", ")}`);
+    } else {
+      console.log("실사용 스톡 영상 검색 중 (4컷)...");
+      const brolls = await fetchStockBrolls(
+        product.category,
+        item.display_number,
+        4,
+        product.product_name
       );
+      if (brolls.length > 0) {
+        inputProps.brollFiles = brolls.map((b) => b.file);
+        // 새로 받은 클립이 번들에 포함되도록 번들 캐시 무효화
+        cachedBundle = null;
+        brollOrigin = "실사용 스톡(Pexels)";
+        console.log(
+          `스톡 클립 ${brolls.length}개 사용: ` +
+            brolls.map((b) => `${b.file}(${b.durationSec}s)`).join(", ")
+        );
+      }
     }
   }
 
@@ -333,7 +345,7 @@ async function renderVideo(
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });
 
-  return { videoPath, thumbnailPath };
+  return { videoPath, thumbnailPath, brollOrigin };
 }
 
 /**
@@ -400,7 +412,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       item = await fillVideoCopy(item, product);
     }
 
-    const { videoPath, thumbnailPath } = await renderVideo(item, product);
+    const { videoPath, thumbnailPath, brollOrigin } = await renderVideo(item, product);
     const captionText = item.caption_text ?? "";
 
     let driveVideoUrl: string | null = null;
@@ -537,6 +549,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         `상품: ${product.product_name}`,
         `후킹: ${item.hook_text ?? "-"}`,
         `링크페이지: ${siteUrl()}/?q=${item.display_number}`,
+        `배경 소스: ${brollOrigin}`,
         `구글드라이브: ${driveVideoUrl ?? `(로컬) ${videoPath}`}`,
         ...(driveNote ? [`※ ${driveNote}`] : []),
         `유튜브: ${youtubeUrl ?? (youtubeError ? `실패 - ${youtubeError.slice(0, 100)}` : "미설정")}`,
