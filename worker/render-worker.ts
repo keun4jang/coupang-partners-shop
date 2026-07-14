@@ -32,7 +32,15 @@ import {
 } from "@remotion/renderer";
 import { supabaseAdmin } from "../src/lib/supabase";
 import { sendTelegramMessage } from "../src/lib/telegram";
-import { ensureDateFolder, uploadFileToDrive, uploadTextToDrive } from "../src/lib/drive";
+import {
+  ensureDateFolder,
+  uploadFileToDrive,
+  uploadTextToDrive,
+  makeFilePublic,
+  driveDirectDownloadUrl,
+} from "../src/lib/drive";
+import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle } from "../src/lib/youtube";
+import { hasInstagramEnv, publishReelToInstagram } from "../src/lib/instagram";
 import {
   dateFolderName,
   driveFileName,
@@ -382,6 +390,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
     const captionText = item.caption_text ?? "";
 
     let driveVideoUrl: string | null = null;
+    let driveVideoFileId: string | null = null;
     let driveCaptionUrl: string | null = null;
     let driveThumbnailUrl: string | null = null;
     let driveNote: string | null = null;
@@ -392,23 +401,29 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       try {
         console.log("구글드라이브 업로드 중...");
         const folderId = await ensureDateFolder(dateFolderName());
-        driveVideoUrl = await uploadFileToDrive(
+        const video = await uploadFileToDrive(
           folderId,
           driveFileName(item.display_number, product.product_name, "video"),
           "video/mp4",
           videoPath
         );
-        driveThumbnailUrl = await uploadFileToDrive(
-          folderId,
-          driveFileName(item.display_number, product.product_name, "thumbnail"),
-          "image/png",
-          thumbnailPath
-        );
-        driveCaptionUrl = await uploadTextToDrive(
-          folderId,
-          driveFileName(item.display_number, product.product_name, "caption"),
-          captionText
-        );
+        driveVideoUrl = video.url;
+        driveVideoFileId = video.id;
+        driveThumbnailUrl = (
+          await uploadFileToDrive(
+            folderId,
+            driveFileName(item.display_number, product.product_name, "thumbnail"),
+            "image/png",
+            thumbnailPath
+          )
+        ).url;
+        driveCaptionUrl = (
+          await uploadTextToDrive(
+            folderId,
+            driveFileName(item.display_number, product.product_name, "caption"),
+            captionText
+          )
+        ).url;
       } catch (uploadError) {
         const msg =
           uploadError instanceof Error ? uploadError.message : String(uploadError);
@@ -419,6 +434,49 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       console.log("[드라이브 미설정] 로컬 파일로 유지:", videoPath);
     }
 
+    // 유튜브 쇼츠 자동 업로드 (실패해도 영상 자체는 완료 처리 - 재시도는 수동)
+    let youtubeUrl: string | null = null;
+    let youtubeError: string | null = null;
+    if (hasYoutubeEnv()) {
+      try {
+        console.log("유튜브 업로드 중...");
+        const result = await uploadShortToYoutube({
+          localPath: videoPath,
+          title: youtubeTitle(item.display_number, shortenProductName(product.product_name)),
+          description: captionText,
+          tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
+        });
+        youtubeUrl = result.url;
+        console.log("유튜브 업로드 완료:", youtubeUrl);
+      } catch (e) {
+        youtubeError = e instanceof Error ? e.message : String(e);
+        console.error("유튜브 업로드 실패:", youtubeError);
+      }
+    }
+
+    // 인스타 릴스 자동 업로드 (드라이브에 올라간 영상을 공개 링크로 메타 서버가 직접 가져감)
+    let instagramUrl: string | null = null;
+    let instagramError: string | null = null;
+    if (hasInstagramEnv()) {
+      if (!driveVideoFileId) {
+        instagramError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
+      } else {
+        try {
+          console.log("인스타 릴스 업로드 중...");
+          await makeFilePublic(driveVideoFileId);
+          const result = await publishReelToInstagram({
+            videoUrl: driveDirectDownloadUrl(driveVideoFileId),
+            caption: captionText,
+          });
+          instagramUrl = result.url;
+          console.log("인스타 업로드 완료:", instagramUrl);
+        } catch (e) {
+          instagramError = e instanceof Error ? e.message : String(e);
+          console.error("인스타 업로드 실패:", instagramError);
+        }
+      }
+    }
+
     await db
       .from("video_items")
       .update({
@@ -426,6 +484,10 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         drive_video_url: driveVideoUrl,
         drive_caption_url: driveCaptionUrl,
         drive_thumbnail_url: driveThumbnailUrl,
+        youtube_url: youtubeUrl,
+        youtube_error: youtubeError,
+        instagram_url: instagramUrl,
+        instagram_error: instagramError,
         landing_visible: true,
         error_message: driveNote,
       })
@@ -441,8 +503,8 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         `링크페이지: ${siteUrl()}/?q=${item.display_number}`,
         `구글드라이브: ${driveVideoUrl ?? `(로컬) ${videoPath}`}`,
         ...(driveNote ? [`※ ${driveNote}`] : []),
-        "",
-        "직접 TikTok/Reels/Shorts에 업로드하세요.",
+        `유튜브: ${youtubeUrl ?? (youtubeError ? `실패 - ${youtubeError.slice(0, 100)}` : "미설정")}`,
+        `인스타: ${instagramUrl ?? (instagramError ? `실패 - ${instagramError.slice(0, 100)}` : "미설정")}`,
       ].join("\n")
     );
     console.log(`=== ${number} 완료 ===`);

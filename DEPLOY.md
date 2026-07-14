@@ -69,11 +69,27 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
    `TELEGRAM_ALLOWED_CHAT_ID`, `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_OAUTH_CLIENT_ID`,
    `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `NEXT_PUBLIC_SITE_URL`,
    `GOOGLE_TTS_API_KEY`(자연스러운 나레이션), `PEXELS_API_KEY`(포맷 D 스톡영상),
-   `FORCE_TEMPLATE=D`(모든 렌더를 포맷 D 로 고정), (선택)`AI_API_KEY`)
+   `FORCE_TEMPLATE=D`(모든 렌더를 포맷 D 로 고정),
+   `INSTAGRAM_BUSINESS_ACCOUNT_ID`/`INSTAGRAM_ACCESS_TOKEN`(인스타 릴스 자동 게시 - 메타 앱 심사
+   통과 후), (선택)`AI_API_KEY`)
 4. Actions 탭에서 `render-worker` → **Run workflow** 로 수동 테스트 가능
 
 > 🎬 **포맷 D 고정**: `FORCE_TEMPLATE=D` 를 넣으면 DB template_type 과 무관하게
 > 모든 영상을 포맷 D(실사용 스톡영상 배경)로 렌더한다. 빼면 저장된 A/B/C 로 렌더됨.
+
+> 📺 **유튜브 쇼츠 자동 업로드**: 별도 키가 필요 없다 - 이미 있는
+> `GOOGLE_OAUTH_*`(드라이브용) 를 그대로 재사용한다. 단, 그 refresh token 이
+> `youtube.upload` 스코프로 발급된 것이어야 한다(구버전 토큰이면 유튜브만 조용히
+> 건너뛴다). 재발급: `node scripts/google-oauth.mjs url` → 동의 → `exchange` →
+> 나온 `GOOGLE_OAUTH_REFRESH_TOKEN` 으로 교체. 같은 구글 클라우드 프로젝트에서
+> **YouTube Data API v3** 도 활성화해야 한다.
+>
+> 📸 **인스타 릴스 자동 게시**: 메타 쪽 사전 절차가 필요하다(코드로 대신할 수 없음) -
+> ① 인스타를 비즈니스 계정으로 전환 ② 페이스북 페이지 연결 ③ developers.facebook.com
+> 에서 비즈니스 앱 생성 + Instagram Graph API 추가 ④ `instagram_business_content_publish`
+> 권한 앱 심사 제출(보통 2~4주) ⑤ 통과 후 장기 액세스 토큰 + 비즈니스 계정 ID 발급받아
+> `INSTAGRAM_ACCESS_TOKEN`/`INSTAGRAM_BUSINESS_ACCOUNT_ID` 에 등록. 자세한 절차는
+> `src/lib/instagram.ts` 상단 주석 참고. 미설정 시 인스타 업로드만 조용히 건너뛴다.
 
 > 시크릿이 없으면 워크플로는 아무것도 안 하고 조용히 종료한다(안전).
 > ⚠️ public 저장소이므로 시크릿은 반드시 GitHub Secrets 에만 — 코드/커밋에 절대 금지.

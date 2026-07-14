@@ -80,12 +80,17 @@ export function ensureDateFolder(dateName: string): Promise<string> {
   return promise;
 }
 
+export interface DriveUploadResult {
+  id: string;
+  url: string;
+}
+
 async function uploadToFolder(
   folderId: string,
   name: string,
   mimeType: string,
   body: Readable
-): Promise<string> {
+): Promise<DriveUploadResult> {
   const drive = driveClient();
   const { data } = await drive.files.create({
     requestBody: { name, parents: [folderId] },
@@ -94,7 +99,10 @@ async function uploadToFolder(
     supportsAllDrives: true,
   });
   if (!data.id) throw new Error(`드라이브 업로드 실패: ${name}`);
-  return data.webViewLink ?? `https://drive.google.com/file/d/${data.id}/view`;
+  return {
+    id: data.id,
+    url: data.webViewLink ?? `https://drive.google.com/file/d/${data.id}/view`,
+  };
 }
 
 export async function uploadFileToDrive(
@@ -102,7 +110,7 @@ export async function uploadFileToDrive(
   name: string,
   mimeType: string,
   localPath: string
-): Promise<string> {
+): Promise<DriveUploadResult> {
   return uploadToFolder(folderId, name, mimeType, fs.createReadStream(localPath));
 }
 
@@ -110,11 +118,30 @@ export async function uploadTextToDrive(
   folderId: string,
   name: string,
   text: string
-): Promise<string> {
+): Promise<DriveUploadResult> {
   return uploadToFolder(
     folderId,
     name,
     "text/plain",
     Readable.from([Buffer.from(text, "utf-8")])
   );
+}
+
+/**
+ * 파일을 "링크가 있는 모든 사용자" 읽기 권한으로 공개한다.
+ * 유튜브/인스타 등 외부 서비스가 로그인 없이 직접 내려받아야 할 때(예: 인스타 릴스 게시 API가
+ * video_url 을 자기 서버에서 fetch) 필요. 이미 게시할 영상이라 공개해도 문제 없다.
+ */
+export async function makeFilePublic(fileId: string): Promise<void> {
+  const drive = driveClient();
+  await drive.permissions.create({
+    fileId,
+    requestBody: { role: "reader", type: "anyone" },
+    supportsAllDrives: true,
+  });
+}
+
+/** 로그인 없이 바이너리를 직접 내려받을 수 있는 링크 (makeFilePublic 후에만 유효) */
+export function driveDirectDownloadUrl(fileId: string): string {
+  return `https://drive.google.com/uc?export=download&id=${fileId}`;
 }

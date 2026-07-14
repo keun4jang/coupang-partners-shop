@@ -32,6 +32,10 @@ export interface VideoItem {
   drive_video_url: string | null;
   drive_caption_url: string | null;
   drive_thumbnail_url: string | null;
+  youtube_url: string | null;
+  youtube_error: string | null;
+  instagram_url: string | null;
+  instagram_error: string | null;
   landing_visible: boolean;
   error_message: string | null;
   created_at: string;

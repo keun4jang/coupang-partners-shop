@@ -37,6 +37,11 @@ create table if not exists video_items (
   drive_video_url text,
   drive_caption_url text,
   drive_thumbnail_url text,
+  -- SNS 자동 업로드 결과. url 이 채워지면 업로드 성공, error 는 실패 사유(재시도 시 초기화).
+  youtube_url text,
+  youtube_error text,
+  instagram_url text,
+  instagram_error text,
   landing_visible boolean not null default false,
   error_message text,
   created_at timestamptz not null default now(),

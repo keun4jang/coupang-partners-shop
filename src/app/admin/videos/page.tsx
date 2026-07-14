@@ -173,10 +173,36 @@ export default async function AdminVideos() {
                   썸네일 ↗
                 </a>
               )}
+              {v.youtube_url && (
+                <a
+                  href={v.youtube_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-dark font-semibold"
+                >
+                  유튜브 ↗
+                </a>
+              )}
+              {v.instagram_url && (
+                <a
+                  href={v.instagram_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-dark font-semibold"
+                >
+                  인스타 ↗
+                </a>
+              )}
             </div>
 
             {v.video_status === "failed" && v.error_message && (
               <p className="text-xs text-red-600 mt-2">{v.error_message}</p>
+            )}
+            {v.video_status === "completed" && v.youtube_error && (
+              <p className="text-xs text-red-600 mt-2">유튜브 업로드 실패: {v.youtube_error}</p>
+            )}
+            {v.video_status === "completed" && v.instagram_error && (
+              <p className="text-xs text-red-600 mt-2">인스타 업로드 실패: {v.instagram_error}</p>
             )}
             {v.video_status === "failed" && (
               <form method="POST" action="/api/admin/videos" className="mt-2">
