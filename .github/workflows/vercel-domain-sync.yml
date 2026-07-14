@@ -1,0 +1,80 @@
+# Vercel 프로덕션 도메인 자동 재연결.
+#
+# 프로젝트를 momitemmom 으로 리네임하면서 momitemmom.vercel.app 도메인이
+# Vercel 의 "새 배포마다 자동 갱신" 목록에서 빠졌다(내부 링크 유실 - 리네임 버그).
+# 그래서 빌드/배포는 항상 성공하는데 실제 도메인은 예전 배포에 멈춰 있었다.
+#
+# 완전한 근본 수정(도메인 삭제 후 재등록)은 순간적으로 사이트가 내려갈 수 있어
+# 보류하고, 대신 이 워크플로가 푸시마다 최신 프로덕션 배포를 찾아
+# momitemmom.vercel.app 에 재연결한다(`vercel alias set`) - 다운타임 없음.
+#
+# 필요한 것: 저장소 Settings → Secrets and variables → Actions 에
+#   VERCEL_TOKEN = Vercel 개인 액세스 토큰 (https://vercel.com/account/tokens)
+# 이 시크릿이 없으면 아무것도 하지 않고 조용히 종료한다.
+
+name: vercel-domain-sync
+
+on:
+  push:
+    branches:
+      - claude/coupang-partners-shortform-hinfcb
+
+# project/team id 는 비밀정보 아님(공개 식별자) - 시크릿 아닌 값으로 둔다.
+env:
+  VERCEL_PROJECT_ID: prj_fToV2H7YJsGLIIQPdr7EhzrepHVl
+  VERCEL_TEAM_SCOPE: rmsduddl200-2456s-projects
+  VERCEL_TEAM_ID: team_K9RrJcr1OyeJodEA9g34IAKO
+  VERCEL_DOMAIN: momitemmom.vercel.app
+
+jobs:
+  sync-domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 토큰 확인
+        id: check
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "VERCEL_TOKEN 시크릿이 없어 건너뜁니다."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 이 커밋의 배포가 준비될 때까지 대기 후 도메인 재연결
+        if: steps.check.outputs.ready == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -e
+          echo "커밋 $GIT_SHA 의 Vercel 배포 대기 중..."
+          URL=""
+          for i in $(seq 1 30); do
+            RESP=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=10&teamId=$VERCEL_TEAM_ID")
+            URL=$(GIT_SHA="$GIT_SHA" node -e "
+              const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+              const sha = process.env.GIT_SHA;
+              const dep = (data.deployments || []).find(
+                (d) => d.meta && d.meta.githubCommitSha === sha && d.state === 'READY'
+              );
+              if (dep) process.stdout.write(dep.url);
+            " <<< "$RESP")
+            if [ -n "$URL" ]; then
+              echo "배포 준비됨: $URL"
+              break
+            fi
+            echo "[$i/30] 아직 준비 안 됨 - 10초 후 재시도"
+            sleep 10
+          done
+
+          if [ -z "$URL" ]; then
+            echo "::warning::5분 내에 배포가 준비되지 않아 도메인 재연결을 건너뜁니다. 다음 푸시에서 재시도됩니다."
+            exit 0
+          fi
+
+          npm install -g vercel@latest --no-progress >/dev/null 2>&1
+          vercel alias set "https://$URL" "$VERCEL_DOMAIN" \
+            --token="$VERCEL_TOKEN" --scope="$VERCEL_TEAM_SCOPE"
+          echo "✅ $VERCEL_DOMAIN → $URL 연결 완료"
