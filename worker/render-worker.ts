@@ -60,7 +60,8 @@ import type { Product, VideoItem, VideoItemWithProduct } from "../src/types/db";
 
 const POLL_INTERVAL_MS = 30_000;
 const RENDER_DIR = path.resolve("renders");
-const THUMBNAIL_SECOND = 8; // 제품 카드가 보이는 시점 (product 장면 5.5초 시작 + 등장 모션 여유)
+// 썸네일은 영상 0프레임(제품사진 꽉 채운 CoverFrame - remotion/components/CoverFrame.tsx)에서 뽑는다.
+const THUMBNAIL_FRAME = 0;
 // 이 시간 넘게 'generating' 상태인 항목은 워커가 죽은 것으로 보고 재시도한다.
 const STALE_GENERATING_MS = 15 * 60_000;
 
@@ -314,7 +315,7 @@ async function renderVideo(
     composition,
     serveUrl,
     output: thumbnailPath,
-    frame: THUMBNAIL_SECOND * VIDEO.fps,
+    frame: THUMBNAIL_FRAME,
     inputProps: inputProps as unknown as Record<string, unknown>,
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });

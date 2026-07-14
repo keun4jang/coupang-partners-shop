@@ -134,7 +134,17 @@ export const FONT_SIZES = {
   ctaText: 58,
   disclosure: 28,
   badge: 34,
+  // 첫 프레임 썸네일용 - 화면 꽉 채운 사진 위라 일반 자막보다 크고 굵게
+  coverBadge: 56,
+  coverHook: 64,
 } as const;
+
+/**
+ * 영상 첫 프레임(정확히 1프레임)을 썸네일처럼 쓰기 위한 정적 커버 화면 길이.
+ * 재생 중엔 1/30초라 거의 안 보이고, 플랫폼이 이 프레임을 미리보기로 캡처하거나
+ * 우리가 직접 썸네일 PNG로 뽑을 때(worker THUMBNAIL_FRAME) 이 화면이 나온다.
+ */
+export const COVER_FRAME_COUNT = 1;
 
 /** 모션 속도/강도 */
 export const MOTION = {

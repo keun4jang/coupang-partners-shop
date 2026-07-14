@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
 import type { ShortsProps } from "../types";
 import {
+  COVER_FRAME_COUNT,
   FONT_SIZES,
   resolveTiming,
   secondsToFrames as f,
@@ -11,6 +12,7 @@ import { Subtitle } from "../components/Subtitle";
 import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { Narration } from "../components/Narration";
+import { CoverFrame } from "../components/CoverFrame";
 
 /**
  * Template D: 실사용 영상형
@@ -145,6 +147,15 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
         <Narration src={props.narration?.[5]} />
+      </Sequence>
+
+      {/* 첫 프레임 썸네일용 커버 - 맨 위 레이어라 1프레임 동안 다른 요소를 전부 가림 */}
+      <Sequence durationInFrames={COVER_FRAME_COUNT}>
+        <CoverFrame
+          productImageUrl={props.productImageUrl}
+          displayNumber={props.displayNumber}
+          hookLine={props.hookLine}
+        />
       </Sequence>
     </AbsoluteFill>
   );

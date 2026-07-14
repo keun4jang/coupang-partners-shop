@@ -9,6 +9,7 @@ import {
 import type { ShortsProps } from "../types";
 import {
   COLORS,
+  COVER_FRAME_COUNT,
   FONT_SIZES,
   MOTION,
   TEMPLATE_BADGE,
@@ -22,6 +23,7 @@ import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { TopBadge } from "../components/TopBadge";
 import { Narration } from "../components/Narration";
+import { CoverFrame } from "../components/CoverFrame";
 
 /** 메모 카드의 체크 항목 - startFrame 이후 순서대로 팝인 */
 const MemoLine: React.FC<{ text: string; delayFrames: number }> = ({
@@ -184,6 +186,14 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[5]} />
       </Sequence>
 
+      {/* 첫 프레임 썸네일용 커버 */}
+      <Sequence durationInFrames={COVER_FRAME_COUNT}>
+        <CoverFrame
+          productImageUrl={props.productImageUrl}
+          displayNumber={props.displayNumber}
+          hookLine={props.hookLine}
+        />
+      </Sequence>
     </AbsoluteFill>
   );
 };

@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
 import type { ShortsProps } from "../types";
 import {
+  COVER_FRAME_COUNT,
   FONT_SIZES,
   TEMPLATE_BADGE,
   resolveTiming,
@@ -13,6 +14,7 @@ import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { TopBadge } from "../components/TopBadge";
 import { Narration } from "../components/Narration";
+import { CoverFrame } from "../components/CoverFrame";
 
 /**
  * Template B: 아이엄마 공감형
@@ -109,6 +111,14 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[5]} />
       </Sequence>
 
+      {/* 첫 프레임 썸네일용 커버 */}
+      <Sequence durationInFrames={COVER_FRAME_COUNT}>
+        <CoverFrame
+          productImageUrl={props.productImageUrl}
+          displayNumber={props.displayNumber}
+          hookLine={props.hookLine}
+        />
+      </Sequence>
     </AbsoluteFill>
   );
 };
