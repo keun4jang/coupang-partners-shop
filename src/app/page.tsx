@@ -75,12 +75,65 @@ function ItemCard({
   );
 }
 
+/** 목록 페이지당 카드 수 */
+const PAGE_SIZE = 5;
+
+/** 페이지 링크 주소 (검색어 q 가 있으면 유지) */
+function pageHref(page: number, q?: string): string {
+  const sp = new URLSearchParams();
+  if (q) sp.set("q", q);
+  sp.set("page", String(page));
+  return `/?${sp.toString()}`;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  q,
+}: {
+  page: number;
+  totalPages: number;
+  q?: string;
+}) {
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const btn =
+    "min-w-10 h-10 px-3 flex items-center justify-center rounded-xl text-[15px] font-bold transition-colors";
+  return (
+    <nav className="flex flex-wrap items-center justify-center gap-2 mt-6" aria-label="페이지 이동">
+      {page > 1 && (
+        <a href={pageHref(page - 1, q)} className={`${btn} bg-card border border-accent-soft text-ink hover:bg-accent-soft`} aria-label="이전 페이지">
+          ‹
+        </a>
+      )}
+      {pages.map((n) => (
+        <a
+          key={n}
+          href={pageHref(n, q)}
+          aria-current={n === page ? "page" : undefined}
+          className={
+            n === page
+              ? `${btn} bg-primary text-white`
+              : `${btn} bg-card border border-accent-soft text-ink hover:bg-accent-soft`
+          }
+        >
+          {n}
+        </a>
+      ))}
+      {page < totalPages && (
+        <a href={pageHref(page + 1, q)} className={`${btn} bg-card border border-accent-soft text-ink hover:bg-accent-soft`} aria-label="다음 페이지">
+          ›
+        </a>
+      )}
+    </nav>
+  );
+}
+
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, page: pageParam } = await searchParams;
 
   let result: VideoItemWithProduct | null = null;
   let items: VideoItemWithProduct[] = [];
@@ -91,6 +144,18 @@ export default async function Home({
   } catch {
     dbReady = false;
   }
+
+  // 검색 결과로 위에 이미 보여준 항목은 목록에서 제외하고, 5개씩 페이지로 나눈다.
+  const listItems = items.filter((item) => item.id !== result?.id);
+  const totalPages = Math.max(1, Math.ceil(listItems.length / PAGE_SIZE));
+  const currentPage = Math.min(
+    totalPages,
+    Math.max(1, parseInt(pageParam ?? "1", 10) || 1)
+  );
+  const pageItems = listItems.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   return (
     <main className="max-w-lg mx-auto px-5 pb-16">
@@ -167,17 +232,18 @@ export default async function Home({
         </section>
       )}
 
-      {/* 전체 목록 (노출된 번호 전부) */}
-      {dbReady && items.length > 0 && (
+      {/* 전체 목록 (5개씩 페이지로) */}
+      {dbReady && listItems.length > 0 && (
         <section className="mt-10">
           <h2 className="font-bold text-xl mb-4">정리해둔 생활템 전체</h2>
           <div className="flex flex-col gap-4">
-            {items
-              .filter((item) => item.id !== result?.id)
-              .map((item) => (
-                <ItemCard key={item.id} item={item} />
-              ))}
+            {pageItems.map((item) => (
+              <ItemCard key={item.id} item={item} />
+            ))}
           </div>
+          {totalPages > 1 && (
+            <Pagination page={currentPage} totalPages={totalPages} q={q} />
+          )}
         </section>
       )}
 
