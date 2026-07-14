@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Product, VideoItemWithProduct } from "@/types/db";
 import { supabaseAdmin } from "@/lib/supabase";
 import { formatDisplayNumber } from "@/lib/format";
@@ -96,7 +97,16 @@ export default async function Home({
       {/* 헤더 */}
       <header className="pt-10 pb-6 text-center">
         <h1 className="text-3xl font-extrabold tracking-tight">
-          살림템 메모장 <span aria-hidden>📝</span>
+          살림템 메모장{" "}
+          {/* 숨은 관리자 진입 버튼 — 겉보기엔 그냥 이모지 (나만 아는 버튼) */}
+          <Link
+            href="/admin"
+            aria-hidden
+            tabIndex={-1}
+            className="cursor-default no-underline"
+          >
+            📝
+          </Link>
         </h1>
         <p className="text-sub mt-2 text-[15px] leading-relaxed">
           아이 둘 키우며 눈에 띈 생활템을
