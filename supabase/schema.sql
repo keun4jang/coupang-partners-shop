@@ -90,3 +90,20 @@ create trigger trg_video_items_updated_at
 alter table products enable row level security;
 alter table video_items enable row level security;
 alter table click_logs enable row level security;
+
+-- 4. app_settings: 키-값 설정 저장소
+-- 인스타 액세스 토큰(60일 만료 → 자동 갱신본 저장)처럼
+-- 코드 배포 없이 갱신돼야 하는 값을 보관한다.
+create table if not exists app_settings (
+  key text primary key,
+  value text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_app_settings_updated_at on app_settings;
+create trigger trg_app_settings_updated_at
+  before update on app_settings
+  for each row execute function set_updated_at();
+
+alter table app_settings enable row level security;

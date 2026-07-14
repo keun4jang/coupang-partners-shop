@@ -40,7 +40,11 @@ import {
   driveDirectDownloadUrl,
 } from "../src/lib/drive";
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription } from "../src/lib/youtube";
-import { hasInstagramEnv, publishReelToInstagram } from "../src/lib/instagram";
+import {
+  hasInstagramEnv,
+  maybeRefreshInstagramToken,
+  publishReelToInstagram,
+} from "../src/lib/instagram";
 import {
   dateFolderName,
   driveFileName,
@@ -597,6 +601,9 @@ function fmtKst(d: Date): string {
 
 async function processPending(): Promise<number> {
   await reclaimStaleGenerating();
+
+  // 인스타 장기 토큰 자동 갱신 (7일 주기, 하루 1회 시도 - 60일 만료 방지)
+  await maybeRefreshInstagramToken();
 
   // 슬롯 게이트: 이번 실행에서 처리할 개수 제한 (UPLOAD_SCHEDULE 설정 시)
   const allowed = await allowedUploadCount();

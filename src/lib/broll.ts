@@ -66,6 +66,18 @@ function queryForProduct(productName: string, category: string): string {
   return SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
 }
 
+/**
+ * 생활감 보정: 산업/상업 시설 장면(공장 세탁실, 업소 주방 등)이 걸리지 않도록
+ * 집안 장면이 어울리는 검색어에는 "home domestic" 힌트를 강제한다.
+ * (10번 영상에서 세탁세제 배경이 산업용 세탁공장으로 나온 문제의 재발 방지)
+ */
+const NON_HOME_QUERY = /\b(car|camping|outdoor|stroller)\b/;
+function domesticize(query: string): string {
+  if (NON_HOME_QUERY.test(query)) return query;
+  const withHome = query.includes("home") ? query : `${query} home`;
+  return withHome.includes("domestic") ? withHome : `${withHome} domestic`;
+}
+
 interface PexelsVideoFile {
   id: number;
   quality: string;
@@ -221,9 +233,11 @@ export async function fetchStockBrolls(
   productName = ""
 ): Promise<StockBroll[]> {
   // 상품명 키워드 검색어를 먼저 쓰고, 부족하면 카테고리 검색어로 채운다.
-  const primary = queryForProduct(productName, category);
-  const categoryQuery =
-    SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
+  // 두 검색어 모두 생활감 보정(home domestic)을 거친다.
+  const primary = domesticize(queryForProduct(productName, category));
+  const categoryQuery = domesticize(
+    SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"]
+  );
   const queries = primary === categoryQuery ? [primary] : [primary, categoryQuery];
   console.log(
     `스톡 검색어: ${queries.map((q) => `"${q}"`).join(" → ")} (상품: ${productName || category})`
