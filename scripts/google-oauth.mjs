@@ -20,10 +20,18 @@ import fs from "node:fs";
 
 // drive: 기존에 만들어둔 폴더(내 드라이브)에 업로드.
 // youtube.upload: 유튜브 쇼츠 자동 업로드(worker/render-worker.ts 에서 사용).
-// 이미 drive 만으로 발급받은 refresh token 이 있다면, 유튜브 업로드를 켜려고
-// 이 스크립트를 다시 돌려서 두 스코프가 모두 포함된 새 refresh token 으로 교체해야 한다.
+// 드라이브 계정과 유튜브 채널 계정이 다르면 OAuth 클라이언트/프로젝트도 따로 쓰는 게 보통이라,
+// SCOPE 환경변수로 필요한 스코프만 골라 요청할 수 있게 했다.
+//   전체(기본):        (아무것도 안 주면 아래 기본값)
+//   드라이브만:         SCOPE=drive node scripts/google-oauth.mjs url
+//   유튜브만:           SCOPE=youtube node scripts/google-oauth.mjs url
+const SCOPE_PRESETS = {
+  drive: "https://www.googleapis.com/auth/drive",
+  youtube: "https://www.googleapis.com/auth/youtube.upload",
+};
 const SCOPE =
-  "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/youtube.upload";
+  SCOPE_PRESETS[process.env.SCOPE] ??
+  `${SCOPE_PRESETS.drive} ${SCOPE_PRESETS.youtube}`;
 const REDIRECT = "http://localhost";
 
 function parseEnv(path) {

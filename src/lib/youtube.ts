@@ -4,21 +4,21 @@ import { optionalEnv, requireEnv } from "./env";
 
 /**
  * 유튜브 쇼츠 자동 업로드.
- * 구글 드라이브와 같은 OAuth 사용자 위임(GOOGLE_OAUTH_*)을 재사용한다.
- * 단, 이 refresh token 은 반드시 `youtube.upload` 스코프로 동의된 것이어야 한다
- * (scripts/google-oauth.mjs 로 재발급 - SCOPE 에 이미 포함돼 있음).
+ * 채널을 소유한 구글 계정이 드라이브 계정과 다를 수 있으므로(예: 별도 채널 전용 계정)
+ * 별도 OAuth 자격증명(YOUTUBE_OAUTH_*)을 쓴다 - GOOGLE_OAUTH_*(드라이브)와 독립적.
+ * scripts/google-oauth.mjs 를 YOUTUBE_OAUTH_CLIENT_ID/SECRET 로 실행해 발급받는다.
  */
 
 const CATEGORY_HOWTO_STYLE = "26"; // 생활/노하우 카테고리 - 살림템 소개에 적합
 
 function youtubeClient() {
-  const clientId = optionalEnv("GOOGLE_OAUTH_CLIENT_ID");
-  const refreshToken = optionalEnv("GOOGLE_OAUTH_REFRESH_TOKEN");
+  const clientId = optionalEnv("YOUTUBE_OAUTH_CLIENT_ID");
+  const refreshToken = optionalEnv("YOUTUBE_OAUTH_REFRESH_TOKEN");
   if (!clientId || !refreshToken) return null;
 
   const oauth2 = new google.auth.OAuth2(
     clientId,
-    requireEnv("GOOGLE_OAUTH_CLIENT_SECRET")
+    requireEnv("YOUTUBE_OAUTH_CLIENT_SECRET")
   );
   oauth2.setCredentials({ refresh_token: refreshToken });
   return google.youtube({ version: "v3", auth: oauth2 });
@@ -26,7 +26,7 @@ function youtubeClient() {
 
 export function hasYoutubeEnv(): boolean {
   return Boolean(
-    optionalEnv("GOOGLE_OAUTH_CLIENT_ID") && optionalEnv("GOOGLE_OAUTH_REFRESH_TOKEN")
+    optionalEnv("YOUTUBE_OAUTH_CLIENT_ID") && optionalEnv("YOUTUBE_OAUTH_REFRESH_TOKEN")
   );
 }
 
