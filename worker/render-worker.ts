@@ -483,7 +483,10 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       }
     }
 
-    await db
+    // 완료 기록. 이 업데이트가 조용히 실패하면 항목이 generating 에 갇혀
+    // 워커가 15분마다 같은 영상을 재렌더·재업로드하는 사고가 난다(실제 발생).
+    // → 실패 시 반드시 알리고, 최소한 completed 표시만이라도 남겨 루프를 끊는다.
+    const { error: completeError } = await db
       .from("video_items")
       .update({
         video_status: "completed",
@@ -498,6 +501,25 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         error_message: driveNote,
       })
       .eq("id", item.id);
+    if (completeError) {
+      console.error("완료 기록 실패:", completeError.message);
+      // 폴백: 상태만이라도 completed 로 (재렌더 루프 방지)
+      const { error: fallbackError } = await db
+        .from("video_items")
+        .update({ video_status: "completed", landing_visible: true })
+        .eq("id", item.id);
+      await notify(
+        [
+          "🚨 시스템 문제 발생",
+          "",
+          "어디서: 렌더 워커 DB 기록",
+          `무엇이: ${number} 완료 기록 실패 (${completeError.message.slice(0, 150)})`,
+          fallbackError
+            ? "⚠️ 폴백도 실패 - 이 영상이 반복 업로드될 수 있어요. 관리자 페이지에서 상태를 확인해주세요!"
+            : "상태는 완료로 저장했지만 링크 정보가 비어있을 수 있어요.",
+        ].join("\n")
+      );
+    }
 
     await notify(
       [
