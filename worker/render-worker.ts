@@ -57,6 +57,7 @@ import { ctaLine } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls } from "../src/lib/broll";
 import { sourceProductClips } from "../src/lib/videoSource";
+import { maybeRefreshAliToken } from "../src/lib/aliexpress";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
@@ -649,6 +650,8 @@ async function processPending(): Promise<number> {
 
   // 인스타 장기 토큰 자동 갱신 (7일 주기, 하루 1회 시도 - 60일 만료 방지)
   await maybeRefreshInstagramToken();
+  // 알리 access_token 자동 갱신 (12시간 주기)
+  await maybeRefreshAliToken();
 
   const db = supabaseAdmin();
   const { data, error } = await db

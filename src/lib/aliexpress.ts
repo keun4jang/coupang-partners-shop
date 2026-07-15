@@ -67,6 +67,32 @@ function encodeBody(params: Record<string, string>): string {
     .join("&");
 }
 
+/** 게이트웨이 호출 - 일시적 DNS/네트워크 오류는 짧게 재시도 */
+async function postAli(
+  url: string,
+  body: string,
+  attempts = 4
+): Promise<Record<string, unknown>> {
+  let lastText = "";
+  for (let i = 0; i < attempts; i++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    lastText = await res.text();
+    if (!lastText.startsWith("DNS resolution")) {
+      try {
+        return JSON.parse(lastText) as Record<string, unknown>;
+      } catch {
+        throw new Error(`알리 응답 파싱 실패: ${lastText.slice(0, 120)}`);
+      }
+    }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  throw new Error(`알리 게이트웨이 재시도 실패: ${lastText.slice(0, 80)}`);
+}
+
 /* ── OAuth 토큰 ───────────────────────────────────────────────────── */
 
 /** 사용자 동의용 인증 URL */
@@ -94,12 +120,7 @@ async function restSystemCall(
     timestamp: String(Date.now()),
   };
   params.sign = signRest(apiPath, params, appSecret);
-  const res = await fetch(`${REST_GATEWAY}${apiPath}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: encodeBody(params),
-  });
-  const data = (await res.json()) as Record<string, unknown>;
+  const data = await postAli(`${REST_GATEWAY}${apiPath}`, encodeBody(params));
   if (data.code && data.code !== "0") {
     throw new Error(`알리 토큰 API 오류: ${data.code} ${data.message ?? ""}`);
   }
@@ -145,6 +166,21 @@ async function currentAliToken(): Promise<string | null> {
   return getSetting(TOKEN_KEY);
 }
 
+/**
+ * 필요 시 access_token 자동 갱신 (워커가 매 실행마다 호출 - 멱등/저비용).
+ * 마지막 갱신 후 12시간 지났고 토큰이 있을 때만 refresh 를 시도한다.
+ * (프로덕션 앱이면 장기 토큰이라 이걸로 무기한 유지, Test 앱이면 만료 전까지만)
+ */
+export async function maybeRefreshAliToken(): Promise<void> {
+  if (!hasAliexpressEnv()) return;
+  const token = await getSetting(TOKEN_KEY);
+  if (!token) return; // 아직 미인증
+  const refreshedAt = await getSetting(REFRESHED_AT_KEY);
+  const REFRESH_EVERY_MS = 12 * 3600_000;
+  if (refreshedAt && Date.now() - Date.parse(refreshedAt) < REFRESH_EVERY_MS) return;
+  await refreshAliToken();
+}
+
 /* ── 비즈니스 API (/sync) ─────────────────────────────────────────── */
 
 async function dsCall(
@@ -166,12 +202,7 @@ async function dsCall(
     v: "2.0",
   };
   params.sign = signTop(params, appSecret);
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: encodeBody(params),
-  });
-  const data = (await res.json()) as Record<string, unknown>;
+  const data = await postAli(GATEWAY, encodeBody(params));
   const err = data.error_response as { code?: unknown; msg?: unknown } | undefined;
   if (err) throw new Error(`알리 API 오류: ${err.code} ${err.msg}`);
   return data;
@@ -186,13 +217,19 @@ function harvestProducts(obj: unknown, out: AliProduct[], seen: Set<string>): vo
   }
   const rec = obj as Record<string, unknown>;
   const pid =
-    rec["product_id"] ?? rec["productId"] ?? rec["item_id"] ?? rec["itemId"];
+    rec["product_id"] ??
+    rec["productId"] ??
+    rec["item_id"] ??
+    rec["itemId"];
   const img =
     rec["product_main_image_url"] ??
     rec["image_url"] ??
     rec["imageUrl"] ??
     rec["main_image_url"] ??
-    rec["product_image_url"];
+    rec["product_image_url"] ??
+    rec["itemMainPic"] ??
+    rec["itemPic"] ??
+    rec["imagePath"];
   if (pid && img && typeof img === "string" && /^https?:/.test(img)) {
     const id = String(pid);
     if (!seen.has(id)) {
