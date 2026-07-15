@@ -127,6 +127,15 @@ export async function uploadTextToDrive(
   );
 }
 
+export async function uploadBufferToDrive(
+  folderId: string,
+  name: string,
+  mimeType: string,
+  buffer: Buffer
+): Promise<DriveUploadResult> {
+  return uploadToFolder(folderId, name, mimeType, Readable.from(buffer));
+}
+
 /**
  * 파일을 "링크가 있는 모든 사용자" 읽기 권한으로 공개한다.
  * 유튜브/인스타 등 외부 서비스가 로그인 없이 직접 내려받아야 할 때(예: 인스타 릴스 게시 API가

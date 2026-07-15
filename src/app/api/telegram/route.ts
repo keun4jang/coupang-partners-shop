@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { sendTelegramMessage } from "@/lib/telegram";
+import { sendTelegramMessage, telegramFileDownloadUrl } from "@/lib/telegram";
 import { selectProductForVideo } from "@/lib/productSelector";
 import { createVideoItem, fillVideoCopy } from "@/lib/videoItems";
+import {
+  makeFilePublic,
+  driveDirectDownloadUrl,
+  uploadBufferToDrive,
+} from "@/lib/drive";
 import { formatDisplayNumber } from "@/lib/format";
 import { optionalEnv, requireEnv } from "@/lib/env";
 import type { Product, TemplateType, VideoItemWithProduct } from "@/types/db";
@@ -10,12 +15,25 @@ import type { Product, TemplateType, VideoItemWithProduct } from "@/types/db";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
+interface TelegramFile {
+  file_id: string;
+  file_size?: number;
+  mime_type?: string;
+}
+
 interface TelegramUpdate {
   message?: {
     text?: string;
+    caption?: string;
     chat?: { id?: number };
+    video?: TelegramFile;
+    document?: TelegramFile;
+    animation?: TelegramFile;
   };
 }
+
+/** 봇 API getFile 다운로드 한도 */
+const TELEGRAM_MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "대기",
@@ -84,6 +102,109 @@ async function handleVideoCommand(
       `후킹: ${filled.hook_text ?? "-"}`,
       "",
       "완료되면 웹사이트에 등록되고 유튜브·인스타에 업로드된 뒤 링크를 보내드릴게요.",
+    ].join("\n"),
+    chatId
+  );
+}
+
+/**
+ * 사용자가 보낸 동영상을 그 상품의 배경 소스로 등록한다.
+ * 캡션에 "13번"처럼 번호가 있으면 그 아이템의 상품에, 없으면 가장 최근
+ * 대기/생성 중인 아이템의 상품에 붙인다. 렌더 워커가 products.source_video_url 을
+ * 최우선으로 읽어 3~4.5초 컷으로 잘라 배경에 쓴다.
+ *
+ * ⚠️ 사용자가 "직접 고른" 영상만 받는다(자동 수집 아님). 저작권 판단·대응은
+ *    업로드한 사람 책임 — 판매자/브랜드 영상, 본인 촬영본, 라이선스 확보분에 쓰세요.
+ */
+async function handleSourceVideo(
+  chatId: number,
+  file: TelegramFile,
+  caption: string | undefined
+): Promise<void> {
+  if (file.file_size && file.file_size > TELEGRAM_MAX_FILE_BYTES) {
+    await sendTelegramMessage(
+      "영상이 20MB를 넘어서 봇이 못 받아요. 더 짧게 잘라서(또는 화질 낮춰) 보내주세요.",
+      chatId
+    );
+    return;
+  }
+
+  const db = supabaseAdmin();
+
+  // 대상 상품 찾기: 캡션의 번호 → 그 아이템, 없으면 가장 최근 대기/생성 중 아이템
+  type Target = { product_id: string; display_number: number };
+  const numMatch = caption?.match(/(\d+)\s*번?/);
+  let target: Target | null = null;
+  if (numMatch) {
+    const { data } = await db
+      .from("video_items")
+      .select("product_id, display_number")
+      .eq("display_number", Number(numMatch[1]))
+      .maybeSingle();
+    target = (data as Target | null) ?? null;
+    if (!target) {
+      await sendTelegramMessage(
+        `${numMatch[1]}번 영상을 못 찾았어요. '최근영상'으로 번호를 확인해주세요.`,
+        chatId
+      );
+      return;
+    }
+  } else {
+    const { data } = await db
+      .from("video_items")
+      .select("product_id, display_number")
+      .in("video_status", ["pending", "generating"])
+      .order("display_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    target = (data as Target | null) ?? null;
+    if (!target) {
+      await sendTelegramMessage(
+        "지금 대기 중인 영상이 없어요. 먼저 '업로드'로 영상을 만든 뒤, 캡션에 번호를 붙여 보내주세요.",
+        chatId
+      );
+      return;
+    }
+  }
+
+  const downloadUrl = await telegramFileDownloadUrl(file.file_id);
+  if (!downloadUrl) {
+    await sendTelegramMessage("영상 다운로드 링크를 못 만들었어요. 다시 보내주세요.", chatId);
+    return;
+  }
+  const res = await fetch(downloadUrl);
+  if (!res.ok) {
+    await sendTelegramMessage("영상 내려받기에 실패했어요. 다시 보내주세요.", chatId);
+    return;
+  }
+  const buffer = Buffer.from(await res.arrayBuffer());
+
+  // 드라이브에 보관 후 공개 URL 을 상품 소스로 등록 (워커가 여기서 받아 컷 추출)
+  const folderId = requireEnv("GOOGLE_DRIVE_FOLDER_ID");
+  const uploaded = await uploadBufferToDrive(
+    folderId,
+    `source-${target.display_number}-${Date.now()}.mp4`,
+    "video/mp4",
+    buffer
+  );
+  await makeFilePublic(uploaded.id);
+  const publicUrl = driveDirectDownloadUrl(uploaded.id);
+
+  await db
+    .from("products")
+    .update({
+      source_video_url: publicUrl,
+      source_video_origin: "직접 업로드",
+      source_video_checked_at: new Date().toISOString(),
+    })
+    .eq("id", target.product_id);
+
+  await sendTelegramMessage(
+    [
+      `✅ ${target.display_number}번 배경 영상으로 등록했어요`,
+      "",
+      "렌더할 때 이 영상을 잘라서 배경으로 써요.",
+      "아직 렌더 전이면 그대로 반영되고, 이미 만들어졌으면 '업로드'로 다시 만들면 적용돼요.",
     ].join("\n"),
     chatId
   );
@@ -204,14 +325,42 @@ export async function POST(request: NextRequest) {
   }
 
   const chatId = update.message?.chat?.id;
-  const text = update.message?.text?.trim();
-  if (!chatId || !text) {
+  if (!chatId) {
     return NextResponse.json({ ok: true });
   }
 
   const allowedChatId = requireEnv("TELEGRAM_ALLOWED_CHAT_ID");
   if (String(chatId) !== allowedChatId) {
     // 허용되지 않은 채팅은 조용히 무시
+    return NextResponse.json({ ok: true });
+  }
+
+  // 동영상 파일 업로드 → 상품 배경 소스로 등록
+  const videoFile =
+    update.message?.video ??
+    update.message?.animation ??
+    (update.message?.document?.mime_type?.startsWith("video/")
+      ? update.message?.document
+      : undefined);
+  if (videoFile) {
+    try {
+      await handleSourceVideo(chatId, videoFile, update.message?.caption);
+    } catch (error) {
+      console.error("소스 영상 처리 실패:", error);
+      try {
+        await sendTelegramMessage(
+          `영상 등록 중 오류가 났어요: ${error instanceof Error ? error.message : String(error)}`,
+          chatId
+        );
+      } catch {
+        // 무시
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  const text = update.message?.text?.trim();
+  if (!text) {
     return NextResponse.json({ ok: true });
   }
 
@@ -244,6 +393,9 @@ export async function POST(request: NextRequest) {
             "상품목록 - 후보 상품 보기",
             "최근영상 - 최근 생성된 영상과 드라이브 링크",
             "상태 - 전체 현황 요약",
+            "",
+            "🎥 동영상을 보내면 배경 소스로 등록돼요 (캡션에 '13번'처럼 번호).",
+            "   번호 없으면 가장 최근 대기 중인 영상에 붙어요.",
           ].join("\n"),
           chatId
         );
