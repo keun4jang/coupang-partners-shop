@@ -4,6 +4,7 @@ import os from "os";
 import path from "path";
 import type { Product } from "@/types/db";
 import { findMatchingAliVideo, hasAliexpressEnv } from "./aliexpress";
+import { findCoupangProductVideo, hasCoupangScraperEnv } from "./coupangVideo";
 import { supabaseAdmin } from "./supabase";
 
 /**
@@ -11,8 +12,9 @@ import { supabaseAdmin } from "./supabase";
  *
  * 우선순위:
  *  ① 캐시 - 이 상품으로 전에 찾아둔 영상 (products.source_video_url)
- *  ② 알리 매칭 - 키워드 검색 + 이미지 지문 대조로 "같은 제품" 판매자 데모 영상
- *  ③ (호출부 폴백) Pexels 카테고리 스톡
+ *  ② 쿠팡 상세영상 - 그 상품 페이지의 판매자 시연 영상 (SCRAPER_PROXY_URL 필요)
+ *  ③ 알리 매칭 - 키워드 검색 + 이미지 지문 대조로 "같은 제품" 판매자 데모 영상
+ *  ④ (호출부 폴백) Pexels 카테고리 스톡
  *
  * 채택된 영상은 자동 가공: 다운로드 → 길이/해상도 검사 → 앞·중간·뒤 고르게
  * 3~4초 세그먼트 N개 추출 → 가장자리 크롭(워터마크 제거) → broll 파일로 저장.
@@ -213,7 +215,24 @@ export async function sourceProductClips(
     console.warn("캐시된 소스 영상 사용 불가 - 재소싱 시도");
   }
 
-  // ② 알리익스프레스 이미지 매칭
+  // ② 쿠팡 상세페이지 판매자 영상 (프록시 설정 시) - 그 상품 자체의 영상이라 최우선
+  if (hasCoupangScraperEnv()) {
+    try {
+      const videoUrl = await findCoupangProductVideo(product.coupang_partner_url);
+      if (videoUrl) {
+        const files = await segmentRemoteVideo(videoUrl, displayNumber, count);
+        if (files.length > 0) {
+          const origin = "쿠팡 상세영상";
+          await cacheSourceVideo(product.id, videoUrl, origin);
+          return { files, origin };
+        }
+      }
+    } catch (e) {
+      console.warn(`쿠팡 소싱 실패: ${(e as Error).message.slice(0, 150)}`);
+    }
+  }
+
+  // ③ 알리익스프레스 이미지 매칭
   if (hasAliexpressEnv() && product.image_url) {
     try {
       const match = await findMatchingAliVideo(
@@ -237,6 +256,6 @@ export async function sourceProductClips(
     }
   }
 
-  // ③ 호출부 폴백 (Pexels 스톡)
+  // ④ 호출부 폴백 (Pexels 스톡)
   return { files: [], origin: "스톡" };
 }
