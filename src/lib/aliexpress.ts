@@ -1,24 +1,32 @@
 import crypto from "crypto";
-import { optionalEnv } from "./env";
-import {
-  dhashFromUrl,
-  hammingDistance,
-  MATCH_THRESHOLD,
-} from "./imageHash";
+import { optionalEnv, requireEnv } from "./env";
+import { getSetting, setSetting } from "./settings";
+import { dhashFromUrl, hammingDistance, MATCH_THRESHOLD } from "./imageHash";
 
 /**
- * 알리익스프레스 어필리에이트 API - "같은 제품" 판매자 데모 영상 자동 소싱.
+ * 알리익스프레스 드롭시핑(DS) API - "같은 제품" 판매자 데모 영상 자동 소싱.
  *
- * 흐름: 쿠팡 상품명으로 알리 상품 검색 → 후보들의 대표 이미지를 우리 상품
- * 사진과 이미지 지문(dHash) 대조 → 임계치 이하로 일치하는 상품의
- * product_video_url 을 돌려준다. 일치 후보가 없으면 null (호출부가 Pexels 폴백).
+ * 흐름: 쿠팡 상품명으로 알리 상품 검색(ds.text.search) → 후보 대표 이미지를 우리
+ * 상품 사진과 이미지 지문(dHash)으로 대조 → 일치 상품의 상세(ds.product.get)에서
+ * 영상 URL 추출. 일치가 없으면 null (호출부가 다음 소스로 폴백).
  *
- * 필요 환경변수 (portals.aliexpress.com 가입 → openservice.aliexpress.com 앱 생성):
- *   ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET
- *   ALIEXPRESS_TRACKING_ID (선택, 기본 "default")
+ * 인증: DS API 는 access_token 이 필요하다(알리 OAuth 셀프 인증).
+ *   1) scripts/aliexpress-oauth.mjs url → 출력 URL 로 알리 로그인·동의
+ *   2) 콜백 URL(/api/aliexpress/callback)에 표시된 code 복사
+ *   3) scripts/aliexpress-oauth.mjs exchange "<code>" → access_token/refresh_token 저장
+ *   토큰은 app_settings(DB)에 보관되고, 만료 전 refreshAliToken() 으로 갱신한다.
+ *
+ * 환경변수: ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET (openservice.aliexpress.com 앱)
  */
 
-const GATEWAY = "https://api-sg.aliexpress.com/sync";
+const GATEWAY = "https://api-sg.aliexpress.com/sync"; // 비즈니스 API(TOP 스타일)
+const REST_GATEWAY = "https://api-sg.aliexpress.com/rest"; // 시스템툴(토큰 발급, path 서명)
+export const ALI_REDIRECT_URI =
+  "https://momitemmom.vercel.app/api/aliexpress/callback";
+
+const TOKEN_KEY = "aliexpress_access_token";
+const REFRESH_KEY = "aliexpress_refresh_token";
+const REFRESHED_AT_KEY = "aliexpress_token_refreshed_at";
 
 export function hasAliexpressEnv(): boolean {
   return Boolean(
@@ -26,163 +34,316 @@ export function hasAliexpressEnv(): boolean {
   );
 }
 
-/** TOP 프로토콜 서명: 파라미터 키 정렬 → key+value 연결 → HMAC-SHA256(secret) 대문자 hex */
-function sign(params: Record<string, string>, secret: string): string {
+/* ── 서명 ─────────────────────────────────────────────────────────── */
+
+/** TOP(/sync) 서명: 정렬된 key+value 연결 → HMAC-SHA256 → 대문자 hex */
+function signTop(params: Record<string, string>, secret: string): string {
   const base = Object.keys(params)
     .sort()
     .map((k) => k + params[k])
     .join("");
-  return crypto
-    .createHmac("sha256", secret)
-    .update(base)
-    .digest("hex")
-    .toUpperCase();
+  return crypto.createHmac("sha256", secret).update(base).digest("hex").toUpperCase();
 }
 
-async function apiCall(
-  method: string,
+/** IOP(/rest) 서명: apiPath + 정렬된 key+value → HMAC-SHA256 → 대문자 hex */
+function signRest(
+  apiPath: string,
+  params: Record<string, string>,
+  secret: string
+): string {
+  const base =
+    apiPath +
+    Object.keys(params)
+      .sort()
+      .map((k) => k + params[k])
+      .join("");
+  return crypto.createHmac("sha256", secret).update(base).digest("hex").toUpperCase();
+}
+
+/** 공백을 + 가 아닌 %20 으로 인코딩(서명 불일치 방지) */
+function encodeBody(params: Record<string, string>): string {
+  return Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+}
+
+/* ── OAuth 토큰 ───────────────────────────────────────────────────── */
+
+/** 사용자 동의용 인증 URL */
+export function aliAuthUrl(): string {
+  const appKey = requireEnv("ALIEXPRESS_APP_KEY");
+  const p = new URLSearchParams({
+    response_type: "code",
+    force_auth: "true",
+    redirect_uri: ALI_REDIRECT_URI,
+    client_id: appKey,
+  });
+  return `https://api-sg.aliexpress.com/oauth/authorize?${p.toString()}`;
+}
+
+async function restSystemCall(
+  apiPath: string,
   bizParams: Record<string, string>
 ): Promise<Record<string, unknown>> {
-  const appKey = optionalEnv("ALIEXPRESS_APP_KEY");
-  const appSecret = optionalEnv("ALIEXPRESS_APP_SECRET");
-  if (!appKey || !appSecret) throw new Error("알리 API 환경변수 미설정");
+  const appKey = requireEnv("ALIEXPRESS_APP_KEY");
+  const appSecret = requireEnv("ALIEXPRESS_APP_SECRET");
+  const params: Record<string, string> = {
+    ...bizParams,
+    app_key: appKey,
+    sign_method: "sha256",
+    timestamp: String(Date.now()),
+  };
+  params.sign = signRest(apiPath, params, appSecret);
+  const res = await fetch(`${REST_GATEWAY}${apiPath}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: encodeBody(params),
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  if (data.code && data.code !== "0") {
+    throw new Error(`알리 토큰 API 오류: ${data.code} ${data.message ?? ""}`);
+  }
+  return data;
+}
 
+/** 인증 code → access_token/refresh_token 발급 후 DB 저장 */
+export async function exchangeAliCode(
+  code: string
+): Promise<{ accessToken: string; expiresInSeconds: number }> {
+  const data = await restSystemCall("/auth/token/security/create", { code });
+  const accessToken = data.access_token as string | undefined;
+  const refreshToken = data.refresh_token as string | undefined;
+  const expiresInSeconds = Number(data.expires_in ?? 0);
+  if (!accessToken) throw new Error("알리 토큰 발급 실패: access_token 없음");
+  await setSetting(TOKEN_KEY, accessToken);
+  if (refreshToken) await setSetting(REFRESH_KEY, refreshToken);
+  await setSetting(REFRESHED_AT_KEY, new Date().toISOString());
+  return { accessToken, expiresInSeconds };
+}
+
+/** refresh_token 으로 access_token 갱신 */
+export async function refreshAliToken(): Promise<boolean> {
+  const refreshToken = await getSetting(REFRESH_KEY);
+  if (!refreshToken) return false;
+  try {
+    const data = await restSystemCall("/auth/token/security/refresh", {
+      refresh_token: refreshToken,
+    });
+    const accessToken = data.access_token as string | undefined;
+    if (!accessToken) return false;
+    await setSetting(TOKEN_KEY, accessToken);
+    if (data.refresh_token) await setSetting(REFRESH_KEY, String(data.refresh_token));
+    await setSetting(REFRESHED_AT_KEY, new Date().toISOString());
+    return true;
+  } catch (e) {
+    console.warn(`알리 토큰 갱신 실패: ${(e as Error).message.slice(0, 150)}`);
+    return false;
+  }
+}
+
+async function currentAliToken(): Promise<string | null> {
+  return getSetting(TOKEN_KEY);
+}
+
+/* ── 비즈니스 API (/sync) ─────────────────────────────────────────── */
+
+async function dsCall(
+  method: string,
+  bizParams: Record<string, string>,
+  accessToken: string
+): Promise<Record<string, unknown>> {
+  const appKey = requireEnv("ALIEXPRESS_APP_KEY");
+  const appSecret = requireEnv("ALIEXPRESS_APP_SECRET");
   const params: Record<string, string> = {
     ...bizParams,
     method,
     app_key: appKey,
+    session: accessToken, // TOP 게이트웨이는 session 파라미터로 토큰 전달
+    access_token: accessToken,
     sign_method: "sha256",
     timestamp: String(Date.now()),
     format: "json",
     v: "2.0",
   };
-  params.sign = sign(params, appSecret);
-
+  params.sign = signTop(params, appSecret);
   const res = await fetch(GATEWAY, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
+    body: encodeBody(params),
   });
   const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    throw new Error(`알리 API HTTP ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
-  }
   const err = data.error_response as { code?: unknown; msg?: unknown } | undefined;
-  if (err) {
-    throw new Error(`알리 API 오류: ${err.code} ${err.msg}`);
-  }
+  if (err) throw new Error(`알리 API 오류: ${err.code} ${err.msg}`);
   return data;
+}
+
+/** JSON 아무 곳에서나 product_id + 이미지 URL 을 갖는 객체들을 긁어온다(응답 구조 변화에 강함) */
+function harvestProducts(obj: unknown, out: AliProduct[], seen: Set<string>): void {
+  if (!obj || typeof obj !== "object") return;
+  if (Array.isArray(obj)) {
+    for (const el of obj) harvestProducts(el, out, seen);
+    return;
+  }
+  const rec = obj as Record<string, unknown>;
+  const pid =
+    rec["product_id"] ?? rec["productId"] ?? rec["item_id"] ?? rec["itemId"];
+  const img =
+    rec["product_main_image_url"] ??
+    rec["image_url"] ??
+    rec["imageUrl"] ??
+    rec["main_image_url"] ??
+    rec["product_image_url"];
+  if (pid && img && typeof img === "string" && /^https?:/.test(img)) {
+    const id = String(pid);
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push({
+        productId: id,
+        title: String(
+          rec["product_title"] ?? rec["title"] ?? rec["subject"] ?? ""
+        ),
+        imageUrl: img,
+      });
+    }
+  }
+  for (const v of Object.values(rec)) harvestProducts(v, out, seen);
+}
+
+/** JSON 어디서든 mp4/video URL 을 찾아 첫 후보를 돌려준다 */
+function harvestVideoUrl(obj: unknown): string | null {
+  const found: string[] = [];
+  const walk = (o: unknown) => {
+    if (!o) return;
+    if (typeof o === "string") {
+      if (/^https?:\/\/[^\s"']+\.mp4/i.test(o)) found.push(o);
+      return;
+    }
+    if (typeof o === "object") {
+      for (const v of Object.values(o as Record<string, unknown>)) walk(v);
+    }
+  };
+  walk(obj);
+  return found[0] ?? null;
 }
 
 export interface AliProduct {
   productId: string;
   title: string;
   imageUrl: string;
-  videoUrl: string | null;
 }
 
-/**
- * 상품명에서 검색 키워드 추출.
- * 쿠팡 상품명은 "브랜드 + 핵심명사들 + 옵션(수량/색상)" 구조라
- * 옵션·수량·괄호를 걷어내고 앞쪽 핵심 토큰만 쓴다.
- */
+/** 상품명 → 검색 키워드 (옵션/수량/괄호 제거, 앞쪽 핵심 토큰) */
 export function keywordsFromProductName(name: string): string {
   const cleaned = name
-    .replace(/\(.*?\)|\[.*?\]/g, " ") // 괄호 제거
-    .replace(/,.*$/, " ") // 첫 콤마 뒤(옵션)는 버림
+    .replace(/\(.*?\)|\[.*?\]/g, " ")
+    .replace(/,.*$/, " ")
     .replace(/\d+(\.\d+)?\s*(개입|개|매|장|ml|l|리터|kg|g|cm|mm|인치|단|팩|세트|p|P)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   const tokens = cleaned.split(" ").filter((t) => t.length >= 2);
-  // 브랜드(첫 토큰)가 영문/한글 고유명이어도 검색엔 무해 - 최대 4토큰
   return tokens.slice(0, 4).join(" ") || cleaned || name;
 }
 
-/** 키워드로 알리 상품 검색 (영상 있는 상품 위주로 정리해 반환) */
-export async function searchAliProducts(keywords: string): Promise<AliProduct[]> {
-  const data = await apiCall("aliexpress.affiliate.product.query", {
-    keywords,
-    target_currency: "KRW",
-    target_language: "KO",
-    ship_to_country: "KR",
-    page_size: "30",
-    sort: "LAST_VOLUME_DESC", // 많이 팔린 순 = 정품 대표 이미지를 쓸 확률 높음
-    tracking_id: optionalEnv("ALIEXPRESS_TRACKING_ID") ?? "default",
-  });
+/** 키워드로 상품 검색 (이미지·id) */
+export async function searchAliProducts(
+  keywords: string,
+  accessToken: string
+): Promise<AliProduct[]> {
+  const data = await dsCall(
+    "aliexpress.ds.text.search",
+    {
+      keyWord: keywords,
+      local: "ko_KR",
+      countryCode: "KR",
+      currency: "KRW",
+      pageSize: "20",
+      pageIndex: "1",
+      sortBy: "orders,desc",
+    },
+    accessToken
+  );
+  const out: AliProduct[] = [];
+  harvestProducts(data, out, new Set());
+  return out;
+}
 
-  // 응답 경로: aliexpress_affiliate_product_query_response.resp_result.result.products.product[]
-  const root = data["aliexpress_affiliate_product_query_response"] as
-    | Record<string, unknown>
-    | undefined;
-  const respResult = root?.["resp_result"] as Record<string, unknown> | undefined;
-  const result = respResult?.["result"] as Record<string, unknown> | undefined;
-  const products = (result?.["products"] as Record<string, unknown> | undefined)?.[
-    "product"
-  ] as Array<Record<string, unknown>> | undefined;
-
-  return (products ?? []).map((p) => ({
-    productId: String(p["product_id"] ?? ""),
-    title: String(p["product_title"] ?? ""),
-    imageUrl: String(p["product_main_image_url"] ?? ""),
-    videoUrl: p["product_video_url"] ? String(p["product_video_url"]) : null,
-  }));
+/** 상품 상세에서 영상 URL 추출 */
+export async function getAliProductVideo(
+  productId: string,
+  accessToken: string
+): Promise<string | null> {
+  const data = await dsCall(
+    "aliexpress.ds.product.get",
+    {
+      product_id: productId,
+      ship_to_country: "KR",
+      target_currency: "KRW",
+      target_language: "KO",
+    },
+    accessToken
+  );
+  return harvestVideoUrl(data);
 }
 
 export interface AliVideoMatch {
   videoUrl: string;
   matchedTitle: string;
-  /** dHash 해밍 거리 (작을수록 확실한 매칭) */
   distance: number;
 }
 
 /**
  * 쿠팡 상품과 "같은 제품"인 알리 상품의 데모 영상을 찾는다.
- * 이미지 지문이 임계치(MATCH_THRESHOLD) 이하로 일치할 때만 돌려준다 → 오매칭 차단.
- * 못 찾으면 null (호출부가 Pexels 폴백).
+ * 이미지 지문이 임계치 이하로 일치하는 상품의 상세영상만 돌려준다(오매칭 차단).
  */
 export async function findMatchingAliVideo(
   productName: string,
   productImageUrl: string
 ): Promise<AliVideoMatch | null> {
   if (!hasAliexpressEnv()) return null;
-
-  const ourHash = await dhashFromUrl(productImageUrl);
-  if (ourHash === null) {
-    console.warn("알리 매칭: 우리 상품 이미지 해시 실패");
+  const token = await currentAliToken();
+  if (!token) {
+    console.warn("알리 매칭: access_token 없음(인증 필요) - 스킵");
     return null;
   }
+
+  const ourHash = await dhashFromUrl(productImageUrl);
+  if (ourHash === null) return null;
 
   const keywords = keywordsFromProductName(productName);
   let candidates: AliProduct[];
   try {
-    candidates = await searchAliProducts(keywords);
+    candidates = await searchAliProducts(keywords, token);
   } catch (e) {
-    console.warn(`알리 검색 실패("${keywords}"): ${(e as Error).message.slice(0, 150)}`);
-    return null;
-  }
-
-  const withVideo = candidates.filter((c) => c.videoUrl && c.imageUrl);
-  console.log(
-    `알리 검색 "${keywords}": 후보 ${candidates.length}개 (영상 있는 것 ${withVideo.length}개)`
-  );
-
-  let best: AliVideoMatch | null = null;
-  for (const c of withVideo.slice(0, 12)) {
-    const hash = await dhashFromUrl(c.imageUrl);
-    if (hash === null) continue;
-    const distance = hammingDistance(ourHash, hash);
-    if (distance <= MATCH_THRESHOLD && (!best || distance < best.distance)) {
-      best = { videoUrl: c.videoUrl!, matchedTitle: c.title, distance };
-      if (distance <= 2) break; // 사실상 동일 이미지 - 더 볼 필요 없음
+    const msg = (e as Error).message;
+    // 토큰 만료면 1회 갱신 후 재시도
+    if (/token|auth|session/i.test(msg) && (await refreshAliToken())) {
+      const t2 = await currentAliToken();
+      candidates = t2 ? await searchAliProducts(keywords, t2) : [];
+    } else {
+      console.warn(`알리 검색 실패("${keywords}"): ${msg.slice(0, 150)}`);
+      return null;
     }
   }
+  console.log(`알리 검색 "${keywords}": 후보 ${candidates.length}개`);
 
-  if (best) {
-    console.log(
-      `알리 매칭 성공 (거리 ${best.distance}): ${best.matchedTitle.slice(0, 60)}`
-    );
-  } else {
-    console.log("알리 매칭: 임계치 이하 일치 없음 → 스톡 폴백");
+  // 이미지가 일치하는 상품을 거리순으로 정렬해 상위부터 영상 확인
+  const scored: Array<{ p: AliProduct; distance: number }> = [];
+  for (const p of candidates.slice(0, 15)) {
+    const h = await dhashFromUrl(p.imageUrl);
+    if (h === null) continue;
+    const distance = hammingDistance(ourHash, h);
+    if (distance <= MATCH_THRESHOLD) scored.push({ p, distance });
   }
-  return best;
+  scored.sort((a, b) => a.distance - b.distance);
+
+  const token2 = (await currentAliToken()) ?? token;
+  for (const { p, distance } of scored) {
+    const videoUrl = await getAliProductVideo(p.productId, token2);
+    if (videoUrl) {
+      console.log(`알리 매칭 성공 (거리 ${distance}): ${p.title.slice(0, 50)}`);
+      return { videoUrl, matchedTitle: p.title, distance };
+    }
+  }
+  console.log("알리 매칭: 일치+영상 있는 상품 없음 → 폴백");
+  return null;
 }
