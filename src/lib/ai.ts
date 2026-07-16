@@ -2,6 +2,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Product, VideoCopy, TemplateType } from "@/types/db";
 import { optionalEnv } from "./env";
 import { shortenProductName } from "./format";
+import {
+  CATEGORY_VARIANTS,
+  extractFeatureLines,
+  specLine,
+  nameHash,
+  pick,
+} from "./copyPresets";
 
 const DEFAULT_MODEL = "claude-opus-4-8";
 
@@ -79,92 +86,47 @@ export function ctaLine(displayNumber: number): string {
 
 // 대가성 고지는 웹사이트(랜딩)에만 두고 SNS 캡션/영상에는 넣지 않는다(사장님 결정).
 
-/** AI 미설정/실패 시 사용하는 카테고리 기반 기본 문구 */
+/**
+ * AI 미설정/실패 시 사용하는 폴백 문구.
+ * 구성: 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 후기 → CTA. (7장면)
+ * - 카테고리별 변형(후킹/공감/팁/후기)을 시드로 골라 매번 다르게 (copyPresets).
+ * - 장점1·2 는 상품명에서 뽑은 "실제 제품 특징"을 우선 쓴다 → 제품 설명이 들어감.
+ * - 시드 = displayNumber + 상품명 해시 → 같은 카테고리라도 상품마다 조합이 달라짐.
+ */
 export function fallbackCopy(product: Product, displayNumber: number): VideoCopy {
   const category = product.category || "생활템";
   const pain = product.pain_point?.trim();
   const benefit = product.main_benefit?.trim();
+  const v = CATEGORY_VARIANTS[category] ?? CATEGORY_VARIANTS["생활템"];
+  const seed = displayNumber + nameHash(product.product_name);
 
-  // 구성: 후킹(문제·욕구 자극) → 공감(문제 심화) → 장점1(핵심 해결) → 장점2(추가 매력·가성비)
-  //       → 사용팁(생활 속 활용법) → 긍정 후기 언급(사회적 증거) → CTA. (7장면, 22~28초)
-  // 동네 친한 언니가 알려주듯 따뜻하고 솔직하되, 문장은 구체적이고 생생하게.
-  // 후기 줄은 "남들 반응"만 전한다(허위 후기 금지).
-  const presets: Record<
-    string,
-    { hook: string; empathy: string; b1: string; b2: string; tip: string; review: string }
-  > = {
-    차량용품: {
-      hook: "차 탈 때마다 발밑 부스러기 밟히는 집?",
-      empathy: "세차장 가자니 돈 아깝고, 그냥 두자니 눈에 밟히잖아요",
-      b1: "이거 하나 차에 두면 신호 대기 중에도 쓱 정리가 돼요",
-      b2: "크기가 작아서 자리도 안 차지하고 가격도 부담 없는 수준이에요",
-      tip: "시트 틈새랑 컵홀더처럼 손 안 닿는 데 위주로 쓰면 진짜 요긴해요",
-      review: "차 있는 집들 재구매 후기가 유독 많은 제품이더라고요",
-    },
-    청소템: {
-      hook: "닦아도 닦아도 먼지 또 쌓이는 집?",
-      empathy: "허리 숙여서 쓸고 닦다 보면 하루가 다 가잖아요",
-      b1: "이건 손에 물 한 방울 안 묻히고 쓱 밀기만 해도 눈에 띄게 깨끗해져요",
-      b2: "청소기 돌리는 횟수가 확 줄어서 그 시간에 커피 한 잔 할 수 있어요",
-      tip: "자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 다르더라고요",
-      review: "괜히 재구매 후기가 수백 개씩 쌓이는 게 아니더라고요",
-    },
-    수납템: {
-      hook: "옷이랑 물건은 느는데 둘 데가 없는 집?",
-      empathy: "주말에 큰맘 먹고 정리해도 며칠이면 도로 엉망 되잖아요",
-      b1: "이거 몇 개면 침대 밑, 장롱 위처럼 놀던 공간이 다 수납장이 돼요",
-      b2: "접었다 폈다 돼서 안 쓸 땐 납작하게 접어두면 그만이에요",
-      tip: "계절 지난 옷이랑 이불부터 넣어보세요, 옷장이 반은 비어요",
-      review: "후기 보면 다들 하나만 산 걸 후회하고 추가 주문하시더라고요",
-    },
-    주방템: {
-      hook: "하루 세 번 밥하고 설거지하는 주부님들?",
-      empathy: "주방일은 해도 해도 티가 안 나서 더 힘 빠지잖아요",
-      b1: "이게 있으면 조리부터 뒷정리까지 걸리는 시간이 눈에 띄게 줄어요",
-      b2: "튼튼하고 세척도 간단해서 몇 년은 두고 쓸 수 있는 물건이에요",
-      tip: "저녁 준비할 때 제일 손 많이 가는 일에 먼저 써보세요, 차이가 확 나요",
-      review: "주방템 중에 후기 많기로 소문난 제품이더라고요",
-    },
-    육아생활템: {
-      hook: "애 키우느라 내 시간 1분이 아쉬운 엄마들?",
-      empathy: "아이 챙기다 보면 손이 두 개로는 늘 모자라잖아요",
-      b1: "이거 하나면 아이 챙기는 일이 한 손으로도 될 만큼 수월해져요",
-      b2: "가볍고 부피도 작아서 외출 가방에 그냥 쏙 들어가요",
-      tip: "기저귀 가방이랑 거실에 하나씩 두면 급할 때 허둥댈 일이 없어요",
-      review: "엄마들 커뮤니티에서 입소문 난 데는 다 이유가 있더라고요",
-    },
-    생활템: {
-      hook: "살림하다 보면 이런 거 하나 꼭 아쉽죠?",
-      empathy: "없을 땐 몰랐는데 한번 쓰면 매일 손이 가는 게 이런 물건이잖아요",
-      b1: "이거 하나 두면 생각보다 훨씬 자주, 요긴하게 쓰게 돼요",
-      b2: "가격도 착해서 실패해도 부담 없다 싶은 수준이에요",
-      tip: "제일 자주 쓰는 자리에 아예 놔두세요, 그래야 진짜 매일 쓰게 돼요",
-      review: "가성비 좋다는 후기가 쭉 달려 있는 제품이더라고요",
-    },
-  };
+  // 상품명에서 실제 특징 문장 뽑기 (장점 자리에 제품 설명으로 들어간다)
+  const features = extractFeatureLines(product.product_name, 2);
+  const spec = specLine(product.product_name, product.price_text);
 
-  const preset = presets[category] ?? {
-    hook: pain ? `${pain}` : presets["생활템"].hook,
-    empathy: presets["생활템"].empathy,
-    b1: benefit ?? presets["생활템"].b1,
-    b2: presets["생활템"].b2,
-    tip: presets["생활템"].tip,
-    review: presets["생활템"].review,
-  };
-
-  // 상품에 타겟이 명시돼 있으면 후킹을 타겟 호명으로 교체 (예: "자취생이라면")
+  // 후킹: 타겟이 명시돼 있으면 호명, 아니면 pain, 아니면 변형 후킹
   const target = product.target_user?.trim();
-  if (target && target.length <= 14) {
-    preset.hook = `${target.replace(/[을를이가은는]$/, "")}이라면 주목`;
-  }
+  const hookText =
+    target && target.length <= 14
+      ? `${target.replace(/[을를이가은는]$/, "")}이라면 주목`
+      : pain && pain.length <= 28
+        ? pain
+        : pick(v.hooks, seed);
+
+  // 장점1: 상품명 특징 1순위 → main_benefit → 카테고리 폴백
+  const benefit1 =
+    features[0] ??
+    (benefit && benefit.length <= 34 ? benefit : v.b1);
+  // 장점2: 상품명 특징 2순위 → 구성 스펙 → 카테고리 폴백
+  const benefit2 = features[1] ?? spec ?? v.b2;
 
   const copy: VideoCopy = {
-    hookText: pain && pain.length <= 28 ? pain : preset.hook,
-    empathyLine: preset.empathy,
-    benefit1: benefit && benefit.length <= 34 ? benefit : preset.b1,
-    benefit2: preset.b2,
-    usageTip: preset.tip,
-    reviewLine: preset.review,
+    hookText,
+    empathyLine: pick(v.empathies, seed >> 1),
+    benefit1,
+    benefit2,
+    usageTip: pick(v.tips, seed >> 2),
+    reviewLine: pick(v.reviews, seed >> 3),
     captionText: "",
   };
 
