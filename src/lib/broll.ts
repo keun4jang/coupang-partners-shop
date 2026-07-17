@@ -17,18 +17,52 @@ const BROLL_DIR = path.resolve("public/assets/broll");
 const MIN_DURATION_SEC = 16;
 const MAX_DURATION_SEC = 60;
 
-/** 카테고리 → Pexels 영어 검색어 (실사용 장면 위주) */
-const SEARCH_QUERY_BY_CATEGORY: Record<string, string> = {
-  청소템: "cleaning home housework",
-  주방템: "kitchen cooking home",
-  수납템: "organizing home closet",
-  육아생활템: "baby home care",
-  차량용품: "car interior cleaning",
-  생활템: "housework daily home",
-  반려동물: "dog cat home",
-  뷰티: "skincare routine",
-  자취템: "small apartment home",
-  캠핑: "camping outdoor",
+/**
+ * 카테고리 → Pexels 영어 검색어 변형들.
+ * 같은 카테고리 영상이 매번 같은 배경으로 나오지 않도록 여러 변형을 두고
+ * 시드로 회전시킨다 (반복 최소화).
+ */
+const SEARCH_QUERY_BY_CATEGORY: Record<string, string[]> = {
+  청소템: [
+    "cleaning home housework",
+    "wiping kitchen counter home",
+    "tidying living room home",
+    "mopping floor home",
+  ],
+  주방템: [
+    "kitchen cooking home",
+    "preparing food home kitchen",
+    "washing dishes home",
+    "kitchen counter home",
+  ],
+  수납템: [
+    "organizing home closet",
+    "folding clothes home",
+    "tidy shelves home",
+    "declutter room home",
+  ],
+  육아생활템: [
+    "baby home care",
+    "mother with baby home",
+    "playing with baby home",
+    "baby nursery home",
+  ],
+  차량용품: [
+    "car interior cleaning",
+    "car dashboard detail",
+    "driving car interior",
+    "car seat interior",
+  ],
+  생활템: [
+    "housework daily home",
+    "cozy home living",
+    "morning routine home",
+    "home lifestyle domestic",
+  ],
+  반려동물: ["dog cat home", "playing pet home", "pet care home"],
+  뷰티: ["skincare routine", "beauty vanity home", "morning skincare home"],
+  자취템: ["small apartment home", "studio apartment living", "cozy small home"],
+  캠핑: ["camping outdoor", "tent camping nature", "outdoor camp cooking"],
 };
 
 /**
@@ -57,12 +91,17 @@ const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
   [/차량|자동차|차\s/, "car interior clean"],
 ];
 
-/** 상품명·카테고리로 가장 관련성 높은 검색어를 고른다 (상품명 키워드 우선) */
-function queryForProduct(productName: string, category: string): string {
+/** 상품명 키워드에 맞는 구체 검색어 (없으면 null) */
+function productQuery(productName: string): string | null {
   const name = productName ?? "";
   for (const [re, q] of PRODUCT_QUERY_KEYWORDS) {
     if (re.test(name)) return q;
   }
+  return null;
+}
+
+/** 카테고리 검색어 변형들 */
+function categoryQueries(category: string): string[] {
   return SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"];
 }
 
@@ -135,13 +174,14 @@ async function downloadClip(
  */
 async function fetchFromPixabay(
   query: string,
-  displayNumber: number
+  seed: number
 ): Promise<StockBroll | null> {
   const apiKey = optionalEnv("PIXABAY_API_KEY");
   if (!apiKey) return null;
+  const page = 1 + (Math.abs(seed) % PAGE_SPREAD);
   const url =
     `https://pixabay.com/api/videos/?key=${apiKey}` +
-    `&q=${encodeURIComponent(query)}&per_page=20&safesearch=true`;
+    `&q=${encodeURIComponent(query)}&per_page=${PER_PAGE}&page=${page}&safesearch=true`;
   const res = await fetch(url);
   if (!res.ok) {
     console.warn(`Pixabay 검색 실패 (${res.status})`);
@@ -158,7 +198,7 @@ async function fetchFromPixabay(
     (v) => v.duration >= MIN_DURATION_SEC && v.duration <= MAX_DURATION_SEC
   );
   if (candidates.length === 0) return null;
-  const video = candidates[displayNumber % candidates.length];
+  const video = candidates[Math.abs(seed) % candidates.length];
   // 세로 파일 우선, 없으면 큰 해상도(가로여도 cover 크롭)
   const files = Object.values(video.videos).filter((f) => f.url);
   const portrait = files.filter((f) => f.height > f.width);
@@ -176,16 +216,22 @@ async function fetchFromPixabay(
  * Pexels 우선, 없으면 Pixabay. 같은 카테고리를 여러 번 만들어도
  * 다른 클립이 나오도록 displayNumber 를 시드로 회전시킨다.
  */
+/** 검색 결과 상위 몇 페이지에서 회전할지 (Pexels 는 결과가 수천 건이라 깊게 파도 됨) */
+const PAGE_SPREAD = 6;
+const PER_PAGE = 30;
+
 async function fetchFromPexels(
   query: string,
-  displayNumber: number
+  seed: number
 ): Promise<StockBroll | null> {
   const apiKey = optionalEnv("PEXELS_API_KEY");
   if (!apiKey) return null;
 
+  // 시드로 페이지를 회전 → 항상 상위 50개만 쓰지 않고 수백 개 풀에서 고름 (반복 방지)
+  const page = 1 + (Math.abs(seed) % PAGE_SPREAD);
   const url =
     `${PEXELS_SEARCH}?query=${encodeURIComponent(query)}` +
-    `&orientation=portrait&size=medium&per_page=50`;
+    `&orientation=portrait&size=medium&per_page=${PER_PAGE}&page=${page}`;
   const res = await fetch(url, { headers: { Authorization: apiKey } });
   if (!res.ok) {
     console.warn(`Pexels 검색 실패 (${res.status})`);
@@ -199,11 +245,10 @@ async function fetchFromPexels(
       pickFile(v)
   );
   if (candidates.length === 0) {
-    console.warn(`Pexels: '${query}' 조건에 맞는 클립 없음`);
     return null;
   }
 
-  const video = candidates[displayNumber % candidates.length];
+  const video = candidates[Math.abs(seed) % candidates.length];
   const file = pickFile(video)!;
   const filename = await downloadClip(file.link, `pexels-${video.id}.mp4`);
   if (!filename) {
@@ -226,57 +271,64 @@ export async function fetchStockBroll(
  * displayNumber 를 시드로 서로 다른 후보를 회전 선택.
  * 구할 수 있는 만큼만 돌려준다 (0개면 블러 배경 폴백).
  */
+type Provider = {
+  name: string;
+  fetch: (query: string, seed: number) => Promise<StockBroll | null>;
+};
+
+/** 키가 설정된 스톡 제공자만 활성화 (Pexels · Pixabay). */
+function activeProviders(): Provider[] {
+  const list: Provider[] = [];
+  if (optionalEnv("PEXELS_API_KEY")) list.push({ name: "Pexels", fetch: fetchFromPexels });
+  if (optionalEnv("PIXABAY_API_KEY")) list.push({ name: "Pixabay", fetch: fetchFromPixabay });
+  return list;
+}
+
 export async function fetchStockBrolls(
   category: string,
   displayNumber: number,
   count: number,
   productName = ""
 ): Promise<StockBroll[]> {
-  // 상품명 키워드 검색어를 먼저 쓰고, 부족하면 카테고리 검색어로 채운다.
-  // 두 검색어 모두 생활감 보정(home domestic)을 거친다.
-  const primary = domesticize(queryForProduct(productName, category));
-  const categoryQuery = domesticize(
-    SEARCH_QUERY_BY_CATEGORY[category] ?? SEARCH_QUERY_BY_CATEGORY["생활템"]
-  );
-  const queries = primary === categoryQuery ? [primary] : [primary, categoryQuery];
+  // 검색어 풀: 상품명 특화 검색어(있으면) + 카테고리 변형들. 모두 생활감 보정.
+  const pq = productQuery(productName);
+  const rawQueries = [...(pq ? [pq] : []), ...categoryQueries(category)];
+  const queries = [...new Set(rawQueries.map(domesticize))];
+
+  const providers = activeProviders();
+  if (providers.length === 0) {
+    console.warn("스톡 API 키 없음 - 블러 상품사진 배경으로 폴백");
+    return [];
+  }
   console.log(
-    `스톡 검색어: ${queries.map((q) => `"${q}"`).join(" → ")} (상품: ${productName || category})`
+    `스톡 검색어 ${queries.length}종 × 제공자 ${providers
+      .map((p) => p.name)
+      .join("+")} (상품: ${productName || category})`
   );
 
   const out: StockBroll[] = [];
-  const seen = new Set<number>();
-  // Pexels 우선(검색어 순서대로) → 부족하면 Pixabay 로 채움
-  for (const query of queries) {
-    for (let i = 0; i < count * 2 && out.length < count; i++) {
-      try {
-        const clip = await fetchFromPexels(query, displayNumber + i);
-        if (clip && !seen.has(clip.pexelsId)) {
-          seen.add(clip.pexelsId);
-          out.push(clip);
-        }
-      } catch (e) {
-        console.warn(`Pexels 처리 실패: ${(e as Error).message}`);
-        break;
+  const seen = new Set<string>();
+  // 슬롯마다 (검색어 · 제공자 · 시드)를 회전시켜 서로 다른 장면/소스가 섞이게 한다.
+  const maxAttempts = count * 4 + 8;
+  for (let attempt = 0; out.length < count && attempt < maxAttempts; attempt++) {
+    const query = queries[attempt % queries.length];
+    const provider = providers[attempt % providers.length];
+    const seed = displayNumber * 101 + attempt * 17;
+    try {
+      const clip = await provider.fetch(query, seed);
+      if (clip && !seen.has(clip.file)) {
+        seen.add(clip.file);
+        out.push(clip);
       }
-    }
-  }
-  for (const query of queries) {
-    for (let i = 0; out.length < count && i < count * 2; i++) {
-      try {
-        const clip = await fetchFromPixabay(query, displayNumber + i);
-        if (clip && !seen.has(clip.pexelsId)) {
-          seen.add(clip.pexelsId);
-          out.push(clip);
-        }
-      } catch (e) {
-        console.warn(`Pixabay 처리 실패: ${(e as Error).message}`);
-        break;
-      }
+    } catch (e) {
+      console.warn(`${provider.name} 처리 실패: ${(e as Error).message}`);
     }
   }
 
   if (out.length === 0) {
     console.warn("스톡 클립 수급 실패 - 블러 상품사진 배경으로 폴백");
+  } else {
+    console.log(`스톡 클립 ${out.length}개: ${out.map((c) => c.file).join(", ")}`);
   }
   return out;
 }
