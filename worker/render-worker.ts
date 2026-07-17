@@ -53,7 +53,7 @@ import {
   shortenProductName,
 } from "../src/lib/format";
 import { fillVideoCopy } from "../src/lib/videoItems";
-import { ctaLine } from "../src/lib/ai";
+import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls } from "../src/lib/broll";
 import { sourceProductClips } from "../src/lib/videoSource";
@@ -689,7 +689,64 @@ async function processPending(): Promise<number> {
   return processed;
 }
 
+/**
+ * 미리보기 렌더: DB의 실제 상품 하나로 새 대본을 뽑아 로컬 mp4 만 만든다.
+ * DB 기록/업로드 없음(큐에 영향 없음). 사용: `tsx worker/render-worker.ts --demo [display_number]`
+ */
+async function runDemo(): Promise<void> {
+  const db = supabaseAdmin();
+  const numArg = process.argv
+    .slice(process.argv.indexOf("--demo") + 1)
+    .find((a) => /^\d+$/.test(a));
+
+  let row: VideoItemWithProduct | null = null;
+  if (numArg) {
+    const { data } = await db
+      .from("video_items")
+      .select("*, products(*)")
+      .eq("display_number", Number(numArg))
+      .maybeSingle();
+    row = (data as VideoItemWithProduct | null) ?? null;
+  }
+  if (!row) {
+    const { data } = await db
+      .from("video_items")
+      .select("*, products(*)")
+      .order("display_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    row = (data as VideoItemWithProduct | null) ?? null;
+  }
+  if (!row) throw new Error("데모용 상품을 DB에서 찾지 못했습니다.");
+
+  const product = row.products;
+  const displayNumber = row.display_number;
+  console.log(`\n=== [데모] ${formatDisplayNumber(displayNumber)} ${product.product_name} ===`);
+  console.log("새 대본 생성 중(Gemini)...");
+  const copy = await generateVideoCopy(product, displayNumber, "D");
+  console.log("대본:");
+  console.log(
+    `  후킹: ${copy.hookText}\n  공감: ${copy.empathyLine}\n  장점1: ${copy.benefit1}\n` +
+      `  장점2: ${copy.benefit2}\n  팁: ${copy.usageTip}\n  후기: ${copy.reviewLine}`
+  );
+
+  const demoItem: VideoItem = {
+    ...row,
+    hook_text: copy.hookText,
+    script_text: composeScriptText(copy, displayNumber),
+    caption_text: copy.captionText,
+    template_type: "D",
+  };
+  const { videoPath } = await renderVideo(demoItem, product);
+  console.log(`\n=== [데모] 완료 (업로드/DB 기록 없음) ===\n${videoPath}`);
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes("--demo")) {
+    await runDemo();
+    return;
+  }
+
   const once = process.argv.includes("--once");
   console.log(`렌더 워커 시작 (${once ? "1회 실행" : `${POLL_INTERVAL_MS / 1000}초 간격 감시`})`);
 
