@@ -303,7 +303,8 @@ async function generateWithGemini(
   apiKey: string,
   userPrompt: string
 ): Promise<VideoCopy | null> {
-  const model = optionalEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  // flash-lite = 무료 등급·최저비용, -latest 별칭은 모델 폐기 시 자동으로 현행 모델로 이동
+  const model = optionalEnv("GEMINI_MODEL") ?? "gemini-flash-lite-latest";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
