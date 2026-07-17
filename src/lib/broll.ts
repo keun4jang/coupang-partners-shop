@@ -1,6 +1,12 @@
 import fs from "fs";
 import path from "path";
 import { optionalEnv } from "./env";
+import { getSetting } from "./settings";
+
+/** 스톡 API 키: 환경변수 우선, 없으면 Supabase app_settings (배포/시크릿 편집 없이 갱신) */
+async function resolveKey(name: string): Promise<string | undefined> {
+  return optionalEnv(name) ?? (await getSetting(name)) ?? undefined;
+}
 
 /**
  * 스톡 실사용 영상(B-roll) 자동 수급 - Pexels API.
@@ -174,10 +180,9 @@ async function downloadClip(
  */
 async function fetchFromPixabay(
   query: string,
-  seed: number
+  seed: number,
+  apiKey: string
 ): Promise<StockBroll | null> {
-  const apiKey = optionalEnv("PIXABAY_API_KEY");
-  if (!apiKey) return null;
   const page = 1 + (Math.abs(seed) % PAGE_SPREAD);
   const url =
     `https://pixabay.com/api/videos/?key=${apiKey}` +
@@ -222,11 +227,9 @@ const PER_PAGE = 30;
 
 async function fetchFromPexels(
   query: string,
-  seed: number
+  seed: number,
+  apiKey: string
 ): Promise<StockBroll | null> {
-  const apiKey = optionalEnv("PEXELS_API_KEY");
-  if (!apiKey) return null;
-
   // 시드로 페이지를 회전 → 항상 상위 50개만 쓰지 않고 수백 개 풀에서 고름 (반복 방지)
   const page = 1 + (Math.abs(seed) % PAGE_SPREAD);
   const url =
@@ -276,11 +279,19 @@ type Provider = {
   fetch: (query: string, seed: number) => Promise<StockBroll | null>;
 };
 
-/** 키가 설정된 스톡 제공자만 활성화 (Pexels · Pixabay). */
-function activeProviders(): Provider[] {
+/** 키가 설정된 스톡 제공자만 활성화 (Pexels · Pixabay). 키는 env → Supabase 순. */
+async function activeProviders(): Promise<Provider[]> {
   const list: Provider[] = [];
-  if (optionalEnv("PEXELS_API_KEY")) list.push({ name: "Pexels", fetch: fetchFromPexels });
-  if (optionalEnv("PIXABAY_API_KEY")) list.push({ name: "Pixabay", fetch: fetchFromPixabay });
+  const [pexels, pixabay] = await Promise.all([
+    resolveKey("PEXELS_API_KEY"),
+    resolveKey("PIXABAY_API_KEY"),
+  ]);
+  if (pexels) {
+    list.push({ name: "Pexels", fetch: (q, s) => fetchFromPexels(q, s, pexels) });
+  }
+  if (pixabay) {
+    list.push({ name: "Pixabay", fetch: (q, s) => fetchFromPixabay(q, s, pixabay) });
+  }
   return list;
 }
 
@@ -295,7 +306,7 @@ export async function fetchStockBrolls(
   const rawQueries = [...(pq ? [pq] : []), ...categoryQueries(category)];
   const queries = [...new Set(rawQueries.map(domesticize))];
 
-  const providers = activeProviders();
+  const providers = await activeProviders();
   if (providers.length === 0) {
     console.warn("스톡 API 키 없음 - 블러 상품사진 배경으로 폴백");
     return [];
