@@ -110,7 +110,6 @@ export function formatReportMessage(d: ReportData): string {
   }
 
   lines.push("📦 현황");
-  lines.push(`· 후보 상품: ${d.candidateCount}개 (승인 대기)`);
   lines.push(`· 노출중 영상: ${d.visibleVideos}개 / 전체 ${d.totalVideos}개`);
 
   return lines.join("\n");

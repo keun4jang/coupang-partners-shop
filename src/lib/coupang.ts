@@ -116,6 +116,43 @@ export async function searchProducts(
   return data?.productData ?? [];
 }
 
+/** 커미션 리포트 1행(일자별). commission 은 정산 예정 커미션(원). */
+export interface CommissionRow {
+  date: string; // YYYYMMDD (KST)
+  trackingCode: string;
+  subId: string;
+  commission: number;
+  click: number;
+}
+
+/**
+ * 일자별 커미션 리포트 (수익 집계용).
+ * - startDate/endDate 는 yyyyMMdd (KST). 조회 기간은 약 31일 이내 권장.
+ * - commission 은 "0E-9" 같은 BigDecimal 문자열로 올 수 있어 Number 로 정규화한다.
+ */
+export async function fetchCommissionReport(
+  startDate: string,
+  endDate: string
+): Promise<CommissionRow[]> {
+  const query = `startDate=${startDate}&endDate=${endDate}`;
+  const data = await request<
+    Array<{
+      date?: string;
+      trackingCode?: string;
+      subId?: string;
+      commission?: number | string;
+      click?: number | string;
+    }>
+  >("GET", `${BASE}/reports/commission`, query);
+  return (Array.isArray(data) ? data : []).map((r) => ({
+    date: String(r.date ?? ""),
+    trackingCode: r.trackingCode ?? "",
+    subId: r.subId ?? "",
+    commission: Number(r.commission) || 0,
+    click: Number(r.click) || 0,
+  }));
+}
+
 /** 일반 쿠팡 상품 URL → 제휴 딥링크 (수동으로 URL 붙여넣을 때 사용) */
 export async function createDeeplink(coupangUrls: string[]): Promise<string[]> {
   const data = await request<Array<{ landingUrl?: string; shortenUrl?: string }>>(

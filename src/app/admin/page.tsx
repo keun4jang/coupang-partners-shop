@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { formatDisplayNumber } from "@/lib/format";
+import { getEarnings, won } from "@/lib/earnings";
 import type { VideoItemWithProduct } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function AdminDashboard() {
     { count: videoCount },
     { count: clickCount },
     { data: recentVideos },
+    earnings,
   ] = await Promise.all([
     db.from("products").select("*", { count: "exact", head: true }),
     db
@@ -39,6 +41,7 @@ export default async function AdminDashboard() {
       .select("*, products(*)")
       .order("display_number", { ascending: false })
       .limit(5),
+    getEarnings(),
   ]);
 
   const stats = [
@@ -65,6 +68,39 @@ export default async function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      <section className="mt-8">
+        <h2 className="font-bold text-lg">💰 쿠팡파트너스 수익</h2>
+        {earnings.ok ? (
+          <>
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              {[
+                { label: "오늘", b: earnings.today },
+                { label: "최근 7일", b: earnings.week },
+                { label: `이번달 (${earnings.monthLabel})`, b: earnings.month },
+              ].map((e) => (
+                <div
+                  key={e.label}
+                  className="bg-card rounded-2xl p-4 border border-accent-soft"
+                >
+                  <div className="text-sub text-xs">{e.label}</div>
+                  <div className="text-xl font-extrabold text-primary-dark mt-1">
+                    {won(e.b.commission)}
+                  </div>
+                  <div className="text-sub text-xs mt-1">클릭 {e.b.clicks}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-sub text-xs mt-2">
+              ※ 커미션은 정산 확정 전 예상치예요.
+            </p>
+          </>
+        ) : (
+          <p className="text-sub text-sm mt-3">
+            수익 정보를 불러오지 못했어요. {earnings.error}
+          </p>
+        )}
+      </section>
 
       <section className="mt-8">
         <div className="flex items-center justify-between">

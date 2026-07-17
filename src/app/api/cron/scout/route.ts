@@ -34,9 +34,10 @@ export async function GET(request: NextRequest) {
       queueError = e instanceof Error ? e.message : String(e);
     }
 
-    await sendTelegramMessage(
+    const scoutMsg = (
       formatScoutMessage(result) + formatQueueMessage(queuedNumbers, queueError)
-    );
+    ).trim();
+    if (scoutMsg) await sendTelegramMessage(scoutMsg);
     return NextResponse.json({
       ok: true,
       registered: result.registered.length,

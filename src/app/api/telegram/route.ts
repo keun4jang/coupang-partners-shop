@@ -9,6 +9,7 @@ import {
   uploadBufferToDrive,
 } from "@/lib/drive";
 import { formatDisplayNumber } from "@/lib/format";
+import { getEarnings, formatEarningsMessage } from "@/lib/earnings";
 import { optionalEnv, requireEnv } from "@/lib/env";
 import type { Product, TemplateType, VideoItemWithProduct } from "@/types/db";
 
@@ -258,15 +259,10 @@ async function handleStatusCommand(chatId: number): Promise<void> {
   const db = supabaseAdmin();
   const [
     { count: productCount },
-    { count: candidateCount },
     { count: videoCount },
     { data: latest },
   ] = await Promise.all([
     db.from("products").select("*", { count: "exact", head: true }),
-    db
-      .from("products")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "candidate"),
     db.from("video_items").select("*", { count: "exact", head: true }),
     db
       .from("video_items")
@@ -287,7 +283,6 @@ async function handleStatusCommand(chatId: number): Promise<void> {
       "현재 상태",
       "",
       `전체 상품: ${productCount ?? 0}개`,
-      `후보 상품: ${candidateCount ?? 0}개`,
       `생성된 영상: ${videoCount ?? 0}개`,
       "",
       "최근 생성:",
@@ -383,6 +378,10 @@ export async function POST(request: NextRequest) {
       case "상태":
         await handleStatusCommand(chatId);
         break;
+      case "수익":
+      case "정산":
+        await sendTelegramMessage(formatEarningsMessage(await getEarnings()), chatId);
+        break;
       default:
         await sendTelegramMessage(
           [
@@ -390,7 +389,7 @@ export async function POST(request: NextRequest) {
             "",
             "업로드 - 새 상품 하나 골라 웹사이트 등록 + 영상 생성·업로드 (즉시)",
             "영상 - 업로드와 같음 (영상D 처럼 템플릿 지정 가능)",
-            "상품목록 - 후보 상품 보기",
+            "수익 - 쿠팡파트너스 오늘/이번주/이번달 커미션",
             "최근영상 - 최근 생성된 영상과 드라이브 링크",
             "상태 - 전체 현황 요약",
             "",

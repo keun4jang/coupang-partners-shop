@@ -154,11 +154,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 
 /** 텔레그램 요약 메시지 */
 export function formatScoutMessage(result: ScoutResult): string {
-  if (result.registered.length === 0) {
-    const base = "🔎 오늘 스카우트: 새 후보가 없어요 (이미 있는 상품이거나 필터 제외).";
-    return result.errors.length ? `${base}\n\n⚠️ ${result.errors.join("\n")}` : base;
-  }
-  // 전부 자동으로 골라 만들어지므로 후보 목록은 나열하지 않는다 (요약만).
-  const warn = result.errors.length ? `\n\n⚠️ 일부 카테고리 오류:\n${result.errors.join("\n")}` : "";
-  return `🔎 오늘 상품 후보 ${result.registered.length}개 수집 완료${warn}`;
+  // 후보 수집 결과는 알림에 넣지 않는다(사장님 요청 - 전부 자동으로 골라 만들어짐).
+  // 오류가 있을 때만 알려서 조치할 수 있게 한다.
+  return result.errors.length ? `⚠️ 스카우트 일부 오류:\n${result.errors.join("\n")}` : "";
 }

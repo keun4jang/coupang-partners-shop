@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildReportData, formatReportMessage } from "@/lib/report";
+import { getEarnings, formatEarningsMessage } from "@/lib/earnings";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { isCronAuthorized } from "@/lib/cronAuth";
 
@@ -16,9 +17,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   try {
-    const data = await buildReportData();
-    await sendTelegramMessage(formatReportMessage(data));
-    return NextResponse.json({ ok: true, ...data });
+    const [data, earnings] = await Promise.all([buildReportData(), getEarnings()]);
+    await sendTelegramMessage(
+      `${formatReportMessage(data)}\n\n${formatEarningsMessage(earnings)}`
+    );
+    return NextResponse.json({ ok: true, ...data, earnings });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
