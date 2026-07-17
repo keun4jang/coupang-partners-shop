@@ -9,6 +9,7 @@ import {
   nameHash,
   pick,
 } from "./copyPresets";
+import { getSetting } from "./settings";
 
 const DEFAULT_MODEL = "claude-opus-4-8";
 
@@ -368,8 +369,12 @@ export async function generateVideoCopy(
   displayNumber: number,
   templateType: TemplateType
 ): Promise<VideoCopy> {
-  const geminiKey = optionalEnv("GEMINI_API_KEY");
-  const anthropicKey = optionalEnv("AI_API_KEY");
+  // 환경변수 우선, 없으면 Supabase app_settings 에서 조회
+  // (GitHub 시크릿을 손대지 않고 키를 넣을 수 있게 - 배포 없이 갱신 가능)
+  const geminiKey =
+    optionalEnv("GEMINI_API_KEY") ?? (await getSetting("GEMINI_API_KEY")) ?? undefined;
+  const anthropicKey =
+    optionalEnv("AI_API_KEY") ?? (await getSetting("AI_API_KEY")) ?? undefined;
   if (!geminiKey && !anthropicKey) {
     return fallbackCopy(product, displayNumber);
   }
