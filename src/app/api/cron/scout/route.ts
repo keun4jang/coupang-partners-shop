@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** 하루에 자동으로 만들 영상 개수 */
-const DAILY_VIDEO_TARGET = 3;
+/** 하루에 자동으로 만들 영상 개수 (신생 계정 안전선: 2개. 자리잡으면 상향) */
+const DAILY_VIDEO_TARGET = 2;
 
 /**
  * 매일 아침 자동 파이프라인 (Vercel Cron).
