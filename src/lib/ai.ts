@@ -236,67 +236,150 @@ const SYSTEM_PROMPT = `너는 아이 키우는 40대 한국인 아줌마다. "�
 - 반드시 "영상 속 제품은 프로필 링크에서 {번호}번으로 찾아보시면 돼요." 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
 - 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;
 
-/**
- * 상품 정보로 후킹/공감/장점/캡션 문구 생성.
- * AI_API_KEY 가 없거나 결과에 금지 표현이 포함되면 안전한 기본 문구로 폴백한다.
- */
-export async function generateVideoCopy(
+/** Gemini responseSchema 는 OpenAPI 서브셋(타입 대문자, additionalProperties 미지원) */
+const GEMINI_COPY_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    hookText: { type: "STRING" },
+    empathyLine: { type: "STRING" },
+    benefit1: { type: "STRING" },
+    benefit2: { type: "STRING" },
+    usageTip: { type: "STRING" },
+    reviewLine: { type: "STRING" },
+    captionText: { type: "STRING" },
+  },
+  required: [
+    "hookText",
+    "empathyLine",
+    "benefit1",
+    "benefit2",
+    "usageTip",
+    "reviewLine",
+    "captionText",
+  ],
+  propertyOrdering: [
+    "hookText",
+    "empathyLine",
+    "benefit1",
+    "benefit2",
+    "usageTip",
+    "reviewLine",
+    "captionText",
+  ],
+};
+
+/** 상품 정보 → AI에게 넘길 사용자 프롬프트 (제공사 공통) */
+function buildUserPrompt(
   product: Product,
   displayNumber: number,
   templateType: TemplateType
-): Promise<VideoCopy> {
-  const apiKey = optionalEnv("AI_API_KEY");
-  if (!apiKey) {
-    return fallbackCopy(product, displayNumber);
-  }
-
+): string {
   const templateHint: Record<TemplateType, string> = {
     A: "템플릿 A(생활 문제 해결형): 문제 제기 → 공감 → 제품 등장 → 장점 → 번호 CTA 흐름.",
     B: "템플릿 B(아이엄마 공감형): 아이 둘 키우는 집의 생활 상황에서 시작해 공감 위주로.",
     C: "템플릿 C(살림 메모형): '이런 거 하나 있으면 은근 편해요' 톤으로 담백한 메모 느낌.",
     D: "템플릿 D(실사용 영상형): 실제 사용 장면 영상 위에 얹히므로 장면과 어울리는 생활감 있는 문장으로.",
   };
+  return [
+    `다음 상품의 숏폼 문구를 만들어줘. ${templateHint[templateType]}`,
+    "",
+    `상품명: ${product.product_name}`,
+    `카테고리: ${product.category}`,
+    `타겟: ${product.target_user ?? "-"}`,
+    `불편한 점(painPoint): ${product.pain_point ?? "-"}`,
+    `핵심 장점(mainBenefit): ${product.main_benefit ?? "-"}`,
+    `가격대: ${product.price_text ?? "-"}`,
+    `영상 번호: ${displayNumber}번`,
+    "",
+    "타겟·불편한점·핵심장점이 '-'로 비어 있으면 상품명을 보고 네가 직접 추론해라.",
+    "benefit1·benefit2 에는 이 제품의 '구체적 특징'(소재·기능·크기·용량·사용법 등)을 꼭 담아,",
+    "보는 사람이 '아, 이래서 좋은 거구나' 하고 제품을 이해하게 제품 설명을 충분히 넣어라.",
+    "hookText 는 매번 새롭고 다르게, 뻔한 첫 문장(예: '이거 하나면')은 피해라.",
+  ].join("\n");
+}
 
-  try {
-    const client = new Anthropic({ apiKey });
-    const response = await client.messages.create({
-      model: optionalEnv("AI_MODEL") ?? DEFAULT_MODEL,
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: COPY_SCHEMA,
-        },
+/** Gemini(무료 등급 가능) 로 문구 생성. 실패 시 throw → 상위에서 폴백 */
+async function generateWithGemini(
+  apiKey: string,
+  userPrompt: string
+): Promise<VideoCopy | null> {
+  const model = optionalEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature: 1.05,
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_COPY_SCHEMA,
       },
-      messages: [
-        {
-          role: "user",
-          content: [
-            `다음 상품의 숏폼 문구를 만들어줘. ${templateHint[templateType]}`,
-            "",
-            `상품명: ${product.product_name}`,
-            `카테고리: ${product.category}`,
-            `타겟: ${product.target_user ?? "-"}`,
-            `불편한 점(painPoint): ${product.pain_point ?? "-"}`,
-            `핵심 장점(mainBenefit): ${product.main_benefit ?? "-"}`,
-            `가격대: ${product.price_text ?? "-"}`,
-            `영상 번호: ${displayNumber}번`,
-          ].join("\n"),
-        },
-      ],
-    });
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Gemini API 오류 ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return null;
+  return JSON.parse(text) as VideoCopy;
+}
 
-    if (response.stop_reason === "refusal") {
-      return fallbackCopy(product, displayNumber);
-    }
+/** Anthropic(유료) 로 문구 생성. 실패 시 throw → 상위에서 폴백 */
+async function generateWithAnthropic(
+  apiKey: string,
+  userPrompt: string
+): Promise<VideoCopy | null> {
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: optionalEnv("AI_MODEL") ?? DEFAULT_MODEL,
+    max_tokens: 2048,
+    system: SYSTEM_PROMPT,
+    output_config: {
+      format: {
+        type: "json_schema",
+        schema: COPY_SCHEMA,
+      },
+    },
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  if (response.stop_reason === "refusal") return null;
+  const textBlock = response.content.find((b) => b.type === "text");
+  if (!textBlock || textBlock.type !== "text") return null;
+  return JSON.parse(textBlock.text) as VideoCopy;
+}
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      return fallbackCopy(product, displayNumber);
-    }
+/**
+ * 상품 정보로 후킹/공감/장점/캡션 문구 생성.
+ * 우선순위: GEMINI_API_KEY(무료) → AI_API_KEY(Anthropic) → 프리셋 폴백.
+ * 키가 없거나 실패/금지표현 시 안전한 기본 문구로 폴백한다.
+ */
+export async function generateVideoCopy(
+  product: Product,
+  displayNumber: number,
+  templateType: TemplateType
+): Promise<VideoCopy> {
+  const geminiKey = optionalEnv("GEMINI_API_KEY");
+  const anthropicKey = optionalEnv("AI_API_KEY");
+  if (!geminiKey && !anthropicKey) {
+    return fallbackCopy(product, displayNumber);
+  }
 
-    const copy = sanitizeCopy(JSON.parse(textBlock.text) as VideoCopy);
+  const userPrompt = buildUserPrompt(product, displayNumber, templateType);
+  try {
+    const raw = geminiKey
+      ? await generateWithGemini(geminiKey, userPrompt)
+      : await generateWithAnthropic(anthropicKey as string, userPrompt);
+    if (!raw) return fallbackCopy(product, displayNumber);
+    const copy = sanitizeCopy(raw);
     if (containsBannedPhrase(copy)) {
       return fallbackCopy(product, displayNumber);
     }
