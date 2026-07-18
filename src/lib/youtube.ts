@@ -70,6 +70,34 @@ export async function uploadShortToYoutube(params: {
   return { videoId, url: `https://youtube.com/shorts/${videoId}` };
 }
 
+/**
+ * 기존 영상의 설명만 교체한다 (제목·태그·카테고리는 현재 값 그대로 보존).
+ * videos.update 는 snippet 을 통째로 덮으므로 현재 snippet 을 먼저 읽어 유지한다.
+ */
+export async function updateYoutubeDescription(
+  videoId: string,
+  description: string
+): Promise<void> {
+  const youtube = youtubeClient();
+  if (!youtube) throw new Error("유튜브 환경변수 미설정");
+  const { data } = await youtube.videos.list({ part: ["snippet"], id: [videoId] });
+  const snippet = data.items?.[0]?.snippet;
+  if (!snippet) throw new Error(`영상 ${videoId} 조회 실패(권한/삭제 확인)`);
+  await youtube.videos.update({
+    part: ["snippet"],
+    requestBody: {
+      id: videoId,
+      snippet: {
+        title: snippet.title,
+        categoryId: snippet.categoryId ?? CATEGORY_HOWTO_STYLE,
+        description,
+        tags: snippet.tags,
+        defaultLanguage: snippet.defaultLanguage ?? undefined,
+      },
+    },
+  });
+}
+
 /** 유튜브 제목: "N번 | 제품명 #Shorts" (100자 제한 고려해 제품명은 이미 요약된 값을 받는다) */
 export function youtubeTitle(displayNumber: number, shortProductName: string): string {
   return `${displayNumber}번 | ${shortProductName} 살림템 추천 #Shorts`;
