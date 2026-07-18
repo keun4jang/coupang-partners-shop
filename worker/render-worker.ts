@@ -45,6 +45,7 @@ import {
   maybeRefreshInstagramToken,
   publishReelToInstagram,
 } from "../src/lib/instagram";
+import { getSetting } from "../src/lib/settings";
 import {
   dateFolderName,
   driveFileName,
@@ -482,9 +483,15 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
     }
 
     // 인스타 릴스 자동 업로드 (드라이브에 올라간 영상을 공개 링크로 메타 서버가 직접 가져감)
+    // 킬스위치: app_settings.instagram_paused = "1" 이면 발행을 건너뛴다
+    // (계정 탈취/복구 중 등 일시중지용 - 배포 없이 DB 플래그로 on/off)
     let instagramUrl: string | null = null;
     let instagramError: string | null = null;
-    if (hasInstagramEnv()) {
+    const instagramPaused = (await getSetting("instagram_paused")) === "1";
+    if (instagramPaused) {
+      instagramError = "인스타 자동발행 일시중지 중 (계정 복구 대기)";
+      console.log("인스타 발행 건너뜀:", instagramError);
+    } else if (hasInstagramEnv()) {
       if (!driveVideoFileId) {
         instagramError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
       } else {
