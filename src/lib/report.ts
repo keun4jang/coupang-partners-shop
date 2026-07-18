@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "./supabase";
-import { dateFolderName, formatDisplayNumber } from "./format";
+import { dateFolderName } from "./format";
 
 /**
  * 매니저 - 성과 리포트.
@@ -88,29 +88,9 @@ export async function buildReportData(): Promise<ReportData> {
   };
 }
 
+/** 현황(영상 개수)만. 수익은 별도 수익 메시지가 담당한다(사장님 요청 - 클릭수 제외). */
 export function formatReportMessage(d: ReportData): string {
-  const lines: string[] = [`📊 오늘의 살림템 리포트 (${d.dateKst})`, ""];
-
-  lines.push("👆 클릭");
-  lines.push(`· 오늘: ${d.todayClicks}번`);
-  lines.push(`· 이번주(7일): ${d.weekClicks}번`);
-  lines.push("");
-
-  if (d.topNumbers.length > 0) {
-    lines.push("🔥 이번주 인기 번호");
-    d.topNumbers.forEach((t, i) => {
-      lines.push(
-        `${i + 1}. ${formatDisplayNumber(t.display_number)} ${t.name} — ${t.count}클릭`
-      );
-    });
-    lines.push("");
-  } else if (d.weekClicks === 0) {
-    lines.push("아직 클릭이 없어요. 영상 올리면 여기에 성과가 쌓여요.");
-    lines.push("");
-  }
-
-  lines.push("📦 현황");
-  lines.push(`· 노출중 영상: ${d.visibleVideos}개 / 전체 ${d.totalVideos}개`);
-
-  return lines.join("\n");
+  return ["📦 현황", `· 노출중 영상: ${d.visibleVideos}개 / 전체 ${d.totalVideos}개`].join(
+    "\n"
+  );
 }

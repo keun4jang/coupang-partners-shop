@@ -88,16 +88,17 @@ export function won(n: number): string {
   return `${Math.round(n).toLocaleString("ko-KR")}원`;
 }
 
-/** 텔레그램용 수익 메시지 */
+/** 텔레그램용 수익 메시지 (수익 중심, 클릭은 쿠팡 유입만 참고로 1줄) */
 export function formatEarningsMessage(e: EarningsSummary): string {
   if (!e.ok) {
     return `💰 쿠팡파트너스 수익\n조회 실패: ${e.error ?? "알 수 없음"}`;
   }
   return [
     "💰 쿠팡파트너스 수익",
-    `· 오늘: ${won(e.today.commission)} (클릭 ${e.today.clicks})`,
-    `· 최근 7일: ${won(e.week.commission)} (클릭 ${e.week.clicks})`,
-    `· 이번달(${e.monthLabel}): ${won(e.month.commission)} (클릭 ${e.month.clicks})`,
+    `· 오늘: ${won(e.today.commission)}`,
+    `· 이번주(7일): ${won(e.week.commission)}`,
+    `· 이번달(${e.monthLabel}): ${won(e.month.commission)}`,
+    `　(이번달 쿠팡 유입 ${e.month.clicks}클릭)`,
     "",
     "※ 커미션은 정산 확정 전 예상치예요.",
   ].join("\n");

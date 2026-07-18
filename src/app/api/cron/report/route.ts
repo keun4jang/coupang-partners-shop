@@ -19,7 +19,13 @@ export async function GET(request: NextRequest) {
   try {
     const [data, earnings] = await Promise.all([buildReportData(), getEarnings()]);
     await sendTelegramMessage(
-      `${formatReportMessage(data)}\n\n${formatEarningsMessage(earnings)}`
+      [
+        `📊 살림템 리포트 (${data.dateKst})`,
+        "",
+        formatEarningsMessage(earnings),
+        "",
+        formatReportMessage(data),
+      ].join("\n")
     );
     return NextResponse.json({ ok: true, ...data, earnings });
   } catch (e) {
