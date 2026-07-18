@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import fs from "fs";
-import { optionalEnv, requireEnv } from "./env";
+import { optionalEnv, requireEnv, siteUrl } from "./env";
 
 /**
  * 유튜브 쇼츠 자동 업로드.
@@ -75,7 +75,11 @@ export function youtubeTitle(displayNumber: number, shortProductName: string): s
   return `${displayNumber}번 | ${shortProductName} 살림템 추천 #Shorts`;
 }
 
-/** 유튜브 설명: 간단하게. 제품명 + 번호 안내 + 해시태그만 (대가성 문구 없음). */
+/**
+ * 유튜브 설명: 간단하게. 제품명 + 상품 직링크 + 해시태그만 (대가성 문구 없음).
+ * 직링크는 해당 상품 페이지(?q=번호)로 바로 연결 → 클릭 1탭이면 상품·구매버튼.
+ * (대가성 고지는 도착 페이지에 있으므로 설명란은 깔끔하게 유지)
+ */
 export function youtubeDescription(
   displayNumber: number,
   shortProductName: string
@@ -83,7 +87,7 @@ export function youtubeDescription(
   return [
     shortProductName,
     "",
-    `영상 속 제품은 프로필 링크 ${displayNumber}번에서 확인하세요.`,
+    `👉 제품 보기: ${siteUrl()}/?q=${displayNumber}`,
     "",
     "#Shorts #살림템 #생활템 #쿠팡추천템",
   ].join("\n");
