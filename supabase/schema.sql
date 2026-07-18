@@ -46,6 +46,8 @@ create table if not exists video_items (
   youtube_error text,
   instagram_url text,
   instagram_error text,
+  facebook_url text,
+  facebook_error text,
   landing_visible boolean not null default false,
   -- 텔레그램 "업로드" 등 수동 요청 여부. 수동 항목은 업로드 슬롯 게이트를 우회한다.
   manual boolean not null default false,

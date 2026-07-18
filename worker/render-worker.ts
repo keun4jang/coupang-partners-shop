@@ -46,6 +46,7 @@ import {
   publishReelToInstagram,
 } from "../src/lib/instagram";
 import { getSetting } from "../src/lib/settings";
+import { facebookConfigured, publishReelToFacebook } from "../src/lib/facebook";
 import {
   dateFolderName,
   driveFileName,
@@ -511,6 +512,29 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       }
     }
 
+    // 페이스북 릴스 자동 업로드 (드라이브 공개 URL 을 메타가 직접 가져감. 별도 세팅 시에만)
+    let facebookUrl: string | null = null;
+    let facebookError: string | null = null;
+    if (await facebookConfigured()) {
+      if (!driveVideoFileId) {
+        facebookError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
+      } else {
+        try {
+          console.log("페이스북 릴스 업로드 중...");
+          await makeFilePublic(driveVideoFileId);
+          const result = await publishReelToFacebook({
+            videoUrl: driveDirectDownloadUrl(driveVideoFileId),
+            caption: captionText,
+          });
+          facebookUrl = result.url;
+          console.log("페이스북 업로드 완료:", facebookUrl);
+        } catch (e) {
+          facebookError = e instanceof Error ? e.message : String(e);
+          console.error("페이스북 업로드 실패:", facebookError);
+        }
+      }
+    }
+
     // 완료 기록. 이 업데이트가 조용히 실패하면 항목이 generating 에 갇혀
     // 워커가 15분마다 같은 영상을 재렌더·재업로드하는 사고가 난다(실제 발생).
     // → 실패 시 반드시 알리고, 최소한 completed 표시만이라도 남겨 루프를 끊는다.
@@ -525,6 +549,8 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         youtube_error: youtubeError,
         instagram_url: instagramUrl,
         instagram_error: instagramError,
+        facebook_url: facebookUrl,
+        facebook_error: facebookError,
         landing_visible: true,
         error_message: driveNote,
       })
@@ -562,6 +588,9 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         ...(driveNote ? [`※ ${driveNote}`] : []),
         `유튜브: ${youtubeUrl ?? (youtubeError ? `실패 - ${youtubeError.slice(0, 100)}` : "미설정")}`,
         `인스타: ${instagramUrl ?? (instagramError ? `실패 - ${instagramError.slice(0, 100)}` : "미설정")}`,
+        ...(facebookUrl || facebookError
+          ? [`페북: ${facebookUrl ?? `실패 - ${(facebookError ?? "").slice(0, 100)}`}`]
+          : []),
       ].join("\n")
     );
     console.log(`=== ${number} 완료 ===`);

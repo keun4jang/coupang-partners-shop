@@ -40,6 +40,8 @@ export interface VideoItem {
   youtube_error: string | null;
   instagram_url: string | null;
   instagram_error: string | null;
+  facebook_url: string | null;
+  facebook_error: string | null;
   landing_visible: boolean;
   /** 텔레그램 "업로드" 등 수동 요청 여부 - 수동 항목은 업로드 슬롯 게이트를 우회한다 */
   manual: boolean;
