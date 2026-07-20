@@ -185,7 +185,7 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
  * - hasTip=false(구버전 6줄 대본)면 사용팁 장면을 0초로 접는다.
  */
 const TARGET_SECONDS = 15;
-const NARRATION_GAP = 0.22;
+const NARRATION_GAP = 0.14;
 function buildSceneTiming(sec: number[], hasTip: boolean): SceneTiming {
   const need = (i: number, min: number) =>
     Math.max(min, (sec[i] ?? 0) + NARRATION_GAP);
