@@ -20,7 +20,7 @@ import { optionalEnv } from "./env";
 
 const DEFAULT_VOICE = "ko-KR-SunHiNeural";
 /** 쇼츠 톤에 맞게 경쾌하게 (구글 TTS 폴백용 Edge 음성도 동일 체감 속도로) */
-const DEFAULT_RATE = "+22%";
+const DEFAULT_RATE = "+30%";
 /** OUTPUT_FORMAT 이 48kbps CBR mp3 → 길이(초) ≈ bytes*8/48000 */
 const MP3_BITRATE = 48_000;
 /**
@@ -110,7 +110,7 @@ const GOOGLE_VOICE_FALLBACKS = [
   "ko-KR-Neural2-A",
 ];
 /** 나레이션 말 속도 - 쇼츠 시청자가 지루하지 않게 경쾌하게 (1.0=기본, 사장님 피드백: 느리다 → 상향) */
-const GOOGLE_SPEAKING_RATE = 1.15;
+const GOOGLE_SPEAKING_RATE = 1.22;
 
 /**
  * 억양 안정화용 텍스트 정리.
