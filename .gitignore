@@ -51,3 +51,7 @@ public/assets/broll/*.mp4
 
 # 자동 생성 버전 파일 (scripts/gen-version.mjs 가 빌드/개발 서버 시작 시마다 새로 만듦)
 src/lib/appVersion.ts
+
+# 로컬 미리보기 렌더 산출물 (데모 영상·검증 프레임)
+/demo_redesign.mp4
+/frame_*.jpg
