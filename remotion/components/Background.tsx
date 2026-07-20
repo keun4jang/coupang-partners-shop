@@ -118,6 +118,11 @@ export const Background: React.FC<{
   cutSeconds?: number[];
 }> = ({ brollFile, bgImageUrl, brollFiles, cutSeconds }) => {
   const { durationInFrames, fps } = useVideoConfig();
+  const frame = useCurrentFrame();
+  // 배경만 아주 천천히 확대(zoom-in) - 정적인 배경에 은은한 생동감
+  const zoom = interpolate(frame, [0, durationInFrames], [1, 1.08], {
+    extrapolateRight: "clamp",
+  });
   const brollSrc = brollFile ? staticFile(`assets/broll/${brollFile}`) : null;
 
   // 멀티컷: 각 컷 구간마다 다른 클립 재생 (클립이 모자라면 순환)
@@ -137,8 +142,8 @@ export const Background: React.FC<{
     <AbsoluteFill style={{ backgroundColor: COLORS.cream }}>
       <FontFaceStyle />
       <BgmAudio />
-      {/* 배경은 줌 없이 고정 - 스톡 영상 자체 움직임만 보이게(줌 인/아웃은 정신없어서 제거) */}
-      <AbsoluteFill>
+      {/* 배경 미디어 - 아주 느린 zoom-in */}
+      <AbsoluteFill style={{ transform: `scale(${zoom})` }}>
         {cuts ? (
           <>
             {cuts.map((cut, i) => (
@@ -172,9 +177,23 @@ export const Background: React.FC<{
           />
         )}
       </AbsoluteFill>
+      {/* 따뜻한 아이보리/베이지/살구 오버레이 - 차가운 파란통·배경을 살림템 톤으로 */}
       <AbsoluteFill
         style={{
-          background: `linear-gradient(180deg, ${COLORS.overlayTintTop} 0%, rgba(0,0,0,0) 40%, ${COLORS.overlayTintBottom} 100%)`,
+          background: `linear-gradient(180deg, rgba(255,247,236,0.42) 0%, rgba(243,227,207,0.14) 45%, rgba(255,216,194,0.34) 100%)`,
+          mixBlendMode: "multiply",
+        }}
+      />
+      {/* 은은한 빛 번짐(세탁실/베란다 햇살 느낌) - 상단 중앙 소프트 글로우 */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(58% 40% at 50% 24%, rgba(255,253,248,0.5) 0%, rgba(255,253,248,0) 70%)`,
+        }}
+      />
+      {/* 가독성용 상·하단 그라데이션 (하단은 자막·정보가 묻히지 않게 살짝 어둡게) */}
+      <AbsoluteFill
+        style={{
+          background: `linear-gradient(180deg, ${COLORS.overlayTintTop} 0%, rgba(0,0,0,0) 38%, rgba(0,0,0,0) 62%, ${COLORS.overlayTintBottom} 100%)`,
         }}
       />
     </AbsoluteFill>

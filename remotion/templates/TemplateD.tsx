@@ -70,8 +70,8 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           productName={props.productName}
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
-          topRatio={0.24}
-          widthRatio={0.72}
+          topRatio={0.23}
+          widthRatio={0.66}
         />
       </Sequence>
 
@@ -114,6 +114,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
             size={FONT_SIZES.benefit}
             variant="bubble"
             y={0.13}
+            badge="보관 TIP"
           />
           <Narration src={props.narration?.[4]} />
         </Sequence>

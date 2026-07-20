@@ -114,31 +114,52 @@ export const BGM = {
   fadeOutSeconds: 1.2,
 } as const;
 
+/**
+ * 살림템 감성 팔레트 (따뜻한 아이보리/베이지/살구/민트).
+ * "30~50대 주부가 저장하고 싶은 따뜻한 생활용품 광고" 톤 - 남성적 파랑/검정 배제.
+ */
+export const PALETTE = {
+  ivory: "#FFF7EC", // 배경 아이보리
+  warmBeige: "#F3E3CF", // 따뜻한 베이지
+  softPeach: "#FFD8C2", // 부드러운 살구
+  sageMint: "#DDEBDD", // 세이지 민트
+  cardCream: "#FFF8EF", // 제품 카드 크림
+  productBlue: "#3F8FD9", // 제품(파란통) 포인트
+  brown: "#2F2722", // 진한 브라운 텍스트
+  sub: "#7A6A5D", // 보조 텍스트
+  badgeCoral: "#FF8A70", // 배지 코랄
+} as const;
+
 /** 베이지/살구톤 팔레트 (사이트와 톤 일치) */
 export const COLORS = {
-  cream: "#FFF8F0",
-  card: "#FFFFFF",
+  cream: PALETTE.ivory,
+  card: PALETTE.cardCream,
   primary: "#D98C5F",
   primaryDark: "#C47A4E",
-  ink: "#3F342C",
-  sub: "#7A6A5F",
+  ink: PALETTE.brown,
+  sub: PALETTE.sub,
   accent: "#F5C7A9",
   accentSoft: "#FBE9DB",
   overlayTintTop: "rgba(63, 52, 44, 0.18)",
-  overlayTintBottom: "rgba(63, 52, 44, 0.45)",
-  subtitleShadow: "rgba(63, 52, 44, 0.35)",
+  overlayTintBottom: "rgba(63, 52, 44, 0.5)",
+  subtitleShadow: "rgba(63, 52, 44, 0.32)",
 } as const;
 
 export const FONT_SIZES = {
   // 자막(후킹·공감·장점·후기)은 모두 같은 크기로 통일 (제각각 방지, 크지 않게)
   hook: 46,
   subtitle: 46,
-  productName: 44,
+  productName: 58, // 제품명 - 정보 위계 최상위(크게)
   benefit: 46,
   ctaNumber: 150,
   ctaText: 58,
   disclosure: 28,
   badge: 34,
+  // 재설계 요소 (살림템 쇼케이스)
+  tipLabel: 30, // 상단 "보관 TIP" 라벨
+  volumeBadge: 32, // 카드 상단 "19L 대용량" 배지
+  numberBadge: 36, // "오늘의 살림템 28번" 배지
+  subInfo: 34, // 보조 정보(대용량 등)
   // 첫 프레임 썸네일용 - 화면 꽉 채운 사진 위라 일반 자막보다 크고 굵게
   coverBadge: 76,
   coverHook: 64,
