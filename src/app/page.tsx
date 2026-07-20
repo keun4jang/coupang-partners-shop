@@ -77,7 +77,8 @@ function ItemCard({
 }
 
 /** 목록 페이지당 카드 수 */
-const PAGE_SIZE = 5;
+// 한 페이지에 전부 노출 (페이지 넘기기 없이). 넉넉히 잡아 totalPages=1 → 페이지 버튼 미표시.
+const PAGE_SIZE = 1000;
 
 /** 페이지 링크 주소 (검색어 q 가 있으면 유지) */
 function pageHref(page: number, q?: string): string {
