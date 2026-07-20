@@ -37,6 +37,20 @@ export const ProductOverlay: React.FC<{
     config: { damping: MOTION.productDamping },
   });
 
+  // 디테일 컷: 상품 사진 1장을 여러 컷(전체→부분 확대)으로 "딱딱" 전환.
+  // 같은 사진이지만 부분을 다르게 보여줘 여러 샷처럼 느껴지게 한다(움직임 없이 하드컷).
+  // z=확대배율, (cx,cy)=초점(이미지 비율 0~1). container 가 overflow:hidden 이라 잘림.
+  const shots = [
+    { z: 1.0, cx: 0.5, cy: 0.5 }, // 전체
+    { z: 1.6, cx: 0.5, cy: 0.5 }, // 중앙 줌
+    { z: 2.1, cx: 0.32, cy: 0.3 }, // 좌상단 디테일
+    { z: 2.2, cx: 0.66, cy: 0.68 }, // 우하단 디테일
+  ];
+  const CUT_FRAMES = Math.round(fps * 2.2);
+  const shot = shots[Math.floor(frame / CUT_FRAMES) % shots.length];
+  const tx = (0.5 - shot.cx * shot.z) * 100;
+  const ty = (0.5 - shot.cy * shot.z) * 100;
+
   const cardWidth = width * widthRatio;
 
   return (
@@ -73,7 +87,13 @@ export const ProductOverlay: React.FC<{
         {productImageUrl && !imageFailed ? (
           <Img
             src={productImageUrl}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transformOrigin: "0 0",
+              transform: `translate(${tx}%, ${ty}%) scale(${shot.z})`,
+            }}
             onError={() => setImageFailed(true)}
           />
         ) : (
