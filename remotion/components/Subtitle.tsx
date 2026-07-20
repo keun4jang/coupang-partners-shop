@@ -47,7 +47,8 @@ export const Subtitle: React.FC<{
   };
 
   if (variant === "bubble") {
-    // "살림 꿀팁 메모지" 느낌: 크림 카드 + (옵션) 왼쪽 상단 TIP 배지 + 브라운 텍스트.
+    // "살림 꿀팁 메모지" 느낌: 순백 종이 카드 + 강한 그림자로 배경/상품카드 위에 "올려진" 느낌.
+    // 크림색 상품 카드와 겹쳐도 한 덩어리로 안 보이게 더 밝은 종이색 + 살구 액센트로 구분.
     return (
       <div
         style={{
@@ -61,6 +62,7 @@ export const Subtitle: React.FC<{
       >
         <div
           style={{
+            position: "relative",
             width: "fit-content",
             maxWidth: width * 0.78,
             margin: "0 auto",
@@ -68,14 +70,30 @@ export const Subtitle: React.FC<{
             flexDirection: "column",
             alignItems: "flex-start",
             gap: 10,
-            background: `linear-gradient(180deg, ${PALETTE.cardCream} 0%, #FFFDF8 100%)`,
+            background: `linear-gradient(180deg, #FFFFFF 0%, #FFFBF3 100%)`,
             color: PALETTE.brown,
-            borderRadius: 26,
-            padding: badge ? "16px 26px 18px" : "14px 26px",
-            boxShadow: `0 12px 32px ${COLORS.subtitleShadow}`,
+            borderRadius: 28,
+            // 배지형(TIP)은 왼쪽 살구 액센트 바를 피해 왼쪽 패딩을 넉넉히
+            padding: badge ? "16px 28px 18px 36px" : "15px 28px",
+            // 2단 그림자: 배경 broll·크림 상품카드 위에서도 확실히 떠 보이게
+            boxShadow: `0 20px 44px rgba(47,39,34,0.30), 0 6px 16px rgba(47,39,34,0.16)`,
             border: `1.5px solid ${PALETTE.warmBeige}`,
           }}
         >
+          {/* 왼쪽 살구 액센트 바 - "메모지 탭" 느낌 (배지형에서만) */}
+          {badge && (
+            <div
+              style={{
+                position: "absolute",
+                left: 16,
+                top: 16,
+                bottom: 16,
+                width: 7,
+                borderRadius: 5,
+                background: PALETTE.softPeach,
+              }}
+            />
+          )}
           {badge && (
             <Badge
               label={badge}
@@ -91,7 +109,7 @@ export const Subtitle: React.FC<{
               fontFamily,
               fontWeight: 800,
               fontSize: size,
-              lineHeight: 1.32,
+              lineHeight: 1.28,
               letterSpacing: "-0.015em",
               wordBreak: "keep-all",
               textWrap: "balance",
