@@ -51,6 +51,9 @@ create table if not exists video_items (
   landing_visible boolean not null default false,
   -- 텔레그램 "업로드" 등 수동 요청 여부. 수동 항목은 업로드 슬롯 게이트를 우회한다.
   manual boolean not null default false,
+  -- 스튜디오(직접 업로드 소재) 모드: Storage 'footage' 버킷의 영상 경로 목록(json 배열).
+  -- 값이 있으면 워커가 스톡/자동소싱 대신 이 영상들을 배경으로 쓴다.
+  footage_paths jsonb,
   error_message text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -360,6 +360,50 @@ async function generateWithAnthropic(
 }
 
 /**
+ * 범용 Gemini JSON 생성 헬퍼 (스튜디오 소재 추천 등 다른 모듈에서 재사용).
+ * 키가 없으면 null, API 실패 시 throw (호출부에서 폴백 처리).
+ * schema 는 Gemini responseSchema 형식(타입 대문자 OBJECT/ARRAY/STRING...).
+ */
+export async function geminiGenerateJson<T>(opts: {
+  system?: string;
+  prompt: string;
+  schema: Record<string, unknown>;
+  temperature?: number;
+}): Promise<T | null> {
+  const apiKey =
+    optionalEnv("GEMINI_API_KEY") ?? (await getSetting("GEMINI_API_KEY")) ?? undefined;
+  if (!apiKey) return null;
+
+  const model = optionalEnv("GEMINI_MODEL") ?? "gemini-flash-lite-latest";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      ...(opts.system
+        ? { systemInstruction: { parts: [{ text: opts.system }] } }
+        : {}),
+      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+      generationConfig: {
+        temperature: opts.temperature ?? 0.7,
+        responseMimeType: "application/json",
+        responseSchema: opts.schema,
+      },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Gemini API 오류 ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return null;
+  return JSON.parse(text) as T;
+}
+
+/**
  * 상품 정보로 후킹/공감/장점/캡션 문구 생성.
  * 우선순위: GEMINI_API_KEY(무료) → AI_API_KEY(Anthropic) → 프리셋 폴백.
  * 키가 없거나 실패/금지표현 시 안전한 기본 문구로 폴백한다.

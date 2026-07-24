@@ -17,6 +17,9 @@ export async function createVideoItem(
   opts?: {
     /** 수동 요청(텔레그램 "업로드" 등) - 업로드 슬롯 게이트를 우회해 즉시 처리된다 */
     manual?: boolean;
+    /** 스튜디오 직접 업로드 소재 - Storage 'footage' 버킷 경로 목록.
+     *  insert 시점에 함께 넣어야 워커가 footage 없이 집어가는 경합이 없다. */
+    footagePaths?: string[];
   }
 ): Promise<VideoItem> {
   const db = supabaseAdmin();
@@ -43,6 +46,7 @@ export async function createVideoItem(
         video_status: "pending",
         landing_visible: false,
         manual: opts?.manual ?? false,
+        footage_paths: opts?.footagePaths ?? null,
       })
       .select("*")
       .single();

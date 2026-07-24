@@ -98,6 +98,69 @@ async function downloadVideo(url: string, dest: string): Promise<boolean> {
 }
 
 /**
+ * 로컬 영상 파일 → broll 세그먼트 N개 추출 (공통 코어).
+ * 실패하거나 품질 기준 미달이면 빈 배열.
+ */
+export function segmentLocalVideo(
+  localPath: string,
+  count: number,
+  outPrefix: string,
+  opts?: { minSeconds?: number }
+): string[] {
+  const minSeconds = opts?.minSeconds ?? MIN_SOURCE_SECONDS;
+  const info = probeVideo(localPath);
+  if (!info) return [];
+  if (info.duration < minSeconds || info.width < MIN_WIDTH) {
+    console.warn(
+      `소스 영상 품질 미달 (${info.duration.toFixed(1)}s, ${info.width}px) - 건너뜀`
+    );
+    return [];
+  }
+
+  // 앞 5% / 뒤 5%는 버리고(인트로·아웃트로 로고 방지) 고르게 count 개 추출
+  fs.mkdirSync(BROLL_DIR, { recursive: true });
+  const segLen = Math.min(SEGMENT_SECONDS, Math.max(2, info.duration * 0.9));
+  const usableFrom = info.duration * 0.05;
+  const usableTo = info.duration * 0.95 - segLen;
+  const n = Math.max(1, count);
+  const files: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const start =
+      usableTo > usableFrom
+        ? usableFrom + ((usableTo - usableFrom) * i) / Math.max(1, n - 1)
+        : usableFrom;
+    const name = `${outPrefix}-${i}.mp4`;
+    try {
+      runFf("ffmpeg", [
+        "-ss",
+        start.toFixed(2),
+        "-i",
+        localPath,
+        "-t",
+        String(segLen),
+        "-vf",
+        // 가장자리 크롭(워터마크 제거) 후 세로 1280 기준으로 축소
+        `crop=iw*${EDGE_KEEP}:ih*${EDGE_KEEP},scale=-2:1280`,
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "25",
+        "-y",
+        path.join(BROLL_DIR, name),
+      ]);
+      files.push(name);
+    } catch (e) {
+      console.warn(`세그먼트 ${i} 추출 실패: ${(e as Error).message.slice(0, 120)}`);
+    }
+  }
+  // 일부만 성공해도 사용 (1개면 전 장면에 반복 사용됨)
+  return files;
+}
+
+/**
  * 소스 영상 URL → broll 세그먼트 N개 추출.
  * 실패하거나 품질 기준 미달이면 빈 배열 (호출부 폴백).
  */
@@ -112,61 +175,78 @@ export async function segmentRemoteVideo(
       console.warn("소스 영상 다운로드 실패");
       return [];
     }
-    const info = probeVideo(tmp);
-    if (!info) return [];
-    if (info.duration < MIN_SOURCE_SECONDS || info.width < MIN_WIDTH) {
-      console.warn(
-        `소스 영상 품질 미달 (${info.duration.toFixed(1)}s, ${info.width}px) - 폴백`
-      );
-      return [];
-    }
-
-    // 앞 5% / 뒤 5%는 버리고(인트로·아웃트로 로고 방지) 고르게 count 개 추출
-    fs.mkdirSync(BROLL_DIR, { recursive: true });
-    const usableFrom = info.duration * 0.05;
-    const usableTo = info.duration * 0.95 - SEGMENT_SECONDS;
-    const n = Math.max(1, count);
-    const files: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const start =
-        usableTo > usableFrom
-          ? usableFrom + ((usableTo - usableFrom) * i) / Math.max(1, n - 1)
-          : usableFrom;
-      const name = `src${displayNumber}-${i}.mp4`;
-      try {
-        runFf("ffmpeg", [
-          "-ss",
-          start.toFixed(2),
-          "-i",
-          tmp,
-          "-t",
-          String(SEGMENT_SECONDS),
-          "-vf",
-          // 가장자리 크롭(워터마크 제거) 후 세로 1280 기준으로 축소
-          `crop=iw*${EDGE_KEEP}:ih*${EDGE_KEEP},scale=-2:1280`,
-          "-an",
-          "-c:v",
-          "libx264",
-          "-preset",
-          "veryfast",
-          "-crf",
-          "25",
-          "-y",
-          path.join(BROLL_DIR, name),
-        ]);
-        files.push(name);
-      } catch (e) {
-        console.warn(`세그먼트 ${i} 추출 실패: ${(e as Error).message.slice(0, 120)}`);
-      }
-    }
-    // 일부만 성공해도 사용 (1개면 전 장면에 반복 사용됨)
-    return files;
+    return segmentLocalVideo(tmp, count, `src${displayNumber}`);
   } finally {
     try {
       fs.unlinkSync(tmp);
     } catch {
       // 무시
     }
+  }
+}
+
+/* ── 스튜디오: 직접 업로드 소재 (Storage 'footage' 버킷) ─────────────── */
+
+const FOOTAGE_BUCKET = "footage";
+/** 직접 올린 영상은 사용자가 이미 골라온 것이라 길이 기준을 느슨하게 (3초 이상) */
+const FOOTAGE_MIN_SECONDS = 3;
+
+/**
+ * 업로드된 footage 영상들 → broll 세그먼트 (총 totalCount 개를 파일들에 고르게 배분).
+ * 예) 파일 1개 → 그 영상에서 4컷 / 파일 2개 → 각 2컷 / 4개 이상 → 각 1컷.
+ * 전부 실패하면 빈 배열 (호출부가 스톡으로 폴백).
+ */
+export async function segmentsFromFootage(
+  storagePaths: string[],
+  displayNumber: number,
+  totalCount: number
+): Promise<string[]> {
+  const db = supabaseAdmin();
+  const usable = storagePaths.slice(0, totalCount);
+  const per = Math.ceil(totalCount / usable.length);
+
+  const files: string[] = [];
+  for (let fi = 0; fi < usable.length && files.length < totalCount; fi++) {
+    const storagePath = usable[fi];
+    const tmp = path.join(os.tmpdir(), `footage-${displayNumber}-${fi}.mp4`);
+    try {
+      const { data, error } = await db.storage
+        .from(FOOTAGE_BUCKET)
+        .download(storagePath);
+      if (error || !data) {
+        console.warn(`footage 다운로드 실패 (${storagePath}): ${error?.message}`);
+        continue;
+      }
+      fs.writeFileSync(tmp, Buffer.from(await data.arrayBuffer()));
+      const want = Math.min(per, totalCount - files.length);
+      const got = segmentLocalVideo(tmp, want, `ftg${displayNumber}-${fi}`, {
+        minSeconds: FOOTAGE_MIN_SECONDS,
+      });
+      files.push(...got);
+    } catch (e) {
+      console.warn(
+        `footage 처리 실패 (${storagePath}): ${(e as Error).message.slice(0, 150)}`
+      );
+    } finally {
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        // 무시
+      }
+    }
+  }
+  return files;
+}
+
+/** 렌더·업로드 성공 후 스토리지의 footage 원본 삭제 (용량 관리, best-effort) */
+export async function deleteFootageFiles(storagePaths: string[]): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin()
+      .storage.from(FOOTAGE_BUCKET)
+      .remove(storagePaths);
+    if (error) console.warn(`footage 정리 실패: ${error.message}`);
+  } catch (e) {
+    console.warn(`footage 정리 실패: ${(e as Error).message.slice(0, 120)}`);
   }
 }
 

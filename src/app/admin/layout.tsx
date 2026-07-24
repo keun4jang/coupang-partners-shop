@@ -48,6 +48,9 @@ export default async function AdminLayout({
         <Link href="/admin/videos" className="hover:text-primary-dark">
           영상 목록
         </Link>
+        <Link href="/admin/studio" className="hover:text-primary-dark">
+          스튜디오
+        </Link>
         <Link href="/" className="hover:text-primary-dark">
           사이트 보기
         </Link>

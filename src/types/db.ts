@@ -45,6 +45,8 @@ export interface VideoItem {
   landing_visible: boolean;
   /** 텔레그램 "업로드" 등 수동 요청 여부 - 수동 항목은 업로드 슬롯 게이트를 우회한다 */
   manual: boolean;
+  /** 스튜디오(직접 업로드 소재) - Storage 'footage' 버킷 영상 경로 목록. 있으면 이 영상을 배경으로 렌더 */
+  footage_paths: string[] | null;
   error_message: string | null;
   created_at: string;
   updated_at: string;

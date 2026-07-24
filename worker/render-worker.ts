@@ -58,7 +58,11 @@ import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls } from "../src/lib/broll";
-import { sourceProductClips } from "../src/lib/videoSource";
+import {
+  deleteFootageFiles,
+  segmentsFromFootage,
+  sourceProductClips,
+} from "../src/lib/videoSource";
 import { maybeRefreshAliToken } from "../src/lib/aliexpress";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
@@ -239,9 +243,26 @@ async function renderVideo(
   // (DB 제약이 아직 'D' 를 안 받을 때 D 포맷을 뽑기 위한 안전장치).
   const effectiveTemplate = optionalEnv("FORCE_TEMPLATE") ?? item.template_type;
 
-  // 포맷 D 배경: ① 상품 영상 자동 소싱(캐시→알리 매칭) → ② 스톡 → ③ 블러 상품사진
+  // 포맷 D 배경 우선순위:
+  // ⓪ 직접 업로드 소재(스튜디오) → ① 상품 영상 자동 소싱 → ② 스톡 → ③ 블러 상품사진
   let brollOrigin = "배경 없음(블러 사진)";
-  if (effectiveTemplate === "D") {
+  if (effectiveTemplate === "D" && item.footage_paths?.length) {
+    console.log(`직접 업로드 소재 처리 중 (${item.footage_paths.length}개)...`);
+    const files = await segmentsFromFootage(
+      item.footage_paths,
+      item.display_number,
+      4
+    );
+    if (files.length > 0) {
+      inputProps.brollFiles = files;
+      cachedBundle = null;
+      brollOrigin = "직접 업로드 소재";
+      console.log(`직접 소재 사용: ${files.join(", ")}`);
+    } else {
+      console.warn("직접 소재 처리 실패 - 자동 소싱/스톡으로 폴백");
+    }
+  }
+  if (effectiveTemplate === "D" && !inputProps.brollFiles) {
     console.log("상품 영상 자동 소싱 중...");
     const sourced = await sourceProductClips(product, item.display_number, 4);
     if (sourced.files.length > 0) {
@@ -573,6 +594,11 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
             : "상태는 완료로 저장했지만 링크 정보가 비어있을 수 있어요.",
         ].join("\n")
       );
+    }
+
+    // 직접 업로드 소재는 렌더·기록까지 끝났으면 스토리지에서 정리 (무료 용량 관리)
+    if (!completeError && item.footage_paths?.length) {
+      await deleteFootageFiles(item.footage_paths);
     }
 
     await notify(
