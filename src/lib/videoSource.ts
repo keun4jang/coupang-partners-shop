@@ -418,7 +418,7 @@ function mergeLineBoxes(
   }
 
   // ② 기하학적 통합 - 더 이상 합칠 게 없을 때까지 반복
-  let boxes = [...byLine.values()];
+  const boxes = [...byLine.values()];
   let merged = true;
   while (merged) {
     merged = false;
