@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
+import { APP_VERSION } from "@/lib/appVersion";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ function LoginGate() {
           </button>
         </form>
       </div>
+      <p className="mt-6 text-center text-xs text-sub/50">{APP_VERSION}</p>
     </main>
   );
 }
@@ -61,6 +63,10 @@ export default async function AdminLayout({
         </form>
       </nav>
       {children}
+      {/* 수정 배포 때마다 자동으로 바뀌는 버전 (마지막 숫자 = 수정 횟수) */}
+      <footer className="mt-12 text-center text-xs text-sub/50">
+        {APP_VERSION}
+      </footer>
     </div>
   );
 }
