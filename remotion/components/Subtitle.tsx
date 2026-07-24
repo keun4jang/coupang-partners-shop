@@ -47,8 +47,8 @@ export const Subtitle: React.FC<{
   };
 
   if (variant === "bubble") {
-    // "살림 꿀팁 메모지" 느낌: 순백 종이 카드 + 강한 그림자로 배경/상품카드 위에 "올려진" 느낌.
-    // 크림색 상품 카드와 겹쳐도 한 덩어리로 안 보이게 더 밝은 종이색 + 살구 액센트로 구분.
+    // 흰 글자 + 그림자만 (카드 없음 - 흰 솔리드는 상품 쇼케이스 카드에만 쓴다).
+    // 배경이 밝은 장면에서도 읽히도록 그림자를 여러 겹으로 깔아준다.
     return (
       <div
         style={{
@@ -62,38 +62,15 @@ export const Subtitle: React.FC<{
       >
         <div
           style={{
-            position: "relative",
             width: "fit-content",
-            maxWidth: width * 0.78,
+            maxWidth: width * 0.86,
             margin: "0 auto",
             display: "flex",
             flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 10,
-            background: `linear-gradient(180deg, #FFFFFF 0%, #FFFBF3 100%)`,
-            color: PALETTE.brown,
-            borderRadius: 28,
-            // 배지형(TIP)은 왼쪽 살구 액센트 바를 피해 왼쪽 패딩을 넉넉히
-            padding: badge ? "16px 28px 18px 36px" : "15px 28px",
-            // 2단 그림자: 배경 broll·크림 상품카드 위에서도 확실히 떠 보이게
-            boxShadow: `0 20px 44px rgba(47,39,34,0.30), 0 6px 16px rgba(47,39,34,0.16)`,
-            border: `1.5px solid ${PALETTE.warmBeige}`,
+            alignItems: "center",
+            gap: 12,
           }}
         >
-          {/* 왼쪽 살구 액센트 바 - "메모지 탭" 느낌 (배지형에서만) */}
-          {badge && (
-            <div
-              style={{
-                position: "absolute",
-                left: 16,
-                top: 16,
-                bottom: 16,
-                width: 7,
-                borderRadius: 5,
-                background: PALETTE.softPeach,
-              }}
-            />
-          )}
           {badge && (
             <Badge
               label={badge}
@@ -105,14 +82,16 @@ export const Subtitle: React.FC<{
           <div
             style={{
               width: "100%",
-              textAlign: badge ? "left" : "center",
+              textAlign: "center",
               fontFamily,
-              fontWeight: 800,
+              fontWeight: 900,
               fontSize: size,
-              lineHeight: 1.28,
+              lineHeight: 1.3,
               letterSpacing: "-0.015em",
               wordBreak: "keep-all",
               textWrap: "balance",
+              color: "#FFFFFF",
+              textShadow: `0 4px 24px ${COLORS.subtitleShadow}, 0 2px 10px rgba(0,0,0,0.55), 0 0 30px rgba(0,0,0,0.28)`,
             }}
           >
             {text}
