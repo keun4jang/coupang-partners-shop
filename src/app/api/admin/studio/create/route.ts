@@ -77,16 +77,18 @@ export async function POST(request: NextRequest) {
 
   try {
     // 직접 소재 영상은 실사용 영상형(D)이 정확히 맞는 포맷이다.
+    // scheduled: 렌더는 바로 하되 SNS 발행은 업로드 슬롯 시간에 (바로 안 올라감)
     const item = await createVideoItem(product as Product, "D", {
       manual: true,
       footagePaths,
+      publishMode: "scheduled",
     });
     if (body.ideaId) await markIdeaUsed(body.ideaId);
     await triggerRenderWorkflow();
     return NextResponse.json({
       displayNumber: item.display_number,
       message:
-        "제작을 시작했어요. 렌더 → 유튜브/인스타 업로드까지 끝나면 텔레그램으로 알려드려요 (보통 5~15분).",
+        "제작을 시작했어요. 완성되면 텔레그램으로 미리보기를 보내드리고, 영상 목록에서도 확인할 수 있어요. 업로드는 정해진 시간에 자동으로 나갑니다.",
     });
   } catch (e) {
     return NextResponse.json(

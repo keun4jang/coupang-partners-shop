@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const STATUS_LABEL: Record<string, string> = {
   pending: "대기",
   generating: "생성 중",
+  rendered: "업로드 예약", // 렌더 완료 - 정해진 시간에 자동 발행 (미리보기 가능)
   completed: "완료",
   failed: "실패",
 };
@@ -15,6 +16,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-gray-100 text-sub",
   generating: "bg-amber-100 text-amber-700",
+  rendered: "bg-sky-100 text-sky-700",
   completed: "bg-emerald-100 text-emerald-700",
   failed: "bg-red-100 text-red-600",
 };

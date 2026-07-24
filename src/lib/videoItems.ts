@@ -1,4 +1,4 @@
-import type { Product, TemplateType, VideoItem } from "@/types/db";
+import type { Product, PublishMode, TemplateType, VideoItem } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { composeScriptText, generateVideoCopy } from "./ai";
 import { selectProductsForVideos } from "./productSelector";
@@ -20,6 +20,8 @@ export async function createVideoItem(
     /** 스튜디오 직접 업로드 소재 - Storage 'footage' 버킷 경로 목록.
      *  insert 시점에 함께 넣어야 워커가 footage 없이 집어가는 경합이 없다. */
     footagePaths?: string[];
+    /** 발행 방식. scheduled = 즉시 렌더하되 SNS 발행은 업로드 슬롯 시간에 */
+    publishMode?: PublishMode;
   }
 ): Promise<VideoItem> {
   const db = supabaseAdmin();
@@ -47,6 +49,7 @@ export async function createVideoItem(
         landing_visible: false,
         manual: opts?.manual ?? false,
         footage_paths: opts?.footagePaths ?? null,
+        publish_mode: opts?.publishMode ?? "auto",
       })
       .select("*")
       .single();

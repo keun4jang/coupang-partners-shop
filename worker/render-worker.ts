@@ -38,6 +38,7 @@ import {
   uploadTextToDrive,
   makeFilePublic,
   driveDirectDownloadUrl,
+  downloadDriveFile,
 } from "../src/lib/drive";
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription } from "../src/lib/youtube";
 import {
@@ -422,6 +423,101 @@ async function reclaimStaleGenerating(): Promise<void> {
   }
 }
 
+interface SnsResult {
+  youtubeUrl: string | null;
+  youtubeError: string | null;
+  instagramUrl: string | null;
+  instagramError: string | null;
+  facebookUrl: string | null;
+  facebookError: string | null;
+}
+
+/**
+ * SNS 발행 (유튜브/인스타/페북).
+ * 즉시 발행(processItem)과 예약 발행(publishRendered)이 공유한다.
+ * 각 채널 실패는 결과에 담아 돌려주고 영상 자체를 실패 처리하지 않는다.
+ */
+async function publishToSns(
+  item: VideoItem,
+  product: Product,
+  videoPath: string,
+  driveVideoFileId: string | null,
+  captionText: string
+): Promise<SnsResult> {
+  // 유튜브 쇼츠
+  let youtubeUrl: string | null = null;
+  let youtubeError: string | null = null;
+  if (hasYoutubeEnv()) {
+    try {
+      console.log("유튜브 업로드 중...");
+      const result = await uploadShortToYoutube({
+        localPath: videoPath,
+        title: youtubeTitle(item.display_number, shortenProductName(product.product_name)),
+        description: youtubeDescription(item.display_number, shortenProductName(product.product_name)),
+        tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
+      });
+      youtubeUrl = result.url;
+      console.log("유튜브 업로드 완료:", youtubeUrl);
+    } catch (e) {
+      youtubeError = e instanceof Error ? e.message : String(e);
+      console.error("유튜브 업로드 실패:", youtubeError);
+    }
+  }
+
+  // 인스타 릴스 (드라이브 공개 링크를 메타 서버가 직접 가져감)
+  // 킬스위치: app_settings.instagram_paused = "1" 이면 발행을 건너뛴다
+  let instagramUrl: string | null = null;
+  let instagramError: string | null = null;
+  const instagramPaused = (await getSetting("instagram_paused")) === "1";
+  if (instagramPaused) {
+    instagramError = "인스타 자동발행 일시중지 중 (계정 복구 대기)";
+    console.log("인스타 발행 건너뜀:", instagramError);
+  } else if (hasInstagramEnv()) {
+    if (!driveVideoFileId) {
+      instagramError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
+    } else {
+      try {
+        console.log("인스타 릴스 업로드 중...");
+        await makeFilePublic(driveVideoFileId);
+        const result = await publishReelToInstagram({
+          videoUrl: driveDirectDownloadUrl(driveVideoFileId),
+          caption: captionText,
+        });
+        instagramUrl = result.url;
+        console.log("인스타 업로드 완료:", instagramUrl);
+      } catch (e) {
+        instagramError = e instanceof Error ? e.message : String(e);
+        console.error("인스타 업로드 실패:", instagramError);
+      }
+    }
+  }
+
+  // 페이스북 릴스 (별도 세팅 시에만)
+  let facebookUrl: string | null = null;
+  let facebookError: string | null = null;
+  if (await facebookConfigured()) {
+    if (!driveVideoFileId) {
+      facebookError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
+    } else {
+      try {
+        console.log("페이스북 릴스 업로드 중...");
+        await makeFilePublic(driveVideoFileId);
+        const result = await publishReelToFacebook({
+          videoUrl: driveDirectDownloadUrl(driveVideoFileId),
+          caption: captionText,
+        });
+        facebookUrl = result.url;
+        console.log("페이스북 업로드 완료:", facebookUrl);
+      } catch (e) {
+        facebookError = e instanceof Error ? e.message : String(e);
+        console.error("페이스북 업로드 실패:", facebookError);
+      }
+    }
+  }
+
+  return { youtubeUrl, youtubeError, instagramUrl, instagramError, facebookUrl, facebookError };
+}
+
 async function processItem(row: VideoItemWithProduct): Promise<void> {
   const db = supabaseAdmin();
   const product = row.products;
@@ -484,77 +580,55 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       console.log("[드라이브 미설정] 로컬 파일로 유지:", videoPath);
     }
 
-    // 유튜브 쇼츠 자동 업로드 (실패해도 영상 자체는 완료 처리 - 재시도는 수동)
-    let youtubeUrl: string | null = null;
-    let youtubeError: string | null = null;
-    if (hasYoutubeEnv()) {
-      try {
-        console.log("유튜브 업로드 중...");
-        const result = await uploadShortToYoutube({
-          localPath: videoPath,
-          title: youtubeTitle(item.display_number, shortenProductName(product.product_name)),
-          description: youtubeDescription(item.display_number, shortenProductName(product.product_name)),
-          tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
-        });
-        youtubeUrl = result.url;
-        console.log("유튜브 업로드 완료:", youtubeUrl);
-      } catch (e) {
-        youtubeError = e instanceof Error ? e.message : String(e);
-        console.error("유튜브 업로드 실패:", youtubeError);
+    // 예약 발행(scheduled): 렌더+드라이브 업로드까지만 하고 여기서 멈춘다.
+    // SNS 발행은 업로드 슬롯 시간에 publishRendered 가 처리한다.
+    if (item.publish_mode === "scheduled") {
+      if (!driveVideoUrl || !driveVideoFileId) {
+        throw new Error(
+          `예약 발행에는 드라이브 업로드가 필요해요: ${driveNote ?? "드라이브 미설정"}`
+        );
       }
+      const { error: renderedError } = await db
+        .from("video_items")
+        .update({
+          video_status: "rendered",
+          drive_video_url: driveVideoUrl,
+          drive_video_file_id: driveVideoFileId,
+          drive_caption_url: driveCaptionUrl,
+          drive_thumbnail_url: driveThumbnailUrl,
+          error_message: driveNote,
+        })
+        .eq("id", item.id);
+      if (renderedError) {
+        throw new Error(`예약 상태 기록 실패: ${renderedError.message}`);
+      }
+      if (item.footage_paths?.length) {
+        await deleteFootageFiles(item.footage_paths);
+      }
+      await notify(
+        [
+          "🎬 영상 준비 완료 (업로드 예약 대기)",
+          "",
+          `번호: ${number}`,
+          `상품: ${product.product_name}`,
+          `후킹: ${item.hook_text ?? "-"}`,
+          `미리보기: ${driveVideoUrl}`,
+          `업로드 예정: ${await nextUploadSlotLabel()}`,
+          "관리자 → 영상 목록에서도 확인할 수 있어요.",
+        ].join("\n")
+      );
+      console.log(`=== ${number} 렌더 완료 (업로드 예약 대기) ===`);
+      return;
     }
 
-    // 인스타 릴스 자동 업로드 (드라이브에 올라간 영상을 공개 링크로 메타 서버가 직접 가져감)
-    // 킬스위치: app_settings.instagram_paused = "1" 이면 발행을 건너뛴다
-    // (계정 탈취/복구 중 등 일시중지용 - 배포 없이 DB 플래그로 on/off)
-    let instagramUrl: string | null = null;
-    let instagramError: string | null = null;
-    const instagramPaused = (await getSetting("instagram_paused")) === "1";
-    if (instagramPaused) {
-      instagramError = "인스타 자동발행 일시중지 중 (계정 복구 대기)";
-      console.log("인스타 발행 건너뜀:", instagramError);
-    } else if (hasInstagramEnv()) {
-      if (!driveVideoFileId) {
-        instagramError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
-      } else {
-        try {
-          console.log("인스타 릴스 업로드 중...");
-          await makeFilePublic(driveVideoFileId);
-          const result = await publishReelToInstagram({
-            videoUrl: driveDirectDownloadUrl(driveVideoFileId),
-            caption: captionText,
-          });
-          instagramUrl = result.url;
-          console.log("인스타 업로드 완료:", instagramUrl);
-        } catch (e) {
-          instagramError = e instanceof Error ? e.message : String(e);
-          console.error("인스타 업로드 실패:", instagramError);
-        }
-      }
-    }
-
-    // 페이스북 릴스 자동 업로드 (드라이브 공개 URL 을 메타가 직접 가져감. 별도 세팅 시에만)
-    let facebookUrl: string | null = null;
-    let facebookError: string | null = null;
-    if (await facebookConfigured()) {
-      if (!driveVideoFileId) {
-        facebookError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
-      } else {
-        try {
-          console.log("페이스북 릴스 업로드 중...");
-          await makeFilePublic(driveVideoFileId);
-          const result = await publishReelToFacebook({
-            videoUrl: driveDirectDownloadUrl(driveVideoFileId),
-            caption: captionText,
-          });
-          facebookUrl = result.url;
-          console.log("페이스북 업로드 완료:", facebookUrl);
-        } catch (e) {
-          facebookError = e instanceof Error ? e.message : String(e);
-          console.error("페이스북 업로드 실패:", facebookError);
-        }
-      }
-    }
+    const {
+      youtubeUrl,
+      youtubeError,
+      instagramUrl,
+      instagramError,
+      facebookUrl,
+      facebookError,
+    } = await publishToSns(item, product, videoPath, driveVideoFileId, captionText);
 
     // 완료 기록. 이 업데이트가 조용히 실패하면 항목이 generating 에 갇혀
     // 워커가 15분마다 같은 영상을 재렌더·재업로드하는 사고가 난다(실제 발생).
@@ -564,6 +638,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       .update({
         video_status: "completed",
         drive_video_url: driveVideoUrl,
+        drive_video_file_id: driveVideoFileId,
         drive_caption_url: driveCaptionUrl,
         drive_thumbnail_url: driveThumbnailUrl,
         youtube_url: youtubeUrl,
@@ -631,6 +706,101 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
   }
 }
 
+/**
+ * 예약(rendered) 항목 발행: 드라이브에서 mp4 를 다시 받아 SNS 에 올린다.
+ * (렌더한 러너는 이미 사라졌으므로 파일은 드라이브에서 가져온다)
+ * 성공 시 completed, 실패 시 rendered 로 되돌려 다음 슬롯에 재시도.
+ */
+async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
+  const db = supabaseAdmin();
+  const product = row.products;
+  const number = formatDisplayNumber(row.display_number);
+
+  // 원자적 점유 (rendered 조건 - 중복 발행 방지)
+  const { data: claimed } = await db
+    .from("video_items")
+    .update({ video_status: "generating" })
+    .eq("id", row.id)
+    .eq("video_status", "rendered")
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return false;
+
+  console.log(`\n=== ${number} 예약 발행 시작 ===`);
+  try {
+    if (!row.drive_video_file_id) {
+      throw new Error("드라이브 파일 id가 없어 발행할 수 없어요.");
+    }
+    const tmpVideo = path.join(RENDER_DIR, `publish-${row.display_number}.mp4`);
+    fs.mkdirSync(RENDER_DIR, { recursive: true });
+    console.log("드라이브에서 영상 다운로드 중...");
+    await downloadDriveFile(row.drive_video_file_id, tmpVideo);
+
+    const sns = await publishToSns(
+      row,
+      product,
+      tmpVideo,
+      row.drive_video_file_id,
+      row.caption_text ?? ""
+    );
+    try {
+      fs.unlinkSync(tmpVideo);
+    } catch {
+      // 무시
+    }
+
+    const { error: completeError } = await db
+      .from("video_items")
+      .update({
+        video_status: "completed",
+        youtube_url: sns.youtubeUrl,
+        youtube_error: sns.youtubeError,
+        instagram_url: sns.instagramUrl,
+        instagram_error: sns.instagramError,
+        facebook_url: sns.facebookUrl,
+        facebook_error: sns.facebookError,
+        landing_visible: true,
+      })
+      .eq("id", row.id);
+    if (completeError) {
+      console.error("예약 발행 완료 기록 실패:", completeError.message);
+      await db
+        .from("video_items")
+        .update({ video_status: "completed", landing_visible: true })
+        .eq("id", row.id);
+    }
+
+    await notify(
+      [
+        "영상 업로드 완료 (예약 발행)",
+        "",
+        `번호: ${number}`,
+        `상품: ${product.product_name}`,
+        `링크페이지: ${siteUrl()}/?q=${row.display_number}`,
+        `유튜브: ${sns.youtubeUrl ?? (sns.youtubeError ? `실패 - ${sns.youtubeError.slice(0, 100)}` : "미설정")}`,
+        `인스타: ${sns.instagramUrl ?? (sns.instagramError ? `실패 - ${sns.instagramError.slice(0, 100)}` : "미설정")}`,
+        ...(sns.facebookUrl || sns.facebookError
+          ? [`페북: ${sns.facebookUrl ?? `실패 - ${(sns.facebookError ?? "").slice(0, 100)}`}`]
+          : []),
+      ].join("\n")
+    );
+    console.log(`=== ${number} 예약 발행 완료 ===`);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`${number} 예약 발행 실패:`, message);
+    // rendered 로 되돌려 다음 실행에서 재시도
+    await db
+      .from("video_items")
+      .update({ video_status: "rendered", error_message: message.slice(0, 500) })
+      .eq("id", row.id);
+    await notify(
+      `예약 영상 업로드 실패 (다음 슬롯에 재시도)\n\n번호: ${number}\n오류: ${message.slice(0, 300)}`
+    );
+    return false;
+  }
+}
+
 /* ── 업로드 슬롯 게이트: 하루 3개를 아침/점심/저녁에 나눠 올리기 ──────────
  * UPLOAD_SCHEDULE 환경변수("08:40,13:00,19:00" - KST 기준)가 있으면
  * 각 슬롯에 날짜별 랜덤 지터(±30분)를 더한 "오늘의 업로드 시각"을 계산하고,
@@ -661,9 +831,32 @@ function todaysUploadSlots(schedule: string, now: Date): Date[] {
     .sort((a, b) => a.getTime() - b.getTime());
 }
 
+/** 슬롯 스케줄 미설정 시 기본값 (KST) - 예약 발행이 항상 동작하도록 */
+const DEFAULT_UPLOAD_SCHEDULE = "11:30,19:30";
+
+/** 업로드 슬롯 스케줄: 환경변수 → app_settings → 기본값 순 (빈 문자열 = 게이트 없음) */
+async function uploadSchedule(): Promise<string> {
+  return (
+    optionalEnv("UPLOAD_SCHEDULE") ??
+    (await getSetting("UPLOAD_SCHEDULE")) ??
+    DEFAULT_UPLOAD_SCHEDULE
+  );
+}
+
+/** 다음 업로드 슬롯 안내 문구 (예: "오늘 19:12 (KST)") */
+async function nextUploadSlotLabel(now = new Date()): Promise<string> {
+  const schedule = await uploadSchedule();
+  if (!schedule) return "다음 워커 실행 시";
+  const next = todaysUploadSlots(schedule, now).find((s) => now < s);
+  if (next) return `오늘 ${fmtKst(next)} (KST)`;
+  const tomorrow = new Date(now.getTime() + 24 * 3600_000);
+  const first = todaysUploadSlots(schedule, tomorrow)[0];
+  return `내일 ${fmtKst(first)} (KST)`;
+}
+
 /** 이번 실행에서 처리할 최대 개수. null = 게이트 없음(전부 처리) */
 async function allowedUploadCount(now = new Date()): Promise<number | null> {
-  const schedule = optionalEnv("UPLOAD_SCHEDULE");
+  const schedule = await uploadSchedule();
   if (!schedule) return null;
 
   const slots = todaysUploadSlots(schedule, now);
@@ -676,8 +869,8 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
     return 0;
   }
 
-  // 오늘(KST 자정 이후) 이미 완료된 "자동" 영상 수 → 지난 슬롯 수만큼만 채운다
-  // (수동 업로드는 슬롯과 무관하므로 세지 않는다 - 수동으로 올려도 자동 3개는 그대로 나감)
+  // 오늘(KST 자정 이후) 슬롯을 소비한 완료 영상 수 → 지난 슬롯 수만큼만 채운다.
+  // 슬롯 소비 = 자동(auto) + 예약(scheduled). 텔레그램 즉시(immediate)는 세지 않는다.
   const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
   const kstMidnightUtc = new Date(
     Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
@@ -688,7 +881,7 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
     .from("video_items")
     .select("id", { count: "exact", head: true })
     .eq("video_status", "completed")
-    .eq("manual", false)
+    .neq("publish_mode", "immediate")
     .gte("updated_at", kstMidnightUtc.toISOString());
   if (error) {
     console.error("오늘 완료 수 조회 실패(안전하게 대기):", error.message);
@@ -728,25 +921,46 @@ async function processPending(): Promise<number> {
   }
 
   const rows = (data ?? []) as Array<{ id: string; manual: boolean | null }>;
-  // 수동 요청(텔레그램 "업로드")은 슬롯 게이트를 우회해 항상 즉시 처리한다.
+  // 수동 요청(스튜디오/텔레그램)은 렌더를 즉시 시작한다.
+  // (scheduled 는 렌더 후 rendered 상태로 멈추고, immediate 는 바로 발행까지)
   const manualIds = rows.filter((r) => r.manual).map((r) => r.id);
   const autoIds = rows.filter((r) => !r.manual).map((r) => r.id);
 
-  // 슬롯 게이트: 자동 항목만 제한 (UPLOAD_SCHEDULE 설정 시)
-  const allowed = autoIds.length > 0 ? await allowedUploadCount() : 0;
-
   let processed = 0;
-  let autoProcessed = 0;
-  for (const id of [...manualIds, ...autoIds]) {
-    const isAuto = !manualIds.includes(id);
-    if (isAuto && allowed !== null && autoProcessed >= (allowed ?? 0)) break;
-    // pending 조건이 걸린 원자적 UPDATE로 점유를 시도한다.
-    // 다른 워커 프로세스가 먼저 점유했다면 null 이 반환되어 자연히 건너뛴다.
+  for (const id of manualIds) {
+    // pending 조건이 걸린 원자적 UPDATE로 점유 - 중복 렌더 방지
     const claimed = await claimItem(id);
     if (!claimed) continue;
     await processItem(claimed);
     processed++;
-    if (isAuto) autoProcessed++;
+  }
+
+  // 발행 슬롯 계산 (자동 렌더+발행, 예약 발행이 공유)
+  let allowed = await allowedUploadCount();
+
+  // 예약(rendered) 항목 발행 - 슬롯을 자동 항목보다 먼저 소비한다
+  const { data: renderedData } = await db
+    .from("video_items")
+    .select("*, products(*)")
+    .eq("video_status", "rendered")
+    .order("display_number", { ascending: true });
+  for (const row of (renderedData ?? []) as VideoItemWithProduct[]) {
+    if (allowed !== null && allowed <= 0) break;
+    const ok = await publishRendered(row);
+    if (ok) {
+      processed++;
+      if (allowed !== null) allowed--;
+    }
+  }
+
+  // 자동 항목 렌더+발행 (남은 슬롯만큼)
+  for (const id of autoIds) {
+    if (allowed !== null && allowed <= 0) break;
+    const claimed = await claimItem(id);
+    if (!claimed) continue;
+    await processItem(claimed);
+    processed++;
+    if (allowed !== null) allowed--;
   }
   return processed;
 }

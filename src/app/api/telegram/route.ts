@@ -40,6 +40,7 @@ const TELEGRAM_MAX_FILE_BYTES = 20 * 1024 * 1024;
 const STATUS_LABEL: Record<string, string> = {
   pending: "대기",
   generating: "생성 중",
+  rendered: "업로드 예약",
   completed: "완료",
   failed: "실패",
 };
@@ -58,7 +59,11 @@ async function handleVideoCommand(
   }
 
   // 수동 요청이므로 manual=true → 업로드 슬롯 게이트를 우회해 즉시 처리된다.
-  const item = await createVideoItem(product, templateType, { manual: true });
+  // 텔레그램 수동 요청은 기존처럼 즉시 발행 (예약은 스튜디오 전용)
+  const item = await createVideoItem(product, templateType, {
+    manual: true,
+    publishMode: "immediate",
+  });
   const filled = await fillVideoCopy(item, product);
   const number = formatDisplayNumber(filled.display_number);
 

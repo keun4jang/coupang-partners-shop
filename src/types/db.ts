@@ -1,8 +1,16 @@
 // DB 행 타입 정의 (Supabase 컬럼은 snake_case)
 
 export type ProductStatus = "candidate" | "paused";
-export type VideoStatus = "pending" | "generating" | "completed" | "failed";
+/** rendered = 렌더·드라이브 업로드 완료, SNS 발행은 예약 시간 대기 */
+export type VideoStatus =
+  | "pending"
+  | "generating"
+  | "rendered"
+  | "completed"
+  | "failed";
 export type TemplateType = "A" | "B" | "C" | "D";
+/** auto: 슬롯 시간에 렌더+발행 / immediate: 즉시 발행 / scheduled: 즉시 렌더→슬롯 발행 */
+export type PublishMode = "auto" | "immediate" | "scheduled";
 
 export interface Product {
   id: string;
@@ -33,7 +41,10 @@ export interface VideoItem {
   caption_text: string | null;
   template_type: TemplateType;
   video_status: VideoStatus;
+  publish_mode: PublishMode;
   drive_video_url: string | null;
+  /** 예약 발행 시 드라이브에서 영상을 다시 받기 위한 파일 id */
+  drive_video_file_id: string | null;
   drive_caption_url: string | null;
   drive_thumbnail_url: string | null;
   youtube_url: string | null;

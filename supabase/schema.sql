@@ -36,9 +36,16 @@ create table if not exists video_items (
   script_text text,
   caption_text text,
   template_type text not null default 'A' check (template_type in ('A', 'B', 'C', 'D')),
+  -- rendered: 렌더+드라이브 업로드 완료, SNS 발행은 예약 시간 대기 (스튜디오 예약 모드)
   video_status text not null default 'pending'
-    check (video_status in ('pending', 'generating', 'completed', 'failed')),
+    check (video_status in ('pending', 'generating', 'rendered', 'completed', 'failed')),
+  -- auto: 자동 파이프라인(슬롯 시간에 렌더+발행) / immediate: 텔레그램 수동(즉시 발행)
+  -- scheduled: 스튜디오(즉시 렌더 → 슬롯 시간에 발행)
+  publish_mode text not null default 'auto'
+    check (publish_mode in ('auto', 'immediate', 'scheduled')),
   drive_video_url text,
+  -- 예약 발행 시 드라이브에서 영상을 다시 받아 유튜브에 올리기 위한 파일 id
+  drive_video_file_id text,
   drive_caption_url text,
   drive_thumbnail_url text,
   -- SNS 자동 업로드 결과. url 이 채워지면 업로드 성공, error 는 실패 사유(재시도 시 초기화).

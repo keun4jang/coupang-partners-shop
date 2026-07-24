@@ -154,3 +154,26 @@ export async function makeFilePublic(fileId: string): Promise<void> {
 export function driveDirectDownloadUrl(fileId: string): string {
   return `https://drive.google.com/uc?export=download&id=${fileId}`;
 }
+
+/**
+ * 드라이브 파일을 로컬로 내려받는다 (예약 발행: 이전 실행에서 렌더한 mp4를
+ * 새 러너에서 다시 받아 유튜브에 올릴 때 사용).
+ */
+export async function downloadDriveFile(
+  fileId: string,
+  destPath: string
+): Promise<void> {
+  const drive = driveClient();
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "stream" }
+  );
+  await new Promise<void>((resolve, reject) => {
+    const out = fs.createWriteStream(destPath);
+    (res.data as Readable)
+      .on("error", reject)
+      .pipe(out)
+      .on("error", reject)
+      .on("finish", () => resolve());
+  });
+}
