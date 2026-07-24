@@ -66,6 +66,24 @@ export interface ClickLog {
   created_at: string;
 }
 
+/** 스튜디오 소재 (studio_ideas 행) */
+export type StudioIdeaStatus = "active" | "hidden" | "used";
+
+export interface StudioIdeaRow {
+  id: string;
+  coupang_product_id: number | null;
+  product_name: string;
+  category: string;
+  price_text: string | null;
+  image_url: string | null;
+  coupang_url: string;
+  douyin_keywords: string[];
+  reason: string | null;
+  status: StudioIdeaStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 /** AI가 생성하는 문구 묶음 */
 export interface VideoCopy {
   /** 타겟 호명 후킹 (예: "아이 태우고 다니는 집이라면") */

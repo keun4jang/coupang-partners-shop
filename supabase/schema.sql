@@ -102,7 +102,31 @@ alter table products enable row level security;
 alter table video_items enable row level security;
 alter table click_logs enable row level security;
 
--- 4. app_settings: 키-값 설정 저장소
+-- 4. studio_ideas: 스튜디오 소재 목록 (도우인 소재 추천/직접 추가)
+--    active: 목록에 노출 / hidden: "그만 보기" / used: 영상 제작에 사용됨
+create table if not exists studio_ideas (
+  id uuid primary key default gen_random_uuid(),
+  coupang_product_id bigint unique, -- 쿠팡 productId (중복 추천 방지 키)
+  product_name text not null,
+  category text not null default '생활템',
+  price_text text,
+  image_url text,
+  coupang_url text not null,
+  douyin_keywords jsonb not null default '[]',
+  reason text,
+  status text not null default 'active' check (status in ('active', 'hidden', 'used')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table studio_ideas enable row level security;
+
+drop trigger if exists trg_studio_ideas_updated_at on studio_ideas;
+create trigger trg_studio_ideas_updated_at
+  before update on studio_ideas
+  for each row execute function set_updated_at();
+
+-- 5. app_settings: 키-값 설정 저장소
 -- 인스타 액세스 토큰(60일 만료 → 자동 갱신본 저장)처럼
 -- 코드 배포 없이 갱신돼야 하는 값을 보관한다.
 create table if not exists app_settings (

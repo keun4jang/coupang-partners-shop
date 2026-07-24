@@ -4,12 +4,15 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createVideoItem } from "@/lib/videoItems";
 import { triggerRenderWorkflow } from "@/lib/renderTrigger";
 import { isValidHttpUrl } from "@/lib/format";
+import { markIdeaUsed } from "@/lib/studio";
 import type { Product } from "@/types/db";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 interface CreateBody {
+  /** studio_ideas 행 id - 제작 시작 시 used 로 표시해 목록에서 뺀다 */
+  ideaId?: string;
   productName?: string;
   category?: string;
   price?: string;
@@ -78,6 +81,7 @@ export async function POST(request: NextRequest) {
       manual: true,
       footagePaths,
     });
+    if (body.ideaId) await markIdeaUsed(body.ideaId);
     await triggerRenderWorkflow();
     return NextResponse.json({
       displayNumber: item.display_number,

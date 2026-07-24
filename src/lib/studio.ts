@@ -1,5 +1,7 @@
 import { searchProducts, priceText, type CoupangProduct } from "./coupang";
 import { geminiGenerateJson } from "./ai";
+import { supabaseAdmin } from "./supabase";
+import type { StudioIdeaRow } from "@/types/db";
 
 /**
  * 스튜디오(직접 소재 제작) 모드 - 소재 추천.
@@ -12,6 +14,10 @@ import { geminiGenerateJson } from "./ai";
  */
 
 export interface StudioIdea {
+  /** studio_ideas 행 id (DB 저장 후에만 존재) */
+  id?: string;
+  /** 쿠팡 productId - 중복 추천 방지 키 */
+  productId: number | null;
   productName: string;
   category: string;
   price: string;
@@ -131,8 +137,12 @@ function sampleArray<T>(arr: T[], n: number): T[] {
 /**
  * 소재 추천 목록 생성.
  * 쿠팡 검색 실패 키워드는 건너뛰고, Gemini 실패 시엔 카테고리 기본 중국어 키워드로 폴백.
+ * excludeProductIds: 이미 목록에 있거나 숨김/사용된 상품 - 다시 추천하지 않는다.
  */
-export async function suggestStudioIdeas(count = 5): Promise<StudioIdea[]> {
+export async function suggestStudioIdeas(
+  count = 5,
+  excludeProductIds?: Set<number>
+): Promise<StudioIdea[]> {
   // 1) 후보 풀 수집 (키워드 6개 × 최대 10개 - 케이스/필름 등 액세서리가 섞여
   //    나오므로 넉넉히 모아서 Gemini 가 본품만 걸러낸다)
   const picked = sampleArray(STUDIO_SEARCH_KEYWORDS, 6);
@@ -143,6 +153,7 @@ export async function suggestStudioIdeas(count = 5): Promise<StudioIdea[]> {
       const items = await searchProducts(keyword, 10);
       for (const p of items) {
         if (seen.has(p.productId)) continue;
+        if (excludeProductIds?.has(p.productId)) continue;
         seen.add(p.productId);
         pool.push({ product: p, appCategory });
       }
@@ -179,6 +190,7 @@ export async function suggestStudioIdeas(count = 5): Promise<StudioIdea[]> {
     douyinKeywords: string[],
     reason: string
   ): StudioIdea => ({
+    productId: c.product.productId,
     productName: c.product.productName,
     category: c.appCategory,
     price: priceText(c.product.productPrice),
@@ -207,4 +219,150 @@ export async function suggestStudioIdeas(count = 5): Promise<StudioIdea[]> {
       "중국에서도 흔히 팔리는 생활용품이라 시연 영상이 많은 편이에요."
     )
   );
+}
+
+/* ── 소재 목록 저장소 (studio_ideas) ─────────────────────────────────
+ * 추천/직접 추가한 소재는 DB에 남아 영상으로 만들 때까지 목록에 계속 보인다.
+ * active: 노출 / hidden: "그만 보기" / used: 영상 제작에 사용됨 */
+
+const rowToIdea = (r: StudioIdeaRow): StudioIdea => ({
+  id: r.id,
+  productId: r.coupang_product_id,
+  productName: r.product_name,
+  category: r.category,
+  price: r.price_text ?? "",
+  imageUrl: r.image_url,
+  coupangUrl: r.coupang_url,
+  douyinKeywords: Array.isArray(r.douyin_keywords) ? r.douyin_keywords : [],
+  reason: r.reason ?? "",
+});
+
+/** 노출 중(active) 소재 목록 - 최신순 */
+export async function listActiveIdeas(): Promise<StudioIdea[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("studio_ideas")
+    .select("*")
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`소재 목록 조회 실패: ${error.message}`);
+  return ((data ?? []) as StudioIdeaRow[]).map(rowToIdea);
+}
+
+/** 이미 알고 있는(모든 상태) 상품 productId - 재추천 방지용 */
+export async function knownProductIds(): Promise<Set<number>> {
+  const { data, error } = await supabaseAdmin()
+    .from("studio_ideas")
+    .select("coupang_product_id");
+  if (error) throw new Error(`소재 id 조회 실패: ${error.message}`);
+  return new Set(
+    ((data ?? []) as Array<{ coupang_product_id: number | null }>)
+      .map((r) => r.coupang_product_id)
+      .filter((v): v is number => typeof v === "number")
+  );
+}
+
+/** 추천 결과 저장 (이미 있는 상품은 조용히 건너뜀) */
+export async function saveIdeas(ideas: StudioIdea[]): Promise<void> {
+  if (ideas.length === 0) return;
+  const { error } = await supabaseAdmin()
+    .from("studio_ideas")
+    .upsert(
+      ideas.map((i) => ({
+        coupang_product_id: i.productId,
+        product_name: i.productName,
+        category: i.category,
+        price_text: i.price || null,
+        image_url: i.imageUrl,
+        coupang_url: i.coupangUrl,
+        douyin_keywords: i.douyinKeywords,
+        reason: i.reason || null,
+        status: "active",
+      })),
+      { onConflict: "coupang_product_id", ignoreDuplicates: true }
+    );
+  if (error) throw new Error(`소재 저장 실패: ${error.message}`);
+}
+
+/** "그만 보기" - 목록에서 숨기고 다시 추천되지도 않는다 */
+export async function hideIdea(id: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("studio_ideas")
+    .update({ status: "hidden" })
+    .eq("id", id);
+  if (error) throw new Error(`소재 숨김 실패: ${error.message}`);
+}
+
+/** 영상 제작에 사용됨 표시 */
+export async function markIdeaUsed(id: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("studio_ideas")
+    .update({ status: "used" })
+    .eq("id", id);
+  if (error) console.warn(`소재 used 표시 실패: ${error.message}`);
+}
+
+/** 단일 상품용 중국어 키워드 생성 (직접 찾기에서 소재 추가할 때) */
+export async function chineseKeywordsFor(
+  productName: string
+): Promise<{ douyinKeywords: string[]; reason: string }> {
+  try {
+    const result = await geminiGenerateJson<{
+      douyinKeywords: string[];
+      reason: string;
+    }>({
+      system: PICK_SYSTEM,
+      prompt: [
+        "아래 상품 1개의 douyinKeywords 와 reason 만 만들어줘.",
+        "(고를 필요 없이 이 상품 그대로 - 액세서리여도 그냥 키워드를 만들어라)",
+        "",
+        `상품명: ${productName}`,
+      ].join("\n"),
+      schema: {
+        type: "OBJECT",
+        properties: {
+          douyinKeywords: { type: "ARRAY", items: { type: "STRING" } },
+          reason: { type: "STRING" },
+        },
+        required: ["douyinKeywords", "reason"],
+        propertyOrdering: ["douyinKeywords", "reason"],
+      },
+      temperature: 0.6,
+    });
+    if (result?.douyinKeywords?.length) {
+      return {
+        douyinKeywords: result.douyinKeywords.filter(Boolean).slice(0, 3),
+        reason: result.reason ?? "직접 추가한 소재",
+      };
+    }
+  } catch (e) {
+    console.warn("직접 추가 키워드 생성 실패:", (e as Error).message);
+  }
+  return {
+    douyinKeywords: FALLBACK_CN["생활템"],
+    reason: "직접 추가한 소재",
+  };
+}
+
+/** 직접 찾은 상품을 소재로 추가 (같은 상품이 숨김/사용 상태였다면 다시 active 로) */
+export async function addManualIdea(idea: StudioIdea): Promise<StudioIdea> {
+  const { data, error } = await supabaseAdmin()
+    .from("studio_ideas")
+    .upsert(
+      {
+        coupang_product_id: idea.productId,
+        product_name: idea.productName,
+        category: idea.category,
+        price_text: idea.price || null,
+        image_url: idea.imageUrl,
+        coupang_url: idea.coupangUrl,
+        douyin_keywords: idea.douyinKeywords,
+        reason: idea.reason || null,
+        status: "active",
+      },
+      { onConflict: "coupang_product_id" }
+    )
+    .select("*")
+    .single();
+  if (error || !data) throw new Error(`소재 추가 실패: ${error?.message}`);
+  return rowToIdea(data as StudioIdeaRow);
 }
