@@ -162,29 +162,18 @@ export default function StudioPage() {
     }
   }
 
-  /** 도우인 앱 바로 열기 (안드로이드: 인텐트 / iOS: 앱 스킴, 실패 시 웹 폴백) */
-  function openDouyinApp() {
-    if (/android/i.test(navigator.userAgent)) {
-      window.location.href =
-        "intent://#Intent;scheme=snssdk1128;package=com.ss.android.ugc.aweme;" +
-        "S.browser_fallback_url=https%3A%2F%2Fwww.douyin.com;end";
-    } else {
-      window.location.href = "snssdk1128://";
-      setTimeout(() => window.open("https://www.douyin.com", "_blank"), 1500);
-    }
-  }
-
-  /** tikvideo.app 을 크롬으로 바로 열기 (크롬 없으면 기본 브라우저 폴백) */
-  function openTikvideoChrome() {
-    if (/android/i.test(navigator.userAgent)) {
-      window.location.href =
-        "intent://tikvideo.app/ko#Intent;scheme=https;package=com.android.chrome;" +
-        "S.browser_fallback_url=https%3A%2F%2Ftikvideo.app%2Fko;end";
-    } else {
-      window.location.href = "googlechromes://tikvideo.app/ko";
-      setTimeout(() => window.open("https://tikvideo.app/ko", "_blank"), 1500);
-    }
-  }
+  // 앱 딥링크 - JS 이동은 PWA에서 막히는 경우가 있어 실제 <a href> 로 연다.
+  // (안드로이드: intent:// 가 확실 / iOS: 앱 스킴)
+  const [isAndroid, setIsAndroid] = useState(true);
+  useEffect(() => {
+    setIsAndroid(/android/i.test(navigator.userAgent));
+  }, []);
+  const douyinHref = isAndroid
+    ? "intent://#Intent;scheme=snssdk1128;package=com.ss.android.ugc.aweme;end"
+    : "snssdk1128://";
+  const tikvideoHref = isAndroid
+    ? "intent://tikvideo.app/ko#Intent;scheme=https;package=com.android.chrome;end"
+    : "googlechromes://tikvideo.app/ko";
 
   function onPickFiles(list: FileList | null) {
     if (!list) return;
@@ -303,19 +292,44 @@ export default function StudioPage() {
           tikvideo.app 에 붙여넣어 다운로드하세요.
         </p>
         <div className="flex gap-2 mt-3">
-          <button
-            onClick={openDouyinApp}
-            className="flex-1 bg-ink text-white font-bold rounded-xl py-2.5 text-sm"
+          <a
+            href={douyinHref}
+            className="flex-1 bg-ink text-white font-bold rounded-xl py-2.5 text-sm text-center"
           >
             🎵 도우인 앱 열기
-          </button>
-          <button
-            onClick={openTikvideoChrome}
-            className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl py-2.5 text-sm"
+          </a>
+          <a
+            href={tikvideoHref}
+            className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl py-2.5 text-sm text-center"
           >
             ⬇️ tikvideo (크롬)
-          </button>
+          </a>
         </div>
+        <p className="text-xs text-sub mt-1.5 text-center">
+          앱이 안 열리면:{" "}
+          <a
+            href="https://www.douyin.com"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            도우인 웹
+          </a>
+          {" · "}
+          <a
+            href="https://tikvideo.app/ko"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            tikvideo 웹
+          </a>
+          <span className="block mt-1">
+            도우인 앱의 다운로드 버튼으로 받은 영상도 그대로 올리면 돼요. 끝의
+            홍보 컷은 자동으로 잘라내고, 화면 속 중국어 글자도 자동으로
+            지워드려요.
+          </span>
+        </p>
 
         {/* 직접 찾기 */}
         <div className="mt-4 rounded-xl border border-accent-soft bg-cream p-3">
