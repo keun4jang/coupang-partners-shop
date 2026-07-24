@@ -26,22 +26,41 @@ export interface StudioIdea {
 
 /**
  * 스튜디오용 검색 키워드 풀.
- * 도우인에 영상이 많은 "만국 공통 생활용품" 위주 - 브랜드보다 제품 종류가 중요하다
- * (중국에서도 똑같이 팔리는 물건이어야 시연 영상이 많다).
+ * "도우인에 검색하면 정확히 그 제품만 나오는" 브랜드+모델형 제품 위주
+ * (갤럭시 S25 울트라처럼 모델명으로 특정되는 것들 - 비슷한 짝퉁/유사품 혼동이 없다).
+ * 조건: 중국에서도 똑같이 팔리는 글로벌 브랜드여야 도우인에 영상이 있다.
  */
 const STUDIO_SEARCH_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
-  { keyword: "규조토 발매트", appCategory: "생활템" },
-  { keyword: "실리콘 주방용품", appCategory: "주방템" },
-  { keyword: "다용도 청소솔", appCategory: "청소템" },
-  { keyword: "수납 정리함", appCategory: "수납템" },
-  { keyword: "미니 다지기", appCategory: "주방템" },
-  { keyword: "돌돌이 테이프클리너", appCategory: "청소템" },
-  { keyword: "문틈 청소", appCategory: "청소템" },
-  { keyword: "주방 기름때", appCategory: "주방템" },
-  { keyword: "욕실 물때 제거", appCategory: "청소템" },
-  { keyword: "냉장고 정리 용기", appCategory: "수납템" },
-  { keyword: "빨래 건조대", appCategory: "생활템" },
-  { keyword: "먼지제거기", appCategory: "청소템" },
+  // 스마트폰/디지털 (모델명으로 100% 특정)
+  { keyword: "갤럭시 S25 울트라", appCategory: "생활템" },
+  { keyword: "갤럭시 Z 플립6", appCategory: "생활템" },
+  { keyword: "아이폰 16 프로", appCategory: "생활템" },
+  { keyword: "에어팟 프로 2", appCategory: "생활템" },
+  { keyword: "갤럭시 버즈3 프로", appCategory: "생활템" },
+  { keyword: "애플워치 10", appCategory: "생활템" },
+  { keyword: "갤럭시 워치7", appCategory: "생활템" },
+  { keyword: "아이패드 에어", appCategory: "생활템" },
+  { keyword: "닌텐도 스위치", appCategory: "생활템" },
+  { keyword: "인스타360", appCategory: "생활템" },
+  { keyword: "고프로 히어로13", appCategory: "생활템" },
+  { keyword: "샤오미 미밴드9", appCategory: "생활템" },
+  // 브랜드 가전 (브랜드+제품군으로 특정)
+  { keyword: "다이슨 에어랩", appCategory: "생활템" },
+  { keyword: "다이슨 무선청소기", appCategory: "청소템" },
+  { keyword: "로보락 로봇청소기", appCategory: "청소템" },
+  { keyword: "드리미 로봇청소기", appCategory: "청소템" },
+  { keyword: "샤오미 공기청정기", appCategory: "생활템" },
+  { keyword: "샤오미 가습기", appCategory: "생활템" },
+  { keyword: "카처 고압세척기", appCategory: "청소템" },
+  { keyword: "필립스 전동칫솔", appCategory: "생활템" },
+  { keyword: "오랄비 전동칫솔", appCategory: "생활템" },
+  { keyword: "브리타 정수기", appCategory: "주방템" },
+  { keyword: "휴롬 착즙기", appCategory: "주방템" },
+  // 중국에서 유명한 생활 브랜드 (브랜드로 특정)
+  { keyword: "스탠리 텀블러", appCategory: "생활템" },
+  { keyword: "락앤락 밀폐용기", appCategory: "주방템" },
+  { keyword: "타이거 보온병", appCategory: "주방템" },
+  { keyword: "조지루시 보온병", appCategory: "주방템" },
 ];
 
 /** Gemini 실패 시 카테고리별 기본 중국어 키워드 */
@@ -80,14 +99,24 @@ const PICK_SCHEMA = {
 };
 
 const PICK_SYSTEM = `너는 중국 숏폼 플랫폼 도우인(抖音)을 잘 아는 소싱 전문가다.
-한국 쿠팡 상품 목록을 보고, 도우인에서 검색하면 제품 시연/사용 영상이 충분히 나올 만한
-상품을 고른다. 기준:
-- 중국에서도 똑같이 팔리는 만국 공통 생활용품(규조토 매트, 실리콘 주방템, 청소솔, 수납함 등)일수록 좋다.
-- 한국 전용 브랜드/한국에만 있는 제품은 제외한다.
-- douyinKeywords 는 도우인 검색창에 그대로 붙여넣을 간체 중국어 키워드 2~3개.
-  제품 종류가 정확히 드러나게 (예: "硅藻泥地垫" 규조토매트, "缝隙清洁刷" 틈새청소솔).
-  브랜드가 중국에서 유명하면 브랜드+제품 조합도 1개 포함.
-- reason 은 한국어 한 문장 (왜 도우인에서 영상 찾기 쉬운지).`;
+한국 쿠팡 상품 목록을 보고, 도우인에서 검색하면 "정확히 그 제품만" 나오는 상품을 고른다.
+
+핵심 기준 (가장 중요):
+- 브랜드+모델명으로 100% 특정되는 제품만 고른다 (예: 갤럭시 S25 울트라, 다이슨 에어랩, 로보락 S8).
+  검색했을 때 비슷한 유사품/다른 브랜드가 섞여 나오는 일반 생활용품(수납함, 청소솔 등)은 제외.
+- 중국에서도 정식으로 팔리는 글로벌 브랜드여야 한다 (도우인에 리뷰/개봉기 영상이 많음).
+- 액세서리는 제외: 케이스, 필름, 충전기, 거치대, 호환품, 리퍼 상품이면 고르지 마라.
+  본품(기기/제품 자체)만 고른다.
+
+douyinKeywords 규칙:
+- 도우인 검색창에 그대로 붙여넣을 간체 중국어 2~3개.
+- 반드시 "중국어 브랜드명 + 모델명" 조합 (모델명·숫자는 그대로 유지).
+  예) 三星Galaxy S25 Ultra / 戴森吹风机 Airwrap / 石头扫地机器人 / 苹果AirPods Pro 2 /
+      小米空气净化器 / 追觅吸尘器 / 斯坦利保温杯 / 任天堂Switch / 飞利浦电动牙刷 /
+      乐扣乐扣保鲜盒 / 虎牌保温杯 / 象印保温杯 / 卡赫高压清洗机 / 影石Insta360
+- "개봉기/리뷰" 계열 보조 키워드 1개 추가 가능 (예: "S25 Ultra 开箱").
+- reason 은 한국어 한 문장 (왜 정확히 그 제품 영상만 나오는지).
+- 다양성: 같은 브랜드 제품은 최대 2개까지만 고른다.`;
 
 /** 배열에서 무작위 n개 (중복 없이) */
 function sampleArray<T>(arr: T[], n: number): T[] {
@@ -104,8 +133,9 @@ function sampleArray<T>(arr: T[], n: number): T[] {
  * 쿠팡 검색 실패 키워드는 건너뛰고, Gemini 실패 시엔 카테고리 기본 중국어 키워드로 폴백.
  */
 export async function suggestStudioIdeas(count = 5): Promise<StudioIdea[]> {
-  // 1) 후보 풀 수집 (키워드 4개 × 최대 10개)
-  const picked = sampleArray(STUDIO_SEARCH_KEYWORDS, 4);
+  // 1) 후보 풀 수집 (키워드 6개 × 최대 10개 - 케이스/필름 등 액세서리가 섞여
+  //    나오므로 넉넉히 모아서 Gemini 가 본품만 걸러낸다)
+  const picked = sampleArray(STUDIO_SEARCH_KEYWORDS, 6);
   const pool: Array<{ product: CoupangProduct; appCategory: string }> = [];
   const seen = new Set<number>();
   for (const { keyword, appCategory } of picked) {
