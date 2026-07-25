@@ -602,9 +602,8 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       if (renderedError) {
         throw new Error(`예약 상태 기록 실패: ${renderedError.message}`);
       }
-      if (item.footage_paths?.length) {
-        await deleteFootageFiles(item.footage_paths);
-      }
+      // 소재 원본은 발행 성공 후에 지운다(publishRendered) - 미리보기 단계에서
+      // 문제가 보이면 원본으로 다시 만들 수 있게 남겨둔다.
       await notify(
         [
           "🎬 영상 준비 완료 (업로드 예약 대기)",
@@ -768,6 +767,11 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
         .from("video_items")
         .update({ video_status: "completed", landing_visible: true })
         .eq("id", row.id);
+    }
+
+    // 발행까지 끝났으니 이제 소재 원본을 정리한다 (재제작 여지 종료)
+    if (row.footage_paths?.length) {
+      await deleteFootageFiles(row.footage_paths);
     }
 
     await notify(
