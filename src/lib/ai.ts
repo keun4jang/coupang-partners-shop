@@ -369,12 +369,17 @@ export async function geminiGenerateJson<T>(opts: {
   prompt: string;
   schema: Record<string, unknown>;
   temperature?: number;
+  /** 모델 강제 지정 (기본: GEMINI_MODEL env → flash-lite) */
+  model?: string;
+  /** 이미지 입력 (비전 호출용 - 프레임 속 텍스트 감지 등) */
+  image?: { base64: string; mimeType: string };
 }): Promise<T | null> {
   const apiKey =
     optionalEnv("GEMINI_API_KEY") ?? (await getSetting("GEMINI_API_KEY")) ?? undefined;
   if (!apiKey) return null;
 
-  const model = optionalEnv("GEMINI_MODEL") ?? "gemini-flash-lite-latest";
+  const model =
+    opts.model ?? optionalEnv("GEMINI_MODEL") ?? "gemini-flash-lite-latest";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
@@ -383,7 +388,24 @@ export async function geminiGenerateJson<T>(opts: {
       ...(opts.system
         ? { systemInstruction: { parts: [{ text: opts.system }] } }
         : {}),
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+      contents: [
+        {
+          role: "user",
+          parts: [
+            ...(opts.image
+              ? [
+                  {
+                    inlineData: {
+                      mimeType: opts.image.mimeType,
+                      data: opts.image.base64,
+                    },
+                  },
+                ]
+              : []),
+            { text: opts.prompt },
+          ],
+        },
+      ],
       generationConfig: {
         temperature: opts.temperature ?? 0.7,
         responseMimeType: "application/json",

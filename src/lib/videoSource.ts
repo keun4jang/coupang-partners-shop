@@ -322,10 +322,104 @@ export async function shutdownOcr(): Promise<void> {
 
 const CJK_RE = /[一-鿿]/g;
 /** 지울 영역 최대 개수 (과도한 delogo 는 화면을 망가뜨림) */
-const MAX_BOXES = 10;
+const MAX_BOXES = 12;
 const BOX_PAD = 8;
 /** OCR 정확도용 프레임 확대 배율 (저해상도에선 자막 인식률이 뚝 떨어진다) */
 const OCR_UPSCALE = 2;
+
+/* ── Gemini Vision 텍스트 감지 (1차 감지기) ──────────────────────────
+ * tesseract 는 도우인 특유의 스타일 자막(테두리·그라데이션)과 반투명
+ * 워터마크를 잘 놓친다(45번 사고). Gemini 비전은 이런 텍스트도 찾아내므로
+ * 1차 감지기로 쓰고 tesseract 는 보조로 합집합한다. 키 없거나 실패 시 null.
+ */
+
+const GEMINI_BOX_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    boxes: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          box_2d: { type: "ARRAY", items: { type: "INTEGER" } },
+          text: { type: "STRING" },
+        },
+        required: ["box_2d"],
+        propertyOrdering: ["box_2d", "text"],
+      },
+    },
+  },
+  required: ["boxes"],
+};
+
+const GEMINI_BOX_PROMPT = `이 이미지는 중국 숏폼 영상의 한 프레임이다.
+화면 위에 "오버레이로 입혀진" 텍스트 요소를 전부 찾아라:
+- 자막, 스티커 글씨(테두리/그라데이션 스타일 포함), 계정명
+- 워터마크 (반투명 포함. 예: "SHOT ON 影石Insta360", 앱 로고 배지, @아이디)
+- 중국어가 한 글자라도 포함된 요소는 반드시 포함
+- 실제 장면 속 사물에 인쇄된 글자(거리 간판, 제품 몸체의 로고)는 제외
+각 요소의 box_2d 는 [ymin, xmin, ymax, xmax] (0~1000 정규화, 글자 전체를 넉넉히 덮게).
+없으면 boxes 를 빈 배열로.`;
+
+async function detectBoxesGemini(
+  framePath: string,
+  width: number,
+  height: number
+): Promise<TextBox[] | null> {
+  const { geminiGenerateJson } = await import("./ai");
+  const base64 = fs.readFileSync(framePath).toString("base64");
+  const call = (model: string) =>
+    geminiGenerateJson<{ boxes: Array<{ box_2d: number[]; text?: string }> }>({
+      prompt: GEMINI_BOX_PROMPT,
+      schema: GEMINI_BOX_SCHEMA,
+      temperature: 0.1,
+      model,
+      image: { base64, mimeType: "image/jpeg" },
+    });
+
+  // lite 가 스타일 자막도 잘 잡고 무료 한도(RPM/일일)가 넉넉해 기본값.
+  const visionModel =
+    process.env.GEMINI_VISION_MODEL ?? "gemini-flash-lite-latest";
+  let result: { boxes: Array<{ box_2d: number[]; text?: string }> } | null = null;
+  try {
+    result = await call(visionModel);
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg.includes("429")) {
+      // 무료 등급 분당 한도 - 잠깐 쉬고 한 번 재시도
+      await new Promise((r) => setTimeout(r, 15_000));
+      try {
+        result = await call(visionModel);
+      } catch {
+        result = null;
+      }
+    }
+    if (!result) {
+      // 다른 모델로 마지막 시도 (모델 미지원/한도 소진 대비)
+      try {
+        result = await call(
+          visionModel.includes("lite") ? "gemini-flash-latest" : "gemini-flash-lite-latest"
+        );
+      } catch {
+        result = null;
+      }
+    }
+  }
+  if (!result) return null;
+
+  return (result.boxes ?? [])
+    .filter((b) => Array.isArray(b.box_2d) && b.box_2d.length === 4)
+    .map((b) => {
+      const [ymin, xmin, ymax, xmax] = b.box_2d;
+      return {
+        x: Math.round((xmin / 1000) * width),
+        y: Math.round((ymin / 1000) * height),
+        w: Math.round(((xmax - xmin) / 1000) * width),
+        h: Math.round(((ymax - ymin) / 1000) * height),
+      };
+    })
+    .filter((b) => b.w >= 8 && b.h >= 8);
+}
 
 /**
  * TSV(level 5 = 단어) 파싱 → "줄 단위" 판정.
@@ -403,29 +497,35 @@ function boxesTouch(a: TextBox, b: TextBox): boolean {
 /**
  * 상자 병합 2단계:
  * ① 같은 프레임의 같은 줄 단어들 → 줄 상자 1개
- * ② 프레임이 달라도 겹치는 상자들(같은 자막이 3프레임에 반복 검출됨) → 1개로 통합
+ * ② 프레임이 달라도 겹치는 상자들(같은 자막이 여러 프레임에 반복 검출됨) → 1개로 통합
  *    (안 합치면 중복이 MAX_BOXES 상한을 잡아먹어 정작 다른 자막을 못 지운다)
+ * 병합 결과가 너무 커지면(높이 상한 초과) 합치지 않는다 - 노이즈 상자들이
+ * 연쇄 병합으로 거대 블롭이 되면 진짜 자막까지 크기 필터에 쓸려 나간다(45번 사고).
  */
 function mergeLineBoxes(
   words: Array<TextBox & { line: string }>,
   width: number,
   height: number
 ): TextBox[] {
+  const maxH = height * 0.24;
   const byLine = new Map<string, TextBox>();
   for (const wd of words) {
     const cur = byLine.get(wd.line);
     byLine.set(wd.line, cur ? unionBox(cur, wd) : { ...wd });
   }
 
-  // ② 기하학적 통합 - 더 이상 합칠 게 없을 때까지 반복
-  const boxes = [...byLine.values()];
+  // 개별 상자 크기 사전 필터 (세로로 너무 큰 건 오탐)
+  // ② 기하학적 통합 - 상한을 넘지 않는 병합만, 더 이상 합칠 게 없을 때까지
+  const boxes = [...byLine.values()].filter((b) => b.h <= maxH);
   let merged = true;
   while (merged) {
     merged = false;
     outer: for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
         if (boxesTouch(boxes[i], boxes[j])) {
-          boxes[i] = unionBox(boxes[i], boxes[j]);
+          const u = unionBox(boxes[i], boxes[j]);
+          if (u.h > maxH) continue; // 커져도 되는 한계 초과 - 따로 지운다
+          boxes[i] = u;
           boxes.splice(j, 1);
           merged = true;
           break outer;
@@ -460,28 +560,46 @@ export async function removeChineseText(segmentPath: string): Promise<void> {
     const info = probeVideo(segmentPath);
     if (!info) return;
 
-    // 프레임 3장 샘플(2배 확대 - OCR 인식률) → OCR → 상자 수집
-    const worker = await getOcrWorker();
+    // 프레임 4장 샘플 → Gemini 비전(1차) + tesseract OCR(보조) 합집합으로 상자 수집
     const allWords: Array<TextBox & { line: string }> = [];
-    const sampleTimes = [0.3, Math.min(2.2, info.duration / 2), Math.max(0.5, info.duration - 0.6)];
+    const d = info.duration;
+    const sampleTimes = [0.3, d * 0.35, d * 0.65, Math.max(0.5, d - 0.6)];
+    let geminiOk = false;
     for (let i = 0; i < sampleTimes.length; i++) {
-      const framePath = path.join(os.tmpdir(), `ocr-${path.basename(segmentPath)}-${i}.png`);
+      const base = path.join(os.tmpdir(), `ocr-${path.basename(segmentPath)}-${i}`);
+      const jpgPath = `${base}.jpg`;
+      const upPath = `${base}-up.png`;
       try {
+        // 원본 해상도 jpg (Gemini 용)
+        execFileSync(
+          ff,
+          ["-ss", sampleTimes[i].toFixed(2), "-i", segmentPath, "-frames:v", "1", "-q:v", "3", "-y", jpgPath],
+          { stdio: "ignore", timeout: 60_000 }
+        );
+
+        // ① Gemini 비전 - 스타일 자막/워터마크까지 잡는 1차 감지기
+        const gBoxes = await detectBoxesGemini(jpgPath, info.width, info.height);
+        if (gBoxes) {
+          geminiOk = true;
+          allWords.push(
+            ...gBoxes.map((b, gi) => ({ ...b, line: `g${i}-${gi}` }))
+          );
+        }
+
+        // ② tesseract 보조 (2배 확대 프레임, 두 PSM 모드)
         execFileSync(
           ff,
           [
-            "-ss", sampleTimes[i].toFixed(2),
-            "-i", segmentPath,
+            "-i", jpgPath,
             "-vf", `scale=iw*${OCR_UPSCALE}:ih*${OCR_UPSCALE}:flags=lanczos`,
-            "-frames:v", "1", "-y", framePath,
+            "-y", upPath,
           ],
           { stdio: "ignore", timeout: 60_000 }
         );
-        // 두 PSM 모드로 인식해 합친다 - AUTO 는 문단형 자막, SPARSE 는 산발 스티커에 강함
+        const worker = await getOcrWorker();
         for (const psm of [PSM_AUTO, PSM_SPARSE]) {
           await worker.setParameters({ tessedit_pageseg_mode: psm });
-          const { data } = await worker.recognize(framePath, {}, { tsv: true });
-          // 확대 좌표 → 원본 좌표. 프레임/모드마다 line 키가 겹칠 수 있어 접두사를 섞는다
+          const { data } = await worker.recognize(upPath, {}, { tsv: true });
           allWords.push(
             ...parseTsvBoxes(data.tsv ?? "").map((b) => ({
               x: Math.round(b.x / OCR_UPSCALE),
@@ -493,20 +611,24 @@ export async function removeChineseText(segmentPath: string): Promise<void> {
           );
         }
       } catch (e) {
-        console.warn(`OCR 프레임 ${i} 실패: ${(e as Error).message.slice(0, 100)}`);
+        console.warn(`텍스트 감지 프레임 ${i} 실패: ${(e as Error).message.slice(0, 100)}`);
       } finally {
-        try {
-          fs.unlinkSync(framePath);
-        } catch {
-          // 무시
+        for (const p of [jpgPath, upPath]) {
+          try {
+            fs.unlinkSync(p);
+          } catch {
+            // 무시
+          }
         }
       }
     }
+    if (!geminiOk) {
+      console.warn("Gemini 비전 감지 불가(키/한도) - tesseract 결과만 사용");
+    }
 
-    const boxes = mergeLineBoxes(allWords, info.width, info.height)
-      // 자막답지 않은 거대 상자는 오탐 - 화면을 크게 지우면 배경이 망가진다
-      .filter((b) => b.h <= info.height * 0.2 && b.w <= info.width * 0.96)
-      .slice(0, MAX_BOXES);
+    // 크기 상한은 mergeLineBoxes 내부에서 병합 단계에 적용된다
+    // (자막은 가로로 화면 전체를 덮을 수 있으므로 가로 제한은 두지 않는다)
+    const boxes = mergeLineBoxes(allWords, info.width, info.height).slice(0, MAX_BOXES);
     if (boxes.length === 0) return;
 
     // delogo 체인으로 지우고 제자리 교체
