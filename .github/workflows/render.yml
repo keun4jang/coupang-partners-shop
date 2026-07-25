@@ -70,6 +70,17 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         run: npx remotion browser ensure
 
+      # 스튜디오 소재의 중국어 자막 지우기(delogo)에 풀 필터판 ffmpeg 가 필요하다.
+      # 러너 이미지에 기본 포함이 아니므로 직접 설치한다 (없으면 지우기가 조용히 생략됨).
+      - name: ffmpeg 설치 (중국어 자막 지우기용)
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -y -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -1
+
       - name: 대기중 영상 렌더
         if: steps.check.outputs.ready == 'true'
         run: npm run worker:once

@@ -843,15 +843,24 @@ async function uploadSchedule(): Promise<string> {
   );
 }
 
+/** 기준 시각 이후의 첫 업로드 슬롯 (게이트 없으면 null) */
+async function nextSlotAfter(t: Date): Promise<Date | null> {
+  const schedule = await uploadSchedule();
+  if (!schedule) return null;
+  const sameDay = todaysUploadSlots(schedule, t).find((s) => s > t);
+  if (sameDay) return sameDay;
+  const nextDay = new Date(t.getTime() + 24 * 3600_000);
+  return todaysUploadSlots(schedule, nextDay)[0] ?? null;
+}
+
 /** 다음 업로드 슬롯 안내 문구 (예: "오늘 19:12 (KST)") */
 async function nextUploadSlotLabel(now = new Date()): Promise<string> {
-  const schedule = await uploadSchedule();
-  if (!schedule) return "다음 워커 실행 시";
-  const next = todaysUploadSlots(schedule, now).find((s) => now < s);
-  if (next) return `오늘 ${fmtKst(next)} (KST)`;
-  const tomorrow = new Date(now.getTime() + 24 * 3600_000);
-  const first = todaysUploadSlots(schedule, tomorrow)[0];
-  return `내일 ${fmtKst(first)} (KST)`;
+  const next = await nextSlotAfter(now);
+  if (!next) return "다음 워커 실행 시";
+  const isToday =
+    new Date(next.getTime() + KST_OFFSET_MS).getUTCDate() ===
+    new Date(now.getTime() + KST_OFFSET_MS).getUTCDate();
+  return `${isToday ? "오늘" : "내일"} ${fmtKst(next)} (KST)`;
 }
 
 /** 이번 실행에서 처리할 최대 개수. null = 게이트 없음(전부 처리) */
@@ -938,14 +947,25 @@ async function processPending(): Promise<number> {
   // 발행 슬롯 계산 (자동 렌더+발행, 예약 발행이 공유)
   let allowed = await allowedUploadCount();
 
-  // 예약(rendered) 항목 발행 - 슬롯을 자동 항목보다 먼저 소비한다
+  // 예약(rendered) 항목 발행 - 슬롯을 자동 항목보다 먼저 소비한다.
+  // 단, 렌더 직후 같은 실행에서 바로 나가지 않도록 "렌더 시각 이후의 첫 슬롯"이
+  // 지나야만 발행한다 → 사용자가 미리보기로 확인할 시간이 생긴다.
   const { data: renderedData } = await db
     .from("video_items")
     .select("*, products(*)")
     .eq("video_status", "rendered")
     .order("display_number", { ascending: true });
+  const now = new Date();
   for (const row of (renderedData ?? []) as VideoItemWithProduct[]) {
     if (allowed !== null && allowed <= 0) break;
+    const renderedAt = new Date(row.updated_at);
+    const slot = await nextSlotAfter(renderedAt);
+    if (slot && slot > now) {
+      console.log(
+        `${formatDisplayNumber(row.display_number)} 발행 대기: ${fmtKst(slot)} (KST) 슬롯부터`
+      );
+      continue;
+    }
     const ok = await publishRendered(row);
     if (ok) {
       processed++;
