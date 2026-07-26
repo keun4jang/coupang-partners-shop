@@ -53,5 +53,5 @@ public/assets/broll/*.mp4
 src/lib/appVersion.ts
 
 # 로컬 미리보기 렌더 산출물 (데모 영상·검증 프레임)
-/demo_redesign.mp4
+/demo_*.mp4
 /frame_*.jpg
