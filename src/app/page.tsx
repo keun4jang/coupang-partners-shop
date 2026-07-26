@@ -133,11 +133,14 @@ export default async function Home({
     dbReady = false;
   }
 
-  // 히어로: 번호 검색 결과가 있으면 그 상품, 없으면 가장 최근 영상 상품
+  // 히어로: 번호 검색 결과가 있으면 그 상품, 없으면 가장 최근 영상 상품.
+  // (프로필 링크는 하나로 고정이라 어느 영상에서 왔는지 알 수 없으므로,
+  //  검색 안 했으면 최신 제품을 보여주고 라벨은 오해 없게 "오늘의 추천"으로 둔다)
   const hero = result ?? items[0] ?? null;
-  const heroLabel = result
-    ? `🔎 ${result.display_number}번, 이 제품이에요!`
-    : "🎬 방금 영상 속 그 제품";
+  const searched = Boolean(result);
+  const heroLabel = searched
+    ? `🔎 ${result!.display_number}번, 이 제품이에요!`
+    : "🔥 오늘의 추천 살림템";
   const listItems = items.filter((item) => item.id !== hero?.id);
 
   return (
@@ -167,15 +170,38 @@ export default async function Home({
         </p>
       )}
 
+      {/* 번호 검색 - 최상단. 예전 영상 보고 온 분이 자기 번호로 바로 점프 */}
+      {dbReady && (
+        <section className="bg-card rounded-2xl p-3.5 shadow-sm border border-accent-soft mb-4">
+          <form method="GET" action="/" className="flex gap-2 items-center">
+            <span className="text-sm font-semibold shrink-0 pl-1">번호로 찾기</span>
+            <input
+              type="text"
+              name="q"
+              inputMode="numeric"
+              defaultValue={q ?? ""}
+              placeholder="영상 속 번호 (예: 17)"
+              className="flex-1 min-w-0 rounded-lg border border-accent px-3 py-2 text-base bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="submit"
+              className="bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg px-3.5 py-2 text-sm shrink-0"
+            >
+              찾기
+            </button>
+          </form>
+        </section>
+      )}
+
       {/* 번호 검색했는데 없는 경우 */}
       {q && dbReady && !result && (
-        <div className="bg-card rounded-2xl p-5 text-center border border-accent-soft mb-5">
+        <div className="bg-card rounded-2xl p-5 text-center border border-accent-soft mb-4">
           <p className="font-semibold">{q.trim()}번은 아직 정리해두지 않았어요.</p>
           <p className="text-sub text-sm mt-1">아래에서 다른 제품을 둘러보세요.</p>
         </div>
       )}
 
-      {/* 원탭 히어로 - 방금 영상에서 온 사람은 여기서 끝 */}
+      {/* 원탭 히어로 - 검색했으면 그 번호, 아니면 최신 추천 */}
       {dbReady && hero && <HeroCard item={hero} label={heroLabel} />}
 
       {/* 최근 제품 목록 (이전 영상에서 온 방문자용) */}
@@ -189,29 +215,6 @@ export default async function Home({
               <ItemCard key={item.id} item={item} />
             ))}
           </div>
-        </section>
-      )}
-
-      {/* 번호 검색 - 보조 수단으로 하단에 */}
-      {dbReady && (
-        <section className="mt-8 bg-card rounded-2xl p-4 shadow-sm border border-accent-soft">
-          <p className="font-semibold text-sm">영상에서 본 번호로 찾기</p>
-          <form method="GET" action="/" className="flex gap-2 mt-2.5">
-            <input
-              type="text"
-              name="q"
-              inputMode="numeric"
-              defaultValue={q ?? ""}
-              placeholder="예: 17"
-              className="flex-1 min-w-0 rounded-lg border border-accent px-3.5 py-2.5 text-base bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              type="submit"
-              className="bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg px-4 text-sm"
-            >
-              찾아보기
-            </button>
-          </form>
         </section>
       )}
 
