@@ -45,7 +45,8 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           text={props.hookLine}
           size={FONT_SIZES.hook}
           variant="bubble"
-          y={0.28}
+          y={0.26}
+          strong
         />
       </Sequence>
       <Sequence durationInFrames={f(T.hook.to)}>

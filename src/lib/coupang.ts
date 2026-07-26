@@ -165,21 +165,27 @@ export async function createDeeplink(coupangUrls: string[]): Promise<string[]> {
 }
 
 /**
- * 주부가 많이 살 것 같은 검색 키워드(우선순위 순).
+ * 스카우트 검색 키워드(우선순위 순).
+ * 방향: "싸고 신기해서 바로 사게 되는" 상품 - 저가 살림템 + 신기/신박한
+ * 아이디어 상품 + 신제품. 고가 브랜드 가전은 충동구매로 이어지지 않아 제외.
  * 카테고리 ID(bestcategories)는 매핑이 불투명해 엉뚱한 상품이 섞이므로,
  * 주제가 명확한 키워드 검색을 쓴다. appCategory 는 이 서비스의 카테고리
  * (자막 톤/브롤/폴백문구에 쓰임)로 매핑.
  */
 export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
+  // 신기/신박/아이디어 (호기심 자극 - 훅 잘 먹힘)
+  { keyword: "신박한 아이디어 상품", appCategory: "생활템" },
+  { keyword: "신기한 주방용품", appCategory: "주방템" },
+  { keyword: "신박한 살림템", appCategory: "생활템" },
+  { keyword: "아이디어 생활용품", appCategory: "생활템" },
+  { keyword: "신기한 청소용품", appCategory: "청소템" },
+  { keyword: "신제품 생활용품", appCategory: "생활템" },
+  { keyword: "만능 다용도 주방", appCategory: "주방템" },
+  // 검증된 저가 살림템 (충동구매 주력)
   { keyword: "청소용품", appCategory: "청소템" },
-  { keyword: "주방용품", appCategory: "주방템" },
-  { keyword: "물티슈", appCategory: "육아생활템" },
-  { keyword: "세탁세제", appCategory: "생활템" },
+  { keyword: "실리콘 주방", appCategory: "주방템" },
   { keyword: "수납정리함", appCategory: "수납템" },
   { keyword: "욕실청소", appCategory: "청소템" },
-  { keyword: "유아용품", appCategory: "육아생활템" },
-  { keyword: "빨래건조대", appCategory: "생활템" },
-  { keyword: "실리콘 주방", appCategory: "주방템" },
   { keyword: "살림템", appCategory: "생활템" },
 ];
 

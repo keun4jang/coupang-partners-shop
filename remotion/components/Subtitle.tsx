@@ -18,7 +18,9 @@ export const Subtitle: React.FC<{
   y?: number;
   /** bubble 상단 왼쪽 라벨 (예: "보관 TIP"). 있으면 메모지 탭처럼 표시 */
   badge?: string;
-}> = ({ text, size = FONT_SIZES.subtitle, variant = "plain", y = 0.42, badge }) => {
+  /** 훅용 강조: 두꺼운 검정 테두리로 어떤 배경에서도 튀게 */
+  strong?: boolean;
+}> = ({ text, size = FONT_SIZES.subtitle, variant = "plain", y = 0.42, badge, strong }) => {
   const frame = useCurrentFrame();
   const { fps, height, width } = useVideoConfig();
 
@@ -92,6 +94,13 @@ export const Subtitle: React.FC<{
               textWrap: "balance",
               color: "#FFFFFF",
               textShadow: `0 4px 24px ${COLORS.subtitleShadow}, 0 2px 10px rgba(0,0,0,0.55), 0 0 30px rgba(0,0,0,0.28)`,
+              ...(strong
+                ? {
+                    WebkitTextStroke: "8px rgba(0,0,0,0.88)",
+                    paintOrder: "stroke fill" as const,
+                    lineHeight: 1.2,
+                  }
+                : {}),
             }}
           >
             {text}

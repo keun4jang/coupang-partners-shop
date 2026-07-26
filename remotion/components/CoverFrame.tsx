@@ -1,13 +1,13 @@
 import React from "react";
 import { AbsoluteFill, Img } from "remotion";
-import { COLORS, FONT_SIZES, SAFE_ZONE, VIDEO } from "../config/videoConfig";
+import { COLORS, FONT_SIZES, PALETTE, SAFE_ZONE, VIDEO } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /**
  * 영상 맨 첫 프레임(1프레임)만 나오는 "썸네일용" 정적 화면.
- * 플랫폼이 영상 첫 프레임을 미리보기/썸네일로 잡거나, 우리가 직접 썸네일 PNG를
- * 이 프레임에서 뽑는 경우를 위해 - 제품 사진을 꽉 채우고 번호+후킹 문구를 크게 얹는다.
- * 애니메이션 없이 처음부터 완성된 상태로 그린다(1프레임만 존재하므로 스프링 팝인이 의미 없음).
+ * 피드에서 손톱만 하게 보여도 읽히도록: 상단에 초대형 훅(흰 글자+검정 테두리,
+ * 핵심어 노란 하이라이트 느낌의 바탕), 하단에 번호 배지. 제품 사진 꽉 채움.
+ * 애니메이션 없이 처음부터 완성된 상태로 그린다(1프레임만 존재).
  */
 export const CoverFrame: React.FC<{
   productImageUrl: string | null;
@@ -29,55 +29,67 @@ export const CoverFrame: React.FC<{
         />
       )}
 
-      {/* 번호 배지 + 후킹 문구 - 하단 안전대에 세로로 쌓아서 번호가 문구 바로 위에 오게 */}
+      {/* 위·아래 어두운 그라데이션 - 훅/배지가 사진 위에서도 무조건 읽히게 */}
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 34%, rgba(0,0,0,0) 66%, rgba(0,0,0,0.45) 100%)",
+        }}
+      />
+
+      {/* 초대형 훅 - 상단 안전대 바로 아래, 흰 글자 + 두꺼운 검정 테두리 */}
       <div
         style={{
           position: "absolute",
-          left: "6%",
-          right: "6%",
-          bottom: VIDEO.height * SAFE_ZONE.bottom + 36,
+          left: "4%",
+          right: "4%",
+          top: VIDEO.height * SAFE_ZONE.top + 10,
+          textAlign: "center",
+          color: "#FFFFFF",
+          fontWeight: 900,
+          fontSize: FONT_SIZES.coverHook,
+          lineHeight: 1.18,
+          letterSpacing: "-0.02em",
+          wordBreak: "keep-all",
+          textWrap: "balance",
+          WebkitTextStroke: "10px rgba(0,0,0,0.9)",
+          paintOrder: "stroke fill",
+          textShadow: "0 8px 28px rgba(0,0,0,0.55)",
+        }}
+      >
+        {hookLine}
+      </div>
+
+      {/* 하단: 코랄 번호 배지 - 쿠폰처럼 톡 튀게 */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: VIDEO.height * SAFE_ZONE.bottom + 30,
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
+          justifyContent: "center",
         }}
       >
         <div
           style={{
-            background: COLORS.cream,
-            border: `6px solid ${COLORS.accent}`,
+            background: PALETTE.badgeCoral,
+            border: "5px solid #FFFFFF",
             borderRadius: 999,
-            padding: "14px 36px",
-            boxShadow: "0 8px 30px rgba(63, 52, 44, 0.3)",
+            padding: "12px 40px",
+            boxShadow: "0 10px 34px rgba(0,0,0,0.4)",
+            transform: "rotate(-2deg)",
           }}
         >
           <span
             style={{
-              color: COLORS.primaryDark,
+              color: "#FFFFFF",
               fontWeight: 900,
               fontSize: FONT_SIZES.coverBadge,
             }}
           >
-            {displayNumber}번
+            오늘의 {displayNumber}번
           </span>
-        </div>
-
-        <div
-          style={{
-            maxWidth: "100%",
-            background: "rgba(255, 248, 240, 0.95)",
-            color: COLORS.ink,
-            fontWeight: 900,
-            fontSize: FONT_SIZES.coverHook,
-            lineHeight: 1.3,
-            textAlign: "center",
-            wordBreak: "keep-all",
-            borderRadius: 24,
-            padding: "16px 28px",
-            boxShadow: `0 10px 34px ${COLORS.subtitleShadow}`,
-          }}
-        >
-          {hookLine}
         </div>
       </div>
     </AbsoluteFill>

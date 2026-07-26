@@ -146,8 +146,8 @@ export const COLORS = {
 } as const;
 
 export const FONT_SIZES = {
-  // 자막(후킹·공감·장점·후기)은 모두 같은 크기로 통일 (제각각 방지, 크지 않게)
-  hook: 46,
+  // 훅은 스크롤을 멈추게 하는 첫 문장 - 일반 자막보다 확실히 크게
+  hook: 62,
   subtitle: 46,
   productName: 58, // 제품명 - 정보 위계 최상위(크게)
   benefit: 46,
@@ -160,9 +160,9 @@ export const FONT_SIZES = {
   volumeBadge: 32, // 카드 상단 "19L 대용량" 배지
   numberBadge: 36, // "오늘의 살림템 28번" 배지
   subInfo: 34, // 보조 정보(대용량 등)
-  // 첫 프레임 썸네일용 - 화면 꽉 채운 사진 위라 일반 자막보다 크고 굵게
-  coverBadge: 76,
-  coverHook: 64,
+  // 첫 프레임 썸네일용 - 피드에서 손톱만 하게 보여도 읽히게 아주 크게
+  coverBadge: 60,
+  coverHook: 92,
 } as const;
 
 /**

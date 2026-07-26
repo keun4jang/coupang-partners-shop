@@ -75,8 +75,10 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   const maxCandidates = opts.maxCandidates ?? 8;
   const perKeywordFetch = opts.perKeywordFetch ?? 10;
   const perKeywordTake = opts.perKeywordTake ?? 2;
+  // 충동구매 가격대: 고민 없이 담는 5천~4만원 구간에 집중
+  // (고가품은 조회수가 나와도 제휴 링크 구매로 이어지지 않는다 - 클릭 데이터 근거)
   const minPrice = opts.minPrice ?? 5000;
-  const maxPrice = opts.maxPrice ?? 200000;
+  const maxPrice = opts.maxPrice ?? 40000;
 
   const errors: string[] = [];
   const known = await loadKnownProductIds();
