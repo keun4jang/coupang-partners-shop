@@ -181,11 +181,11 @@ export const MOTION = {
   productDamping: 14,
 } as const;
 
-/** CTA 문구 템플릿 (번호는 "17번"처럼 앞자리 0 없이) */
-export const ctaTemplate = (displayNumber: number): string =>
-  `영상 속 제품은 프로필 링크 ${displayNumber}번에 정리해뒀어요`;
+/** CTA 문구 템플릿 (랜딩 원탭 개편 - 링크만 누르면 맨 위에 뜬다) */
+export const ctaTemplate = (_displayNumber: number): string =>
+  `이 제품, 프로필 링크 누르면 바로 있어요`;
 
-export const CTA_SUB_TEXT = "프로필 링크에서 번호로 검색";
+export const CTA_SUB_TEXT = "프로필 링크 → 맨 위 제품";
 
 /** CTA 화면 신뢰 문구 - 큐레이션 기준을 진실하게 전달 (허위 사용 후기 아님) */
 export const TRUST_TEXT = "가성비 좋고 후기까지 확인한 제품만 골라요";

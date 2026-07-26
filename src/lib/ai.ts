@@ -81,8 +81,10 @@ export function composeScriptText(copy: VideoCopy, displayNumber: number): strin
 }
 
 export function ctaLine(displayNumber: number): string {
-  // CTA 화면 자막과 나레이션이 완전히 같은 문장을 쓴다
-  return `영상 속 제품은 프로필 링크 ${displayNumber}번에 정리해뒀어요`;
+  // CTA 화면 자막과 나레이션이 완전히 같은 문장을 쓴다.
+  // 랜딩 원탭 개편: 링크만 누르면 맨 위에 뜨므로 "번호 검색" 대신 원탭 안내.
+  // (번호는 CTA 화면에 크게 표시되어 예전 영상 폴백 검색용으로 남는다)
+  return `이 제품, 프로필 링크 누르면 바로 있어요`;
 }
 
 // 대가성 고지는 웹사이트(랜딩)에만 두고 SNS 캡션/영상에는 넣지 않는다(사장님 결정).
@@ -137,7 +139,7 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
     copy.usageTip,
     "",
     "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요.",
-    `영상 속 제품은 프로필 링크에서 ${displayNumber}번으로 찾아보시면 돼요.`,
+    `영상 속 제품은 프로필 링크 누르면 바로 확인할 수 있어요. (${displayNumber}번)`,
     "",
     "#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템",
   ].join("\n");
@@ -180,7 +182,7 @@ const COPY_SCHEMA = {
     captionText: {
       type: "string",
       description:
-        "SNS 업로드용 캡션 전문. 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크에서 N번으로 찾아보시면 돼요.' + 빈 줄 + 해시태그.",
+        "SNS 업로드용 캡션 전문. 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크 누르면 바로 확인할 수 있어요. (N번)' + 빈 줄 + 해시태그.",
     },
   },
   required: [
@@ -245,7 +247,7 @@ const SYSTEM_PROMPT = `너는 아이 키우는 40대 한국인 아줌마다. "�
 - 본문은 후킹+공감+장점을 자연스럽게 2~3문장으로.
 - "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요." 같은 큐레이션 기준 문장 포함
   (직접 사용해봤다는 표현은 금지 - 고른 기준만 말한다).
-- 반드시 "영상 속 제품은 프로필 링크에서 {번호}번으로 찾아보시면 돼요." 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
+- 반드시 "영상 속 제품은 프로필 링크 누르면 바로 확인할 수 있어요. ({번호}번)" 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
 - 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;
 
 /** Gemini responseSchema 는 OpenAPI 서브셋(타입 대문자, additionalProperties 미지원) */

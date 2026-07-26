@@ -19,8 +19,7 @@ async function findByNumber(q: string): Promise<VideoItemWithProduct | null> {
 }
 
 async function visibleItems(): Promise<VideoItemWithProduct[]> {
-  // 노출 설정된 번호는 전부 보여준다(개수 제한 없음).
-  // 방문자가 검색한 번호 외에 다른 생활템도 눌러볼 수 있도록.
+  // 노출 설정된 번호는 전부 (최신순) - 영상에서 넘어온 방문자가 스크롤로 찾을 수 있게
   const { data } = await supabaseAdmin()
     .from("video_items")
     .select("*, products(*)")
@@ -40,93 +39,80 @@ function shortDescription(item: VideoItemWithProduct): string {
   );
 }
 
-function ItemCard({
-  item,
-  highlight,
-}: {
-  item: VideoItemWithProduct;
-  highlight?: boolean;
-}) {
+/**
+ * 히어로 카드: 영상에서 막 넘어온 방문자를 위한 "원탭" 카드.
+ * 카드 전체가 쿠팡 링크 - 사진 크게, 버튼 크게, 다른 행동 필요 없음.
+ */
+function HeroCard({ item, label }: { item: VideoItemWithProduct; label: string }) {
   const product: Product = item.products;
   return (
-    <div
-      className={`bg-card rounded-2xl px-4 py-3.5 shadow-sm border ${
-        highlight ? "border-primary ring-2 ring-primary/30" : "border-accent-soft"
-      }`}
+    <a
+      href={`/api/click?videoItemId=${item.id}`}
+      rel="nofollow sponsored"
+      className="block bg-card rounded-3xl overflow-hidden shadow-md border-2 border-primary/60 active:scale-[0.99] transition-transform"
     >
-      {/* 사진 없이 글자만: 번호 · 제품명 · 한 줄 설명 · 가격보기 버튼 */}
-      <div className="inline-block bg-accent-soft text-primary-dark font-semibold rounded-full px-2.5 py-0.5 text-xs">
-        {formatDisplayNumber(item.display_number)}
+      <div className="bg-primary/10 px-5 py-2.5 flex items-center justify-between">
+        <span className="font-bold text-primary-dark text-sm">{label}</span>
+        <span className="bg-primary text-white text-xs font-bold rounded-full px-2.5 py-1">
+          {formatDisplayNumber(item.display_number)}
+        </span>
       </div>
-      <h3 className="font-bold text-base mt-1.5 leading-snug">
-        {shortenProductName(product.product_name, 24)}
-      </h3>
-      <p className="text-ink/70 text-sm mt-1 leading-relaxed">
-        {shortDescription(item)}
-      </p>
-      {/* 실시간 가격은 쿠팡에서 - 이 클릭이 파트너스 수수료로 연결된다 */}
-      <a
-        href={`/api/click?videoItemId=${item.id}`}
-        rel="nofollow sponsored"
-        className="flex items-center justify-center gap-1 mt-2.5 bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg py-2 text-sm"
-      >
-        가격 보기 <span aria-hidden>→</span>
-      </a>
-    </div>
+      {product.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.image_url}
+          alt={product.product_name}
+          className="w-full aspect-square object-cover bg-white"
+        />
+      )}
+      <div className="px-5 pt-4 pb-5">
+        <h2 className="font-extrabold text-lg leading-snug">
+          {shortenProductName(product.product_name, 34)}
+        </h2>
+        <p className="text-ink/70 text-sm mt-1.5 leading-relaxed">
+          {shortDescription(item)}
+        </p>
+        <div className="mt-4 bg-primary hover:bg-primary-dark transition-colors text-white font-extrabold rounded-xl py-3.5 text-center text-base">
+          쿠팡에서 바로 보기 →
+        </div>
+      </div>
+    </a>
   );
 }
 
-/** 목록 페이지당 카드 수 */
-// 한 페이지에 전부 노출 (페이지 넘기기 없이). 넉넉히 잡아 totalPages=1 → 페이지 버튼 미표시.
-const PAGE_SIZE = 1000;
-
-/** 페이지 링크 주소 (검색어 q 가 있으면 유지) */
-function pageHref(page: number, q?: string): string {
-  const sp = new URLSearchParams();
-  if (q) sp.set("q", q);
-  sp.set("page", String(page));
-  return `/?${sp.toString()}`;
-}
-
-function Pagination({
-  page,
-  totalPages,
-  q,
-}: {
-  page: number;
-  totalPages: number;
-  q?: string;
-}) {
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-  const btn =
-    "min-w-10 h-10 px-3 flex items-center justify-center rounded-xl text-[15px] font-bold transition-colors";
+/** 목록 카드: 사진 왼쪽 + 정보 오른쪽, 카드 전체가 쿠팡 링크 */
+function ItemCard({ item }: { item: VideoItemWithProduct }) {
+  const product: Product = item.products;
   return (
-    <nav className="flex flex-wrap items-center justify-center gap-2 mt-6" aria-label="페이지 이동">
-      {page > 1 && (
-        <a href={pageHref(page - 1, q)} className={`${btn} bg-card border border-accent-soft text-ink hover:bg-accent-soft`} aria-label="이전 페이지">
-          ‹
-        </a>
+    <a
+      href={`/api/click?videoItemId=${item.id}`}
+      rel="nofollow sponsored"
+      className="flex gap-3 items-center bg-card rounded-2xl p-3 shadow-sm border border-accent-soft active:scale-[0.99] transition-transform"
+    >
+      {product.image_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.image_url}
+          alt=""
+          className="w-20 h-20 rounded-xl object-cover bg-white shrink-0 border border-accent-soft"
+        />
+      ) : (
+        <div className="w-20 h-20 rounded-xl bg-accent-soft shrink-0 flex items-center justify-center text-2xl">
+          🧺
+        </div>
       )}
-      {pages.map((n) => (
-        <a
-          key={n}
-          href={pageHref(n, q)}
-          aria-current={n === page ? "page" : undefined}
-          className={
-            n === page
-              ? `${btn} bg-primary text-white`
-              : `${btn} bg-card border border-accent-soft text-ink hover:bg-accent-soft`
-          }
-        >
-          {n}
-        </a>
-      ))}
-      {page < totalPages && (
-        <a href={pageHref(page + 1, q)} className={`${btn} bg-card border border-accent-soft text-ink hover:bg-accent-soft`} aria-label="다음 페이지">
-          ›
-        </a>
-      )}
-    </nav>
+      <div className="min-w-0 flex-1">
+        <span className="inline-block bg-accent-soft text-primary-dark font-semibold rounded-full px-2 py-0.5 text-[11px]">
+          {formatDisplayNumber(item.display_number)}
+        </span>
+        <h3 className="font-bold text-[15px] mt-1 leading-snug line-clamp-2">
+          {shortenProductName(product.product_name, 30)}
+        </h3>
+      </div>
+      <span className="shrink-0 text-primary-dark font-extrabold text-sm">
+        보기 →
+      </span>
+    </a>
   );
 }
 
@@ -135,7 +121,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ q?: string; page?: string }>;
 }) {
-  const { q, page: pageParam } = await searchParams;
+  const { q } = await searchParams;
 
   let result: VideoItemWithProduct | null = null;
   let items: VideoItemWithProduct[] = [];
@@ -147,23 +133,18 @@ export default async function Home({
     dbReady = false;
   }
 
-  // 검색 결과로 위에 이미 보여준 항목은 목록에서 제외하고, 5개씩 페이지로 나눈다.
-  const listItems = items.filter((item) => item.id !== result?.id);
-  const totalPages = Math.max(1, Math.ceil(listItems.length / PAGE_SIZE));
-  const currentPage = Math.min(
-    totalPages,
-    Math.max(1, parseInt(pageParam ?? "1", 10) || 1)
-  );
-  const pageItems = listItems.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
+  // 히어로: 번호 검색 결과가 있으면 그 상품, 없으면 가장 최근 영상 상품
+  const hero = result ?? items[0] ?? null;
+  const heroLabel = result
+    ? `🔎 ${result.display_number}번, 이 제품이에요!`
+    : "🎬 방금 영상 속 그 제품";
+  const listItems = items.filter((item) => item.id !== hero?.id);
 
   return (
     <main className="max-w-lg mx-auto px-5 pb-16">
-      {/* 헤더 */}
-      <header className="pt-10 pb-6 text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight">
+      {/* 헤더 - 짧게 (히어로가 주인공) */}
+      <header className="pt-8 pb-5 text-center">
+        <h1 className="text-2xl font-extrabold tracking-tight">
           살림템 메모장{" "}
           {/* 숨은 관리자 진입 버튼 — 겉보기엔 그냥 이모지 (나만 아는 버튼) */}
           <Link
@@ -175,35 +156,10 @@ export default async function Home({
             📝
           </Link>
         </h1>
-        <p className="text-sub mt-2 text-[15px] leading-relaxed">
-          아이 둘 키우며 눈에 띈 생활템을
-          <br />
-          번호로 정리해두는 곳이에요.
+        <p className="text-sub mt-1.5 text-sm">
+          영상 속 제품, 여기서 바로 확인하세요.
         </p>
       </header>
-
-      {/* 번호 검색 */}
-      <section className="bg-card rounded-2xl p-4 shadow-sm border border-accent-soft">
-        <p className="font-semibold text-sm">
-          영상에서 본 생활템 번호를 입력해보세요.
-        </p>
-        <form method="GET" action="/" className="flex gap-2 mt-2.5">
-          <input
-            type="text"
-            name="q"
-            inputMode="numeric"
-            defaultValue={q ?? ""}
-            placeholder="예: 17"
-            className="flex-1 min-w-0 rounded-lg border border-accent px-3.5 py-2.5 text-base bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <button
-            type="submit"
-            className="bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg px-4 text-sm"
-          >
-            찾아보기
-          </button>
-        </form>
-      </section>
 
       {!dbReady && (
         <p className="text-center text-sub text-sm mt-6">
@@ -211,41 +167,51 @@ export default async function Home({
         </p>
       )}
 
-      {/* 검색 결과 */}
-      {q && dbReady && (
-        <section className="mt-6">
-          {result ? (
-            <>
-              <p className="text-center text-primary-dark font-bold mb-3">
-                🔎 {result.display_number}번, 이 제품이에요!
-              </p>
-              <ItemCard item={result} highlight />
-            </>
-          ) : (
-            <div className="bg-card rounded-2xl p-6 text-center border border-accent-soft">
-              <p className="font-semibold">
-                {q.trim()}번은 아직 정리해두지 않았어요.
-              </p>
-              <p className="text-sub text-sm mt-1">
-                번호를 다시 확인해보시겠어요?
-              </p>
-            </div>
-          )}
-        </section>
+      {/* 번호 검색했는데 없는 경우 */}
+      {q && dbReady && !result && (
+        <div className="bg-card rounded-2xl p-5 text-center border border-accent-soft mb-5">
+          <p className="font-semibold">{q.trim()}번은 아직 정리해두지 않았어요.</p>
+          <p className="text-sub text-sm mt-1">아래에서 다른 제품을 둘러보세요.</p>
+        </div>
       )}
 
-      {/* 전체 목록 (5개씩 페이지로) */}
+      {/* 원탭 히어로 - 방금 영상에서 온 사람은 여기서 끝 */}
+      {dbReady && hero && <HeroCard item={hero} label={heroLabel} />}
+
+      {/* 최근 제품 목록 (이전 영상에서 온 방문자용) */}
       {dbReady && listItems.length > 0 && (
-        <section className="mt-8">
-          <h2 className="font-bold text-lg mb-3">정리해둔 생활템 전체</h2>
-          <div className="flex flex-col gap-2.5">
-            {pageItems.map((item) => (
+        <section className="mt-7">
+          <h2 className="font-bold text-base mb-2.5 px-1">
+            다른 영상 속 제품들
+          </h2>
+          <div className="flex flex-col gap-2">
+            {listItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
           </div>
-          {totalPages > 1 && (
-            <Pagination page={currentPage} totalPages={totalPages} q={q} />
-          )}
+        </section>
+      )}
+
+      {/* 번호 검색 - 보조 수단으로 하단에 */}
+      {dbReady && (
+        <section className="mt-8 bg-card rounded-2xl p-4 shadow-sm border border-accent-soft">
+          <p className="font-semibold text-sm">영상에서 본 번호로 찾기</p>
+          <form method="GET" action="/" className="flex gap-2 mt-2.5">
+            <input
+              type="text"
+              name="q"
+              inputMode="numeric"
+              defaultValue={q ?? ""}
+              placeholder="예: 17"
+              className="flex-1 min-w-0 rounded-lg border border-accent px-3.5 py-2.5 text-base bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="submit"
+              className="bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg px-4 text-sm"
+            >
+              찾아보기
+            </button>
+          </form>
         </section>
       )}
 

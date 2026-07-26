@@ -115,7 +115,7 @@ export function youtubeDescription(
   return [
     shortProductName,
     "",
-    `영상 속 제품은 프로필 링크에서 ${displayNumber}번으로 확인하세요 🔎`,
+    `영상 속 제품은 프로필 링크 누르면 바로 나와요 🔎 (${displayNumber}번)`,
     "",
     "#Shorts #살림템 #생활템 #쿠팡추천템",
   ].join("\n");
