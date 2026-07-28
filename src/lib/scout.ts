@@ -75,10 +75,11 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   const maxCandidates = opts.maxCandidates ?? 8;
   const perKeywordFetch = opts.perKeywordFetch ?? 10;
   const perKeywordTake = opts.perKeywordTake ?? 2;
-  // 충동구매 가격대: 고민 없이 담는 5천~4만원 구간에 집중
-  // (고가품은 조회수가 나와도 제휴 링크 구매로 이어지지 않는다 - 클릭 데이터 근거)
+  // 가격 상한을 넓게 둔다: "클릭(트래픽) 유발"이 우선이라 비싸도 클릭 잘 나올
+  // 신박·가젯템이면 넣는다. 커미션은 판매가의 %라 고가 1건이 저가 여러 건보다 큼.
+  // 상한 50만원은 충동/관심 구매가 아예 안 되는 초고가(대형가전·가구)만 거른다.
   const minPrice = opts.minPrice ?? 5000;
-  const maxPrice = opts.maxPrice ?? 40000;
+  const maxPrice = opts.maxPrice ?? 500000;
 
   const errors: string[] = [];
   const known = await loadKnownProductIds();

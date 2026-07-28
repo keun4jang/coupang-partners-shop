@@ -169,7 +169,8 @@ export async function createDeeplink(coupangUrls: string[]): Promise<string[]> {
  * 방향(A안): "싸고 신기해서 바로 사게 되는" 남녀 공통 신박템.
  * - 저가 살림템(주부) + 신기/신박 아이디어 상품 + 30~40대 남자도 혹하는
  *   차량·공구·캠핑·전자가젯·자취가전 (계정을 나누지 않고 성별 중립으로 폭만 넓힘).
- * - 고가 브랜드 가전은 충동구매로 이어지지 않아 제외(가격상한 4만원 필터도 함께).
+ * - 가격 상한을 50만원으로 크게 열었다(클릭·트래픽 우선). 비싸도 클릭·조회 잘
+ *   나올 관심구매 가젯이면 넣는다 - 커미션이 판매가의 %라 고가 1건 수익이 크다.
  * 카테고리 ID(bestcategories)는 매핑이 불투명해 엉뚱한 상품이 섞이므로,
  * 주제가 명확한 키워드 검색을 쓴다. appCategory 는 이 서비스의 카테고리
  * (자막 톤/브롤/폴백문구에 쓰임)로 매핑.
@@ -189,6 +190,13 @@ export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
   { keyword: "차박 캠핑 소품", appCategory: "캠핑" },
   { keyword: "USB 가젯", appCategory: "생활템" },
   { keyword: "자취 필수템 가전", appCategory: "자취템" },
+  // 클릭·조회 잘 나오는 "관심 구매" 가젯 (가격 상한 완화로 편입 - 비싸도 클릭 우선)
+  { keyword: "미니 빔프로젝터", appCategory: "생활템" },
+  { keyword: "가성비 로봇청소기", appCategory: "청소템" },
+  { keyword: "무선 청소기 가성비", appCategory: "청소템" },
+  { keyword: "액션캠 입문용", appCategory: "생활템" },
+  { keyword: "휴대용 미니 선풍기 신상", appCategory: "생활템" },
+  { keyword: "가성비 블루투스 스피커", appCategory: "생활템" },
   // 검증된 저가 살림템 (주부 충동구매 주력)
   { keyword: "신기한 주방용품", appCategory: "주방템" },
   { keyword: "신기한 청소용품", appCategory: "청소템" },
