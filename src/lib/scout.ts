@@ -75,11 +75,13 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   const maxCandidates = opts.maxCandidates ?? 8;
   const perKeywordFetch = opts.perKeywordFetch ?? 10;
   const perKeywordTake = opts.perKeywordTake ?? 2;
-  // 가격 상한을 넓게 둔다: "클릭(트래픽) 유발"이 우선이라 비싸도 클릭 잘 나올
-  // 신박·가젯템이면 넣는다. 커미션은 판매가의 %라 고가 1건이 저가 여러 건보다 큼.
-  // 상한 50만원은 충동/관심 구매가 아예 안 되는 초고가(대형가전·가구)만 거른다.
+  // 가격 상한을 크게 연다: 목표는 "그 제품 판매"가 아니라 "클릭".
+  // 클릭 시 심기는 쿠팡 쿠키로 24시간 내 다른 구매까지 수수료가 붙으므로,
+  // 비싼 제품은 오히려 "가격 궁금해서 눌러보는" 클릭 미끼로 좋다.
+  // 상한 150만원은 클릭 잘 나올 프리미엄 가젯(고급 로봇청소기·액션캠·드론 등)까지
+  // 허용하고, 영상으로 보여주기 애매한 초대형 가전/가구만 거른다.
   const minPrice = opts.minPrice ?? 5000;
-  const maxPrice = opts.maxPrice ?? 500000;
+  const maxPrice = opts.maxPrice ?? 1_500_000;
 
   const errors: string[] = [];
   const known = await loadKnownProductIds();
