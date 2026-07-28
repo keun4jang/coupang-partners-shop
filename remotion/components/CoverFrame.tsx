@@ -1,96 +1,99 @@
 import React from "react";
 import { AbsoluteFill, Img } from "remotion";
-import { COLORS, FONT_SIZES, PALETTE, SAFE_ZONE, VIDEO } from "../config/videoConfig";
+import { COLORS, FONT_SIZES, PALETTE, VIDEO } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /**
- * 영상 맨 첫 프레임(1프레임)만 나오는 "썸네일용" 정적 화면.
- * 피드에서 손톱만 하게 보여도 읽히도록: 상단에 초대형 훅(흰 글자+검정 테두리,
- * 핵심어 노란 하이라이트 느낌의 바탕), 하단에 번호 배지. 제품 사진 꽉 채움.
+ * 영상 첫 프레임(1프레임)이자 유튜브/인스타 커스텀 썸네일용 정적 화면.
+ * "형님여기" 류 성공 채널 레이아웃을 살림템 톤으로:
+ *  - 상단: 코랄 밴드 위 2줄 초대형 헤드라인(흰 글자 + 두꺼운 브라운 테두리)
+ *  - 하단: 제품 사진을 흰 카드에 크게 (그리드에서 뭐 파는지 한눈에)
+ *  - 우상단: 작은 "오늘의 N번" 칩
  * 애니메이션 없이 처음부터 완성된 상태로 그린다(1프레임만 존재).
+ *
+ * 데드존: 인스타 프로필 그리드는 세로 9:16 커버를 위·아래로 잘라 보여주고,
+ * 재생 중엔 상·하단에 플랫폼 UI가 겹친다. 그래서 밴드·제품 카드를
+ * 세로 11%~86% 안쪽에 배치해 어느 쪽에서도 잘리지 않게 한다.
  */
 export const CoverFrame: React.FC<{
   productImageUrl: string | null;
-  displayNumber: number;
+  /** 파이프라인 호환용(현재 썸네일엔 미표시 - 번호는 영상 끝 CTA에 노출) */
+  displayNumber?: number;
   hookLine: string;
-}> = ({ productImageUrl, displayNumber, hookLine }) => {
+}> = ({ productImageUrl, hookLine }) => {
   return (
     <AbsoluteFill
       style={{
         fontFamily,
-        background: `linear-gradient(160deg, ${COLORS.cream} 0%, ${COLORS.accentSoft} 100%)`,
+        background: `linear-gradient(165deg, ${PALETTE.ivory} 0%, ${PALETTE.warmBeige} 100%)`,
       }}
     >
-      {/* 사진을 자르지 않고(contain) 그대로 보여준다 - 빈 공간은 배경색 그대로 */}
-      {productImageUrl && (
-        <Img
-          src={productImageUrl}
-          style={{ width: "100%", height: "100%", objectFit: "contain" }}
-        />
-      )}
-
-      {/* 위·아래 어두운 그라데이션 - 훅/배지가 사진 위에서도 무조건 읽히게 */}
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 34%, rgba(0,0,0,0) 66%, rgba(0,0,0,0.45) 100%)",
-        }}
-      />
-
-      {/* 초대형 훅 - 상단 안전대 바로 아래, 흰 글자 + 두꺼운 검정 테두리 */}
+      {/* 상단 헤드라인 밴드 - 코랄, 화면 폭 거의 꽉 채우고 2줄 대형 텍스트
+          (데드존 회피: 최상단 11% 아래에 배치) */}
       <div
         style={{
           position: "absolute",
-          left: "4%",
-          right: "4%",
-          top: VIDEO.height * SAFE_ZONE.top + 10,
-          textAlign: "center",
-          color: "#FFFFFF",
-          fontWeight: 900,
-          fontSize: FONT_SIZES.coverHook,
-          lineHeight: 1.18,
-          letterSpacing: "-0.02em",
-          wordBreak: "keep-all",
-          textWrap: "balance",
-          WebkitTextStroke: "10px rgba(0,0,0,0.9)",
-          paintOrder: "stroke fill",
-          textShadow: "0 8px 28px rgba(0,0,0,0.55)",
-        }}
-      >
-        {hookLine}
-      </div>
-
-      {/* 하단: 코랄 번호 배지 - 쿠폰처럼 톡 튀게 */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: VIDEO.height * SAFE_ZONE.bottom + 30,
+          top: VIDEO.height * 0.11,
+          left: VIDEO.width * 0.04,
+          width: VIDEO.width * 0.92,
+          minHeight: VIDEO.height * 0.235,
           display: "flex",
+          alignItems: "center",
           justifyContent: "center",
+          background: `linear-gradient(160deg, ${PALETTE.badgeCoral} 0%, #F26A47 100%)`,
+          borderRadius: 44,
+          border: "8px solid #FFFFFF",
+          boxShadow: "0 18px 44px rgba(63,52,44,0.32)",
+          padding: "34px 40px",
+          boxSizing: "border-box",
         }}
       >
         <div
           style={{
-            background: PALETTE.badgeCoral,
-            border: "5px solid #FFFFFF",
-            borderRadius: 999,
-            padding: "12px 40px",
-            boxShadow: "0 10px 34px rgba(0,0,0,0.4)",
-            transform: "rotate(-2deg)",
+            textAlign: "center",
+            color: "#FFFFFF",
+            fontWeight: 900,
+            fontSize: FONT_SIZES.coverHook,
+            lineHeight: 1.14,
+            letterSpacing: "-0.02em",
+            wordBreak: "keep-all",
+            textWrap: "balance",
+            WebkitTextStroke: "11px rgba(47,39,34,0.92)",
+            paintOrder: "stroke fill",
+            textShadow: "0 6px 18px rgba(0,0,0,0.35)",
           }}
         >
-          <span
-            style={{
-              color: "#FFFFFF",
-              fontWeight: 900,
-              fontSize: FONT_SIZES.coverBadge,
-            }}
-          >
-            오늘의 {displayNumber}번
-          </span>
+          {hookLine}
         </div>
+      </div>
+
+      {/* 하단 제품 사진 - 흰 카드에 크게 (데드존 회피: 아래 86% 위에서 끝나게).
+          번호는 썸네일에 넣지 않는다(레퍼런스처럼 깔끔하게 - 번호는 영상 끝 CTA에 크게 노출) */}
+      <div
+        style={{
+          position: "absolute",
+          top: VIDEO.height * 0.37,
+          left: VIDEO.width * 0.05,
+          width: VIDEO.width * 0.9,
+          height: VIDEO.height * 0.49,
+          background: "#FFFFFF",
+          borderRadius: 40,
+          border: `3px solid ${PALETTE.warmBeige}`,
+          boxShadow: "0 20px 50px rgba(63,52,44,0.22)",
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {productImageUrl ? (
+          <Img
+            src={productImageUrl}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
+        ) : (
+          <span style={{ fontSize: 220 }}>🧺</span>
+        )}
       </div>
     </AbsoluteFill>
   );

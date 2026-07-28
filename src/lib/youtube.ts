@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import fs from "fs";
+import { Readable } from "stream";
 import { optionalEnv, requireEnv } from "./env";
 
 /**
@@ -40,6 +41,9 @@ export async function uploadShortToYoutube(params: {
   title: string;
   description: string;
   tags?: string[];
+  /** 커스텀 썸네일 PNG/JPG 경로. 있으면 업로드 후 thumbnails.set 으로 지정
+   *  (Shorts 그리드에 이 이미지가 뜬다). 실패해도 영상 업로드는 유지. */
+  thumbnailPath?: string;
   /** 기본 public - 완전 자동 게시가 목표이므로 바로 공개 */
   privacyStatus?: "public" | "unlisted" | "private";
 }): Promise<YoutubeUploadResult> {
@@ -67,7 +71,78 @@ export async function uploadShortToYoutube(params: {
 
   const videoId = data.id;
   if (!videoId) throw new Error("유튜브 업로드 실패: 응답에 video id 없음");
+
+  // 커스텀 썸네일 지정 (채널 미인증/미지원 시 실패할 수 있으므로 감싸서 무시)
+  if (params.thumbnailPath && fs.existsSync(params.thumbnailPath)) {
+    try {
+      await youtube.thumbnails.set({
+        videoId,
+        media: { body: fs.createReadStream(params.thumbnailPath) },
+      });
+      console.log("유튜브 커스텀 썸네일 지정 완료");
+    } catch (e) {
+      console.warn(
+        "유튜브 썸네일 지정 실패(영상은 정상 업로드됨):",
+        (e as Error).message.slice(0, 150)
+      );
+    }
+  }
+
   return { videoId, url: `https://youtube.com/shorts/${videoId}` };
+}
+
+/**
+ * 유튜브 자동자막(ASR)을 화면에서 안 뜨게 억제한다.
+ *
+ * 원리: 유튜브는 크리에이터가 직접 올린 "표준(standard)" 자막 트랙이 있으면
+ * 자동생성(asr) 트랙 대신 그걸 우선한다. 그래서 사실상 비어 있는(공백 한 칸)
+ * 한국어 자막 트랙을 올려두면, 자동자막이 표시되지 않는다.
+ * 우리 영상은 자막을 이미 화면에 구워 넣으므로 자동자막은 중복·오역만 유발한다.
+ *
+ * captions.insert 는 400 units(무료 일일 할당량 10,000 내). youtube.force-ssl 스코프 필요.
+ * 실패해도(스코프 미부여/할당량 소진 등) 영상 게시엔 영향 없도록 감싸서 무시한다.
+ * @returns 성공 여부 (배치 재시도 판단용)
+ */
+export async function suppressAutoCaptions(videoId: string): Promise<boolean> {
+  const youtube = youtubeClient();
+  if (!youtube) return false;
+  try {
+    // 이미 표준 자막 트랙이 있으면(재실행 등) 중복 삽입하지 않는다.
+    const existing = await youtube.captions.list({ part: ["snippet"], videoId });
+    const hasStandard = existing.data.items?.some(
+      (c) => c.snippet?.trackKind !== "asr" && c.snippet?.language === "ko"
+    );
+    if (hasStandard) {
+      console.log("유튜브 표준 자막 트랙 이미 존재 - 자동자막 억제 스킵");
+      return true;
+    }
+
+    // 공백 한 칸짜리 SRT (실질적으로 안 보이지만 "표준 트랙"으로 인정됨)
+    const srt = "1\n00:00:00,000 --> 00:00:00,400\n \n";
+    await youtube.captions.insert({
+      part: ["snippet"],
+      requestBody: {
+        snippet: {
+          videoId,
+          language: "ko",
+          name: "",
+          isDraft: false,
+        },
+      },
+      media: {
+        mimeType: "application/octet-stream",
+        body: Readable.from(Buffer.from(srt, "utf8")),
+      },
+    });
+    console.log("유튜브 자동자막 억제 완료(빈 표준 자막 업로드):", videoId);
+    return true;
+  } catch (e) {
+    console.warn(
+      "유튜브 자동자막 억제 실패(영상은 정상):",
+      (e as Error).message.slice(0, 150)
+    );
+    return false;
+  }
 }
 
 /**

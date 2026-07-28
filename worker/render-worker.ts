@@ -24,6 +24,7 @@ dotenv.config();
 
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 import { bundle } from "@remotion/bundler";
 import {
   renderMedia,
@@ -40,7 +41,7 @@ import {
   driveDirectDownloadUrl,
   downloadDriveFile,
 } from "../src/lib/drive";
-import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription } from "../src/lib/youtube";
+import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription, suppressAutoCaptions } from "../src/lib/youtube";
 import {
   hasInstagramEnv,
   maybeRefreshInstagramToken,
@@ -442,7 +443,8 @@ async function publishToSns(
   product: Product,
   videoPath: string,
   driveVideoFileId: string | null,
-  captionText: string
+  captionText: string,
+  thumbnailPath?: string
 ): Promise<SnsResult> {
   // 유튜브 쇼츠
   let youtubeUrl: string | null = null;
@@ -455,9 +457,13 @@ async function publishToSns(
         title: youtubeTitle(item.display_number, shortenProductName(product.product_name)),
         description: youtubeDescription(item.display_number, shortenProductName(product.product_name)),
         tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
+        thumbnailPath,
       });
       youtubeUrl = result.url;
       console.log("유튜브 업로드 완료:", youtubeUrl);
+      // 자동자막(ASR) 억제: 빈 표준 자막 트랙을 올려 화면에 자동자막이 안 뜨게 한다.
+      // (우리 영상은 자막을 이미 구워넣으므로 자동자막은 중복·오역만 됨). 실패해도 무시.
+      await suppressAutoCaptions(result.videoId);
     } catch (e) {
       youtubeError = e instanceof Error ? e.message : String(e);
       console.error("유튜브 업로드 실패:", youtubeError);
@@ -627,7 +633,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       instagramError,
       facebookUrl,
       facebookError,
-    } = await publishToSns(item, product, videoPath, driveVideoFileId, captionText);
+    } = await publishToSns(item, product, videoPath, driveVideoFileId, captionText, thumbnailPath);
 
     // 완료 기록. 이 업데이트가 조용히 실패하면 항목이 generating 에 갇혀
     // 워커가 15분마다 같은 영상을 재렌더·재업로드하는 사고가 난다(실제 발생).
@@ -735,17 +741,34 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
     console.log("드라이브에서 영상 다운로드 중...");
     await downloadDriveFile(row.drive_video_file_id, tmpVideo);
 
+    // 썸네일: 영상 첫 프레임(=CoverFrame)을 뽑아 유튜브 커스텀 썸네일로 사용
+    const tmpThumb = path.join(RENDER_DIR, `publish-${row.display_number}.jpg`);
+    let thumbPath: string | undefined;
+    try {
+      execFileSync(
+        "ffmpeg",
+        ["-i", tmpVideo, "-frames:v", "1", "-q:v", "2", "-y", tmpThumb],
+        { stdio: "ignore", timeout: 60_000 }
+      );
+      thumbPath = tmpThumb;
+    } catch (e) {
+      console.warn("썸네일 프레임 추출 실패:", (e as Error).message.slice(0, 100));
+    }
+
     const sns = await publishToSns(
       row,
       product,
       tmpVideo,
       row.drive_video_file_id,
-      row.caption_text ?? ""
+      row.caption_text ?? "",
+      thumbPath
     );
-    try {
-      fs.unlinkSync(tmpVideo);
-    } catch {
-      // 무시
+    for (const f of [tmpVideo, tmpThumb]) {
+      try {
+        fs.unlinkSync(f);
+      } catch {
+        // 무시
+      }
     }
 
     const { error: completeError } = await db

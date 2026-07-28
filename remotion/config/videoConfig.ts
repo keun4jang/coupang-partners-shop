@@ -160,9 +160,9 @@ export const FONT_SIZES = {
   volumeBadge: 32, // 카드 상단 "19L 대용량" 배지
   numberBadge: 36, // "오늘의 살림템 28번" 배지
   subInfo: 34, // 보조 정보(대용량 등)
-  // 첫 프레임 썸네일용 - 피드에서 손톱만 하게 보여도 읽히게 아주 크게
-  coverBadge: 60,
-  coverHook: 92,
+  // 첫 프레임 썸네일용 - 피드/그리드에서 손톱만 하게 보여도 읽히게 아주 크게
+  coverBadge: 46,
+  coverHook: 104,
 } as const;
 
 /**
