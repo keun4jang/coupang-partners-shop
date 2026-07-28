@@ -73,7 +73,7 @@ function HeroCard({ item, label }: { item: VideoItemWithProduct; label: string }
           {shortDescription(item)}
         </p>
         <div className="mt-4 bg-primary hover:bg-primary-dark transition-colors text-white font-extrabold rounded-xl py-3.5 text-center text-base">
-          쿠팡에서 바로 보기 →
+          가격 보기 →
         </div>
       </div>
     </a>
