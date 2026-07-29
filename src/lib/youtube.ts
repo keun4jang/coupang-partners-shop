@@ -101,11 +101,14 @@ export async function uploadShortToYoutube(params: {
  *
  * captions.insert 는 400 units(무료 일일 할당량 10,000 내). youtube.force-ssl 스코프 필요.
  * 실패해도(스코프 미부여/할당량 소진 등) 영상 게시엔 영향 없도록 감싸서 무시한다.
- * @returns 성공 여부 (배치 재시도 판단용)
+ * @returns 수행한 동작 - "inserted"(빈 자막 업로드), "exists"(이미 표준 트랙 있어 스킵),
+ *          "failed"(오류). 백필의 할당량 계산에 쓰인다(inserted≈450, exists≈50 units).
  */
-export async function suppressAutoCaptions(videoId: string): Promise<boolean> {
+export type SuppressResult = "inserted" | "exists" | "failed";
+
+export async function suppressAutoCaptions(videoId: string): Promise<SuppressResult> {
   const youtube = youtubeClient();
-  if (!youtube) return false;
+  if (!youtube) return "failed";
   try {
     // 이미 표준 자막 트랙이 있으면(재실행 등) 중복 삽입하지 않는다.
     const existing = await youtube.captions.list({ part: ["snippet"], videoId });
@@ -114,7 +117,7 @@ export async function suppressAutoCaptions(videoId: string): Promise<boolean> {
     );
     if (hasStandard) {
       console.log("유튜브 표준 자막 트랙 이미 존재 - 자동자막 억제 스킵");
-      return true;
+      return "exists";
     }
 
     // 공백 한 칸짜리 SRT (실질적으로 안 보이지만 "표준 트랙"으로 인정됨)
@@ -135,13 +138,13 @@ export async function suppressAutoCaptions(videoId: string): Promise<boolean> {
       },
     });
     console.log("유튜브 자동자막 억제 완료(빈 표준 자막 업로드):", videoId);
-    return true;
+    return "inserted";
   } catch (e) {
     console.warn(
       "유튜브 자동자막 억제 실패(영상은 정상):",
       (e as Error).message.slice(0, 150)
     );
-    return false;
+    return "failed";
   }
 }
 

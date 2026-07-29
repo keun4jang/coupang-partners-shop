@@ -16,6 +16,7 @@
     "worker": "tsx worker/render-worker.ts",
     "worker:once": "tsx worker/render-worker.ts --once",
     "scout": "tsx worker/scout-runner.ts",
+    "yt:backfill-captions": "tsx scripts/yt-caption-backfill.ts",
     "remotion:studio": "remotion studio",
     "remotion:render": "remotion render TemplateA renders/sample.mp4"
   },

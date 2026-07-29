@@ -1,0 +1,76 @@
+# 기존 유튜브 영상 자동자막(ASR) 억제 백필 (무료 경로 전용).
+#
+# 새로 올라가는 영상은 렌더 워커가 업로드 직후 자동 억제한다.
+# 이 워크플로는 그 전에 올라간 기존 영상들을 "무료 할당량 안에서" 마저 처리한다.
+#   - 퍼블릭 저장소라 GitHub Actions 무료
+#   - 유튜브 captions.insert 400 units/개, 무료 일일 할당량 10,000 내에서만 사용
+#   - 유료 할당량 증설은 절대 하지 않는다
+#
+# 한 번에 기본 5,000 units(약 11개)만 쓰고 멈춘다(매일 자동게시 몫을 남겨둠).
+# 남은 영상은 다음날(할당량 리셋 후) 다시 돌리면 이어서 처리한다(app_settings 로 멱등).
+#
+# 실행: 수동(Actions 탭 → yt-caption-backfill → Run workflow) 또는 예약 트리거가 dispatch.
+
+name: yt-caption-backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: "이번 실행에서 쓸 최대 유튜브 할당량(units). 기본 5000"
+        required: false
+        default: "5000"
+
+# 유튜브 할당량 보호를 위해 동시 실행 금지
+concurrency:
+  group: yt-caption-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 워커 환경변수 확인
+        id: check
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then
+            echo "WORKER_ENV 시크릿이 없어 백필을 건너뜁니다."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - name: node_modules 캐시
+        if: steps.check.outputs.ready == 'true'
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true' && steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: 기존 영상 자동자막 억제 백필
+        if: steps.check.outputs.ready == 'true'
+        env:
+          YT_BACKFILL_BUDGET: ${{ github.event.inputs.budget || '5000' }}
+        run: npm run yt:backfill-captions
