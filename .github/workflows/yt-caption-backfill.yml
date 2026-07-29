@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       budget:
-        description: "이번 실행에서 쓸 최대 유튜브 할당량(units). 기본 5000"
+        description: "이번 실행에서 쓸 최대 유튜브 할당량(units). 기본 3000 (하루 게시 3개 몫 우선 확보)"
         required: false
-        default: "5000"
+        default: "3000"
 
 # 유튜브 할당량 보호를 위해 동시 실행 금지
 concurrency:
@@ -72,5 +72,5 @@ jobs:
       - name: 기존 영상 자동자막 억제 백필
         if: steps.check.outputs.ready == 'true'
         env:
-          YT_BACKFILL_BUDGET: ${{ github.event.inputs.budget || '5000' }}
+          YT_BACKFILL_BUDGET: ${{ github.event.inputs.budget || '3000' }}
         run: npm run yt:backfill-captions

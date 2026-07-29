@@ -10,8 +10,9 @@
  *  - 유튜브 captions.insert 는 400 units/개 (무료 일일 할당량 10,000 내)
  *  - 유료 할당량 증설은 절대 요청하지 않는다.
  *
- * 할당량 보호: 매일 자동게시(영상 업로드 1,600×2 + 썸네일·자막억제)가 약 4,000 units 를
- * 쓰므로, 이 백필은 기본 5,000 units 만 쓰고 멈춘다(YT_BACKFILL_BUDGET 로 조정).
+ * 할당량 보호: 매일 자동게시 3개(영상 1,600 + 썸네일 50 + 자막억제 450 ≈ 2,100/개, 총 ≈6,300)를
+ * 먼저 보장하고, 이 백필은 남는 여유분인 기본 3,000 units 만 쓰고 멈춘다(YT_BACKFILL_BUDGET 로 조정).
+ * 6,300 + 3,000 = 9,300 < 무료 일일한도 10,000 → 게시가 항상 우선, 비용 0.
  * 남은 영상은 다음 실행(=다음날 할당량 리셋 후)에 마저 처리한다.
  *
  * 진행상태: app_settings.yt_caption_suppressed 에 처리 완료한 display_number 를
@@ -28,7 +29,9 @@ import { getSetting, setSetting } from "../src/lib/settings";
 import { suppressAutoCaptions, hasYoutubeEnv } from "../src/lib/youtube";
 
 const DONE_KEY = "yt_caption_suppressed";
-const BUDGET = Number(process.env.YT_BACKFILL_BUDGET ?? 5000);
+// 하루 자동게시 3개(≈6,300 units)를 먼저 보장하고 남는 여유분만 백필에 쓴다.
+// 6,300 + 3,000 = 9,300 < 무료 일일한도 10,000 (게시가 항상 우선).
+const BUDGET = Number(process.env.YT_BACKFILL_BUDGET ?? 3000);
 // 비용(units): 새로 삽입 = list(50)+insert(400)=450, 이미 있어 스킵 = list(50)만
 const COST_INSERT = 450;
 const COST_EXISTS = 50;

@@ -859,7 +859,7 @@ function todaysUploadSlots(schedule: string, now: Date): Date[] {
 }
 
 /** 슬롯 스케줄 미설정 시 기본값 (KST) - 예약 발행이 항상 동작하도록 */
-const DEFAULT_UPLOAD_SCHEDULE = "11:30,19:30";
+const DEFAULT_UPLOAD_SCHEDULE = "09:00,13:00,19:30";
 
 /** 업로드 슬롯 스케줄: 환경변수 → app_settings → 기본값 순 (빈 문자열 = 게이트 없음) */
 async function uploadSchedule(): Promise<string> {
