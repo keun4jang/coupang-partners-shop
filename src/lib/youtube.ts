@@ -134,9 +134,10 @@ export async function uploadShortToYoutube(params: {
  * captions.insert 는 400 units(무료 일일 할당량 10,000 내). youtube.force-ssl 스코프 필요.
  * 실패해도(스코프 미부여/할당량 소진 등) 영상 게시엔 영향 없도록 감싸서 무시한다.
  * @returns 수행한 동작 - "inserted"(빈 자막 업로드), "exists"(이미 표준 트랙 있어 스킵),
- *          "failed"(오류). 백필의 할당량 계산에 쓰인다(inserted≈450, exists≈50 units).
+ *          "notFound"(영상이 삭제/비공개라 영영 처리 불가), "failed"(일시 오류).
+ *          백필의 할당량 계산에 쓰인다(inserted≈450, exists/notFound≈50 units).
  */
-export type SuppressResult = "inserted" | "exists" | "failed";
+export type SuppressResult = "inserted" | "exists" | "notFound" | "failed";
 
 export async function suppressAutoCaptions(videoId: string): Promise<SuppressResult> {
   const youtube = youtubeClient();
@@ -172,10 +173,16 @@ export async function suppressAutoCaptions(videoId: string): Promise<SuppressRes
     console.log("유튜브 자동자막 억제 완료(빈 표준 자막 업로드):", videoId);
     return "inserted";
   } catch (e) {
-    console.warn(
-      "유튜브 자동자막 억제 실패(영상은 정상):",
-      (e as Error).message.slice(0, 150)
-    );
+    // 삭제/비공개 영상은 재시도해도 영영 안 되므로 구분해서 알린다 (백필이 완료 처리).
+    const err = e as Error & { errors?: Array<{ reason?: string }> };
+    const notFound =
+      err.errors?.some((it) => it.reason === "videoNotFound") ||
+      /could not be found/i.test(err.message);
+    if (notFound) {
+      console.warn("유튜브 영상 없음(삭제/비공개 추정) - 자동자막 억제 불가:", videoId);
+      return "notFound";
+    }
+    console.warn("유튜브 자동자막 억제 실패(영상은 정상):", err.message.slice(0, 150));
     return "failed";
   }
 }

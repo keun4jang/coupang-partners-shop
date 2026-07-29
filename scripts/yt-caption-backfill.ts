@@ -106,7 +106,14 @@ async function main() {
     }
 
     const result = await suppressAutoCaptions(videoId);
-    if (result === "inserted" || result === "exists") {
+    if (result === "notFound") {
+      // 삭제/비공개 영상은 재시도해도 영영 안 됨 → 완료로 기록해 매 실행 낭비를 막는다.
+      done.add(String(v.display_number));
+      await setSetting(DONE_KEY, Array.from(done).join(","));
+      spent += COST_EXISTS; // captions.list 호출 비용만 듦
+      consecutiveFail = 0;
+      console.warn(`🗑 ${v.display_number}번 영상 없음(삭제/비공개) - 완료로 기록`);
+    } else if (result === "inserted" || result === "exists") {
       done.add(String(v.display_number));
       await setSetting(DONE_KEY, Array.from(done).join(",")); // 진행 즉시 저장(중단 대비)
       spent += result === "inserted" ? COST_INSERT : COST_EXISTS;
