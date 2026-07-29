@@ -26,7 +26,11 @@ dotenv.config();
 
 import { supabaseAdmin } from "../src/lib/supabase";
 import { getSetting, setSetting } from "../src/lib/settings";
-import { suppressAutoCaptions, hasYoutubeEnv } from "../src/lib/youtube";
+import {
+  suppressAutoCaptions,
+  hasYoutubeEnv,
+  loadYoutubeCredsFromSettings,
+} from "../src/lib/youtube";
 
 const DONE_KEY = "yt_caption_suppressed";
 // 하루 자동게시 3개(≈6,300 units)를 먼저 보장하고 남는 여유분만 백필에 쓴다.
@@ -49,6 +53,8 @@ function extractVideoId(url: string): string | null {
 }
 
 async function main() {
+  // app_settings 의 force-ssl 토큰 우선 (Actions WORKER_ENV 구토큰엔 captions 스코프 없음)
+  await loadYoutubeCredsFromSettings();
   if (!hasYoutubeEnv()) {
     console.error("유튜브 환경변수 미설정 - 백필 중단");
     process.exit(1);

@@ -41,7 +41,7 @@ import {
   driveDirectDownloadUrl,
   downloadDriveFile,
 } from "../src/lib/drive";
-import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription, suppressAutoCaptions } from "../src/lib/youtube";
+import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import {
   hasInstagramEnv,
   maybeRefreshInstagramToken,
@@ -1094,6 +1094,10 @@ async function main(): Promise<void> {
 
   const once = process.argv.includes("--once");
   console.log(`렌더 워커 시작 (${once ? "1회 실행" : `${POLL_INTERVAL_MS / 1000}초 간격 감시`})`);
+
+  // 유튜브 자격증명: app_settings 에 force-ssl 토큰이 있으면 우선 사용
+  // (GitHub Actions WORKER_ENV 의 구토큰은 captions/thumbnails 스코프가 없음)
+  await loadYoutubeCredsFromSettings();
 
   if (once) {
     const n = await processPending();

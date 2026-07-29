@@ -31,6 +31,38 @@ export function hasYoutubeEnv(): boolean {
   );
 }
 
+/**
+ * app_settings 에 저장된 유튜브 OAuth 자격증명이 있으면 process.env 를 덮어쓴다.
+ *
+ * 왜: GitHub Actions 의 WORKER_ENV 시크릿에 든 리프레시 토큰이 업로드 스코프만 있고
+ * captions/thumbnails 에 필요한 youtube.force-ssl 스코프가 없다("insufficient
+ * authentication scopes"). 시크릿은 API 로 갱신할 수 없어, 올바른(force-ssl) 토큰을
+ * DB(app_settings)에 두고 워커/백필이 시작 시 이걸 우선하게 한다.
+ * (인스타 토큰을 app_settings 로 관리하는 기존 패턴과 동일)
+ *
+ * 세 값(YOUTUBE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN)이 모두 있을 때만 덮어쓴다
+ * (리프레시 토큰은 발급한 클라이언트에 묶이므로 쌍으로만 유효).
+ * 이후 WORKER_ENV 시크릿을 force-ssl 토큰으로 갱신하면 이 키들은 지워도 된다.
+ */
+export async function loadYoutubeCredsFromSettings(): Promise<void> {
+  try {
+    const { getSetting } = await import("./settings");
+    const [id, secret, token] = await Promise.all([
+      getSetting("YOUTUBE_OAUTH_CLIENT_ID"),
+      getSetting("YOUTUBE_OAUTH_CLIENT_SECRET"),
+      getSetting("YOUTUBE_OAUTH_REFRESH_TOKEN"),
+    ]);
+    if (id && secret && token) {
+      process.env.YOUTUBE_OAUTH_CLIENT_ID = id;
+      process.env.YOUTUBE_OAUTH_CLIENT_SECRET = secret;
+      process.env.YOUTUBE_OAUTH_REFRESH_TOKEN = token;
+      console.log("유튜브 자격증명: app_settings 값 사용(force-ssl 토큰)");
+    }
+  } catch (e) {
+    console.warn("유튜브 자격증명 설정 조회 실패(env 값 유지):", (e as Error).message);
+  }
+}
+
 export interface YoutubeUploadResult {
   videoId: string;
   url: string;
