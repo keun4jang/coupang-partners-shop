@@ -829,12 +829,16 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
 }
 
 /* ── 업로드 슬롯 게이트: 하루 3개를 아침/점심/저녁에 나눠 올리기 ──────────
- * UPLOAD_SCHEDULE 환경변수("08:40,13:00,19:00" - KST 기준)가 있으면
- * 각 슬롯에 날짜별 랜덤 지터(±30분)를 더한 "오늘의 업로드 시각"을 계산하고,
- * (지금까지 지난 슬롯 수 - 오늘 이미 완료된 영상 수)개만 처리한다.
- * 지터는 날짜+슬롯 번호에서 결정되는 의사난수라 15분마다 깨어나는 워커가
- * 매번 같은 값을 얻는다(별도 상태 저장 불필요). 매일 시각이 조금씩 달라져
- * "봇처럼 정각에 몰아 올리는" 패턴을 피한다. 미설정 시 기존처럼 즉시 전부 처리.
+ * UPLOAD_SCHEDULE(KST 기준)는 두 가지 표기를 지원한다:
+ *   - 범위    "08:00-11:00,12:30-15:30,18:30-21:30"  → 그날의 시각을 각 범위 안에서
+ *             랜덤 선택 (매일 크게 달라짐 - 정각에 몰아 올리는 봇 패턴 회피)
+ *   - 고정    "09:00,13:00,19:30"                     → ±30분 지터만 (구버전 호환)
+ * "오늘의 업로드 시각"을 계산하고 (지금까지 지난 슬롯 수 - 오늘 이미 완료된 영상 수)
+ * 개만 처리한다. 시각은 날짜+슬롯 번호에서 결정되는 의사난수라 15분마다 깨어나는
+ * 워커가 매번 같은 값을 얻는다(별도 상태 저장 불필요). 미설정 시 즉시 전부 처리.
+ *
+ * 주의(무료 할당량): 범위는 각 창(morning/afternoon/evening)이 07:00 UTC(할당량
+ * 리셋 경계)를 넘지 않게 잡는다 → 한 할당량-일에 게시 3개만 들어가 백필과 안 겹침.
  */
 const KST_OFFSET_MS = 9 * 3600_000;
 const SLOT_JITTER_MINUTES = 30;
@@ -845,21 +849,39 @@ function todaysUploadSlots(schedule: string, now: Date): Date[] {
   const m = kstNow.getUTCMonth();
   const d = kstNow.getUTCDate();
   const dayNum = y * 10000 + (m + 1) * 100 + d;
+  const parseHm = (s: string): number => {
+    const [hh, mm = 0] = s.trim().split(":").map(Number);
+    return hh * 60 + mm;
+  };
   return schedule
     .split(",")
     .map((raw, i) => {
-      const [hh, mm = 0] = raw.trim().split(":").map(Number);
-      // 날짜·슬롯별 고정 지터: -30 ~ +30분
-      const jitter =
-        ((dayNum * 7919 + (i + 1) * 104729) % (SLOT_JITTER_MINUTES * 2 + 1)) -
-        SLOT_JITTER_MINUTES;
-      return new Date(Date.UTC(y, m, d, hh, mm + jitter) - KST_OFFSET_MS);
+      const seg = raw.trim();
+      // 날짜·슬롯별 고정 의사난수 - 워커가 매번 같은 값을 얻도록 결정적
+      const seed = (dayNum * 7919 + (i + 1) * 104729) >>> 0;
+      let totalMin: number;
+      if (seg.includes("-")) {
+        // 범위: 그날 시각을 [start, end] 안에서 결정적 랜덤 선택
+        const [a, b] = seg.split("-");
+        const startMin = parseHm(a);
+        const endMin = parseHm(b);
+        const span = Math.max(0, endMin - startMin);
+        const rand01 = (seed % 10007) / 10007;
+        totalMin = startMin + Math.round(rand01 * span);
+      } else {
+        // 고정 + ±30분 지터
+        const jitter = (seed % (SLOT_JITTER_MINUTES * 2 + 1)) - SLOT_JITTER_MINUTES;
+        totalMin = parseHm(seg) + jitter;
+      }
+      return new Date(
+        Date.UTC(y, m, d, Math.floor(totalMin / 60), totalMin % 60) - KST_OFFSET_MS
+      );
     })
     .sort((a, b) => a.getTime() - b.getTime());
 }
 
 /** 슬롯 스케줄 미설정 시 기본값 (KST) - 예약 발행이 항상 동작하도록 */
-const DEFAULT_UPLOAD_SCHEDULE = "09:00,13:00,19:30";
+const DEFAULT_UPLOAD_SCHEDULE = "08:00-11:00,12:30-15:30,18:30-21:30";
 
 /** 업로드 슬롯 스케줄: 환경변수 → app_settings → 기본값 순 (빈 문자열 = 게이트 없음) */
 async function uploadSchedule(): Promise<string> {
