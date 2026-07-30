@@ -46,12 +46,16 @@ export function hasYoutubeEnv(): boolean {
  */
 export async function loadYoutubeCredsFromSettings(): Promise<void> {
   try {
-    const { getSetting } = await import("./settings");
-    const [id, secret, token] = await Promise.all([
-      getSetting("YOUTUBE_OAUTH_CLIENT_ID"),
-      getSetting("YOUTUBE_OAUTH_CLIENT_SECRET"),
-      getSetting("YOUTUBE_OAUTH_REFRESH_TOKEN"),
+    const { getSettings } = await import("./settings");
+    // 일괄 조회 + 재시도: 키 하나만 일시 오류로 빠져도 전체 덮어쓰기가 무효가 되므로
+    const s = await getSettings([
+      "YOUTUBE_OAUTH_CLIENT_ID",
+      "YOUTUBE_OAUTH_CLIENT_SECRET",
+      "YOUTUBE_OAUTH_REFRESH_TOKEN",
     ]);
+    const id = s.YOUTUBE_OAUTH_CLIENT_ID;
+    const secret = s.YOUTUBE_OAUTH_CLIENT_SECRET;
+    const token = s.YOUTUBE_OAUTH_REFRESH_TOKEN;
     if (id && secret && token) {
       process.env.YOUTUBE_OAUTH_CLIENT_ID = id;
       process.env.YOUTUBE_OAUTH_CLIENT_SECRET = secret;

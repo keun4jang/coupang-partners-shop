@@ -65,7 +65,7 @@ import {
   segmentsFromFootage,
   sourceProductClips,
 } from "../src/lib/videoSource";
-import { maybeRefreshAliToken } from "../src/lib/aliexpress";
+import { maybeRefreshAliToken, loadAliexpressCredsFromSettings } from "../src/lib/aliexpress";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
@@ -1098,6 +1098,9 @@ async function main(): Promise<void> {
   // 유튜브 자격증명: app_settings 에 force-ssl 토큰이 있으면 우선 사용
   // (GitHub Actions WORKER_ENV 의 구토큰은 captions/thumbnails 스코프가 없음)
   await loadYoutubeCredsFromSettings();
+  // 알리 앱 키: WORKER_ENV(구 스냅샷)에 없으면 app_settings 에서 로드
+  // (없으면 알리 소싱이 조용히 스킵돼 스톡 폴백만 쓰게 됨)
+  await loadAliexpressCredsFromSettings();
 
   if (once) {
     const n = await processPending();

@@ -34,6 +34,30 @@ export function hasAliexpressEnv(): boolean {
   );
 }
 
+/**
+ * app_settings 에 저장된 알리 앱 키가 있으면 process.env 를 채운다.
+ *
+ * 왜: GitHub Actions 의 WORKER_ENV 시크릿이 알리 연동 이전의 스냅샷이라
+ * ALIEXPRESS_* 가 없고, 그 탓에 운영에서 알리 소싱이 통째로 스킵돼 왔다
+ * (소싱은 조용히 폴백하는 설계라 눈에 안 띄었음). 시크릿은 API 로 갱신할 수
+ * 없으므로 유튜브 자격증명과 동일하게 DB(app_settings) 값을 로드한다.
+ * env 에 이미 있으면(로컬 등) 그대로 둔다.
+ */
+export async function loadAliexpressCredsFromSettings(): Promise<void> {
+  if (hasAliexpressEnv()) return;
+  try {
+    const { getSettings } = await import("./settings");
+    const s = await getSettings(["ALIEXPRESS_APP_KEY", "ALIEXPRESS_APP_SECRET"]);
+    if (s.ALIEXPRESS_APP_KEY && s.ALIEXPRESS_APP_SECRET) {
+      process.env.ALIEXPRESS_APP_KEY = s.ALIEXPRESS_APP_KEY;
+      process.env.ALIEXPRESS_APP_SECRET = s.ALIEXPRESS_APP_SECRET;
+      console.log("알리 앱 키: app_settings 값 사용");
+    }
+  } catch (e) {
+    console.warn("알리 앱 키 설정 조회 실패(env 값 유지):", (e as Error).message);
+  }
+}
+
 /* ── 서명 ─────────────────────────────────────────────────────────── */
 
 /** TOP(/sync) 서명: 정렬된 key+value 연결 → HMAC-SHA256 → 대문자 hex */
