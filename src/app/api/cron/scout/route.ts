@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** 하루에 자동으로 만들 영상 개수 (신생 계정 안전선: 2개. 자리잡으면 상향) */
-const DAILY_VIDEO_TARGET = 2;
+/** 하루에 자동으로 만들 영상 개수 (인스타 복구 2주 경과·계정 정상 확인 후 3개로 램프업.
+ *  유튜브 무료 할당량 설계상 3개 ≈ 6,300 units + 백필 3,000 = 9,300 < 10,000) */
+const DAILY_VIDEO_TARGET = 3;
 
 /**
  * 매일 아침 자동 파이프라인 (Vercel Cron).
