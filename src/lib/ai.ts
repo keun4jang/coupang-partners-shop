@@ -51,6 +51,47 @@ function sanitizeCopy(copy: VideoCopy): VideoCopy {
   };
 }
 
+/**
+ * 약한 훅 판정 (프롬프트로 금지해도 AI가 반복해서 흘러가는 패턴을 코드로 막는다).
+ *
+ * 실제 발행분 #1~59 를 세어보니 절반이 "~라면 / ~분들 / ~시죠?" 류의 순한 호명·동의구걸
+ * 형태였다. 이런 훅은 궁금증을 만들지 않아 스크롤을 못 멈춘다.
+ * 여기서 걸리면 교정 지시를 붙여 1회 재생성한다(generateVideoCopy).
+ *
+ * 주의: 패턴 ④ 손해 지목("아직도 맨손으로 건지세요?")은 강한 훅이라 통과시켜야 한다.
+ * "아직도"가 있으면 ④로 보고 약함 판정에서 제외한다.
+ */
+const WEAK_HOOK_PATTERNS: RegExp[] = [
+  // 순한 호명: "~하는 집이라면", "~담고 싶다면"
+  /(이?라면|다면)\s*[?!.]?$/,
+  // 대상 호명이 문장 중간에 있어도 호명형: "아기 키우는 집이라면 공감할 거예요"
+  /(집|분|분들|엄마|아빠|주부|가정)(이?라면|이면)/,
+  // 대상 호명으로 끝남: "~분?", "~분들 계시죠?", "~주부님들", "~엄마들", "~집 손?"
+  /(분|분들|주부님들?|엄마들?|아빠들?|집)\s*(손)?\s*[?!.]?$/,
+  // 동의 구걸형 물음: "~시죠?", "~셨죠?", "~시나요?", "~계시죠?"
+  /(시죠|셨죠|시나요|셨나요|계시죠|계세요|계신가요|이시죠)\s*[?!.]?$/,
+  // 동의 구걸 종결: "~아쉽죠", "~일이죠?" / 순한 확인형: "~엉망인가요?"
+  /죠\s*[?!.]?$/,
+  /(인가요|은가요|나요)\s*[?!.]?$/,
+  // 호명 상투어
+  /주목\s*(요)?\s*[?!.]?$/,
+  // 상황 서술로 끝나 질문이 없음: "새벽에 애 우유 탈 때", "~지칠 때"
+  /\s때\s*[?!.]?$/,
+  // 밋밋한 평서 종결: "~자주 떨어진다" (궁금증 없이 상황만 진술)
+  /(는다|한다|진다|린다|았다|었다|이다)\s*[.]?$/,
+  // 문장이 안 끝나고 이어짐: "~하고", "~시키느라", "~주걱," → 훅 한 줄로 성립 안 됨
+  /(고|서|며|면서|는데|느라)\s*,?$/,
+  /,$/,
+];
+
+export function isWeakHook(hook: string): boolean {
+  const h = hook.trim();
+  if (!h) return true;
+  // 패턴 ④(손해 지목)은 "아직도"로 시작하는 강한 훅 - 예외 처리
+  if (h.includes("아직도")) return false;
+  return WEAK_HOOK_PATTERNS.some((re) => re.test(h));
+}
+
 function containsBannedPhrase(copy: VideoCopy): boolean {
   const all = [
     copy.hookText,
@@ -119,14 +160,10 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   const features = extractFeatureLines(product.product_name, 2);
   const spec = specLine(product.product_name, product.price_text);
 
-  // 후킹: 타겟이 명시돼 있으면 호명, 아니면 pain, 아니면 변형 후킹
-  const target = product.target_user?.trim();
+  // 후킹: pain 이 그 자체로 강한 훅이면 쓰고, 아니면 검증된 카테고리 프리셋 훅.
+  // (예전엔 타겟을 "~이라면 주목"으로 호명했지만 순한 호명형은 스크롤을 못 멈춰 폐기)
   const hookText =
-    target && target.length <= 14
-      ? `${target.replace(/[을를이가은는]$/, "")}이라면 주목`
-      : pain && pain.length <= 28
-        ? pain
-        : pick(v.hooks, seed);
+    pain && pain.length <= 28 && !isWeakHook(pain) ? pain : pick(v.hooks, seed);
 
   // 장점1: 상품명 특징 1순위 → main_benefit → 카테고리 폴백
   const benefit1 =
@@ -242,8 +279,17 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
       특정 브랜드·타사 제품 비방 금지.
    ⑥ 가격 반전: 제공된 가격대가 실제 값이고 놀랄 만큼 착하면(대략 2만원 이하) 그 값 그대로 —
       예) "이게 9,900원이라고?". 제공된 가격대 외의 숫자·가격 창작은 절대 금지.
-   훅 금지: 순한 호명형("~라면 주목"), "실화?" 같은 1020 슬랭, 상품 정보에 없는 숫자·가격.
+   훅 금지(매우 중요 - 실제로 가장 많이 어기는 지점이다):
+     아래 종결·형태는 전부 탈락이다. 대상을 부르거나 상황에 공감만 하면 궁금증이 안 생긴다.
+     ✗ "~라면" / "~다면"        예) "아기 키우는 집이라면", "담고 싶다면"
+     ✗ "~분들" / "~분?" / "~주부님들" / "~엄마들"   예) "매일 세 끼 차리는 주부님들"
+     ✗ "~시죠?" / "~셨죠?" / "~죠" / "~인가요?"     예) "바닥 닦는 거 정말 일이죠?"
+     ✗ "~할 때"로 끝내기        예) "새벽에 애 우유 탈 때"
+     ✗ 평서형 "~한다/~진다"     예) "차 안에 과자 부스러기가 자주 떨어진다"
+     ✗ "~주목", "실화?" 같은 슬랭, 상품 정보에 없는 숫자·가격
+     위 형태가 하나라도 걸리면 시스템이 자동으로 탈락시키고 재작성을 요구한다.
    자가 검증: 훅만 읽고 장면과 정답이 다 그려지면 탈락, 다시 쓴다.
+   자가 검증2: 훅이 위 ✗ 목록의 종결로 끝나는지 쓰고 나서 반드시 다시 확인한다.
    훅에서 던진 질문·반전의 답은 benefit1~usageTip 에서 반드시 회수한다(낚시로 끝나면 실패).
 2. empathyLine: 그 타겟이 겪는 "문제"를 공감하며 짚어준다. 훅의 궁금증을 이어받아 증폭.
 3. benefit1: 제품이 그 문제를 어떻게 덜어주는지 핵심 장점을 소개한다.
@@ -305,6 +351,44 @@ const GEMINI_COPY_SCHEMA = {
   ],
 };
 
+/**
+ * 이번 영상에 권장할 훅 패턴을 번호로 회전시킨다.
+ * AI 는 이전 영상을 기억하지 못해 한 패턴(특히 가격 반전)으로 쏠리는데,
+ * 번호 기반 회전이면 연속 게시분이 서로 다른 패턴이 되고 재렌더에도 결과가 같다.
+ */
+const HOOK_PATTERN_HINTS = [
+  "① 지칭 은폐+의문형 (상품명 대신 '이걸/이것')",
+  "② 상식 반전 ('~라고?', '~가 이 크기?')",
+  "③ 결과 예고 ('~하면 사라지는 것', '~된 이유')",
+  "④ 손해 지목 ('아직도 ~하세요?')",
+  "⑤ 구식 부정 ('○○ 버리세요' - 구식 방식·범용 카테고리만)",
+  "⑥ 가격 반전 ('이게 ○○원이라고?')",
+];
+
+/** price_text 에서 원 단위 숫자 추출 (가격 반전 훅 가능 여부 판단용) */
+function parsePriceWon(priceText?: string | null): number | null {
+  if (!priceText) return null;
+  const digits = priceText.replace(/[^0-9]/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function hookPatternHint(displayNumber: number, priceText?: string | null): string {
+  const price = parsePriceWon(priceText);
+  const cheapEnough = price !== null && price <= 20000;
+  let idx = displayNumber % HOOK_PATTERN_HINTS.length;
+  // 가격 반전은 실제로 놀랄 만한 값일 때만 - 아니면 다음 패턴으로 넘긴다
+  if (idx === 5 && !cheapEnough) idx = displayNumber % 5;
+  return [
+    `이번 영상 권장 훅 패턴: ${HOOK_PATTERN_HINTS[idx]}`,
+    "그 패턴이 이 상품에 도저히 안 맞으면 다른 패턴을 써도 되지만, 금지 종결(~라면/~분들/~시죠?/~할 때/평서형)은 어느 경우에도 불가.",
+    cheapEnough
+      ? "가격 반전을 쓸 경우 값은 제공된 가격대 그대로만 쓴다(창작 금지)."
+      : "이 상품은 가격 반전 훅(⑥) 대상이 아니다 - 가격을 훅에 쓰지 마라.",
+  ].join("\n");
+}
+
 /** 상품 정보 → AI에게 넘길 사용자 프롬프트 (제공사 공통) */
 function buildUserPrompt(
   product: Product,
@@ -333,7 +417,19 @@ function buildUserPrompt(
     "보는 사람이 '아, 이래서 좋은 거구나' 하고 제품을 이해하게 제품 설명을 충분히 넣어라.",
     "hookText 는 매번 새롭고 다르게, 뻔한 첫 문장(예: '이거 하나면')은 피해라.",
     "hookText 는 18자 이내로 짧게 - 썸네일에 초대형으로 박힌다.",
-    "가격대가 실제 값이고 2만원 이하면 훅 패턴 ⑥(가격 반전)도 유력 후보다. 값은 제공된 그대로만.",
+    hookPatternHint(displayNumber, product.price_text),
+  ].join("\n");
+}
+
+/** 약한 훅이 나왔을 때 재생성에 붙이는 교정 지시 */
+function weakHookRetryNote(rejected: string): string {
+  return [
+    `[재작성 요청] 방금 만든 훅 "${rejected}" 는 탈락이다.`,
+    "탈락 사유: 대상을 부르거나 상황에 공감만 해서 궁금증이 생기지 않는다.",
+    "다음을 모두 지켜 hookText 만 완전히 새로 써라(나머지 필드도 그에 맞게 다시).",
+    "- 금지 종결: ~라면 / ~다면 / ~분들 / ~주부님들 / ~엄마들 / ~시죠? / ~셨죠? / ~죠 / ~인가요? / ~할 때 / ~주목 / 평서형 '~한다'",
+    "- 반드시 훅 패턴 ①~⑥ 중 하나를 골라 그 형태로 쓴다(지칭 은폐·상식 반전·결과 예고·손해 지목·구식 부정·가격 반전).",
+    "- 훅만 읽었을 때 '그래서 뭔데?'가 나와야 한다. 정답이 훅에 다 드러나면 실패다.",
   ].join("\n");
 }
 
@@ -484,14 +580,46 @@ export async function generateVideoCopy(
   }
 
   const userPrompt = buildUserPrompt(product, displayNumber, templateType);
+  const run = (prompt: string) =>
+    geminiKey
+      ? generateWithGemini(geminiKey, prompt)
+      : generateWithAnthropic(anthropicKey as string, prompt);
+
   try {
-    const raw = geminiKey
-      ? await generateWithGemini(geminiKey, userPrompt)
-      : await generateWithAnthropic(anthropicKey as string, userPrompt);
+    const raw = await run(userPrompt);
     if (!raw) return fallbackCopy(product, displayNumber);
-    const copy = sanitizeCopy(raw);
+    let copy = sanitizeCopy(raw);
     if (containsBannedPhrase(copy)) {
       return fallbackCopy(product, displayNumber);
+    }
+
+    // 훅이 약하면(순한 호명·동의구걸 등) 교정 지시를 붙여 1회만 재생성한다.
+    // 무료 등급이라 비용은 0원이고, 실패해도 아래에서 강한 프리셋 훅으로 대체된다.
+    if (isWeakHook(copy.hookText)) {
+      console.warn(`약한 훅 감지 - 재생성 시도: "${copy.hookText}"`);
+      try {
+        const retryRaw = await run(
+          `${userPrompt}\n\n${weakHookRetryNote(copy.hookText)}`
+        );
+        if (retryRaw) {
+          const retryCopy = sanitizeCopy(retryRaw);
+          if (!containsBannedPhrase(retryCopy) && !isWeakHook(retryCopy.hookText)) {
+            console.log(`훅 재생성 성공: "${retryCopy.hookText}"`);
+            copy = retryCopy;
+          }
+        }
+      } catch (e) {
+        console.warn("훅 재생성 실패(원본 유지):", (e as Error).message.slice(0, 150));
+      }
+    }
+
+    // 재생성까지 실패하면 훅만 카테고리 프리셋(검증된 강한 훅)으로 바꾼다.
+    // 나머지 문구는 상품 설명이 담긴 AI 생성분을 그대로 살린다.
+    if (isWeakHook(copy.hookText)) {
+      const v = CATEGORY_VARIANTS[product.category] ?? CATEGORY_VARIANTS["생활템"];
+      const preset = pick(v.hooks, displayNumber + nameHash(product.product_name));
+      console.warn(`훅 재생성 실패 - 프리셋 훅으로 대체: "${preset}"`);
+      copy = { ...copy, hookText: preset };
     }
     return copy;
   } catch (error) {
