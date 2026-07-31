@@ -151,10 +151,11 @@ export const ProductOverlay: React.FC<{
         {productName}
       </div>
 
-      {/* 번호 배지 - 쿠폰/랭킹 느낌 */}
+      {/* 번호 배지 - 마지막 CTA 전에 이탈하는 시청자도 클릭 경로를 보도록
+          장점~후기 구간 내내 "어디서 사는지"를 함께 노출한다 */}
       <div style={{ textAlign: "center", marginTop: 14 }}>
         <Badge
-          label={`오늘의 살림템 ${displayNumber}번`}
+          label={`프로필 링크 → ${displayNumber}번`}
           bg={PALETTE.badgeCoral}
           color="#FFFFFF"
           fontSize={FONT_SIZES.numberBadge}

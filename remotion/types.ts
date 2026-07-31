@@ -61,7 +61,7 @@ export const defaultShortsProps: ShortsProps = {
   benefit2: "작아서 신랑도 부담 없이 쓸 것 같고요",
   usageTip: "시트 틈새랑 컵홀더까지 구석구석 밀어주면 돼요",
   reviewLine: "후기도 많고 평이 괜찮아 보이더라고요",
-  ctaText: "영상 속 제품은 17번에 정리해뒀어요",
+  ctaText: "이 영상 지나가면 다시 찾기 어려워요, 프로필 링크에 있어요",
   productImageUrl: null,
   category: "차량용품",
   brollFile: null,

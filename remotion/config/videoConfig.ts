@@ -181,9 +181,9 @@ export const MOTION = {
   productDamping: 14,
 } as const;
 
-/** CTA 문구 템플릿 (랜딩 원탭 개편 - 링크만 누르면 맨 위에 뜬다) */
+/** CTA 문구 템플릿 (ctaText 미전달 시 폴백 - 워커는 ai.ts ctaLine 변형을 넘긴다) */
 export const ctaTemplate = (_displayNumber: number): string =>
-  `이 제품, 프로필 링크 누르면 바로 있어요`;
+  `지금 프로필 링크 누르면 이 제품이 맨 위에 떠요`;
 
 export const CTA_SUB_TEXT = "프로필 링크 → 맨 위 제품";
 
