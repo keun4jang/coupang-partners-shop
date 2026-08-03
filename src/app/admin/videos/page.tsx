@@ -1,7 +1,11 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { formatDisplayNumber } from "@/lib/format";
+import { getSetting } from "@/lib/settings";
 import type { Product, VideoItemWithProduct } from "@/types/db";
+
+/** 워커의 기본 업로드 슬롯 (render-worker.ts DEFAULT_UPLOAD_SCHEDULE 과 같은 값) */
+const DEFAULT_UPLOAD_SCHEDULE = "07:30-10:00,12:00-14:00,20:00-22:30";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +30,9 @@ export default async function AdminVideos() {
   if (!(await isAdminAuthenticated())) return null;
 
   const db = supabaseAdmin();
+
+  const uploadSchedule =
+    (await getSetting("UPLOAD_SCHEDULE")) ?? DEFAULT_UPLOAD_SCHEDULE;
 
   const [{ data: videos }, { data: clicks }, { data: candidates }] =
     await Promise.all([
@@ -90,7 +97,7 @@ export default async function AdminVideos() {
             name="templateType"
             className="rounded-xl border border-accent px-3 py-2.5 bg-cream text-sm"
           >
-            <option value="">템플릿 자동</option>
+            <option value="">문구 톤 자동</option>
             <option value="A">A 문제해결형</option>
             <option value="B">B 아이엄마 공감형</option>
             <option value="C">C 살림 메모형</option>
@@ -103,7 +110,11 @@ export default async function AdminVideos() {
           </button>
         </form>
         <p className="text-xs text-sub mt-2">
-          문구는 바로 생성되고, 영상 렌더링은 워커(npm run worker)가 처리해요.
+          문구는 바로 생성되고, 영상은 클라우드 워커(GitHub Actions)가 15분마다
+          자동으로 렌더해요. PC를 켜둘 필요 없어요.
+          <br />
+          영상 화면은 실사용 영상형(포맷 D)으로 통일돼 있고, 위 선택은 문구 톤만
+          바꿔요.
         </p>
       </section>
 
@@ -140,11 +151,19 @@ export default async function AdminVideos() {
               </p>
             )}
 
+            {/* 렌더는 끝났고 발행 대기 중 - 언제 올라가는지 보여준다 */}
+            {v.video_status === "rendered" && (
+              <p className="text-xs text-sky-700 mt-2">
+                발행 대기 중 · 오늘의 업로드 슬롯({uploadSchedule}, KST) 중 다음
+                시간에 자동 게시돼요.
+              </p>
+            )}
+
             <div className="flex items-center gap-4 mt-2 text-sm flex-wrap">
               <span className="font-bold">
                 클릭 {clickCount.get(v.id) ?? 0}회
               </span>
-              <span className="text-sub">템플릿 {v.template_type}</span>
+              <span className="text-sub">문구 톤 {v.template_type}</span>
               {v.drive_video_url && (
                 <a
                   href={v.drive_video_url}

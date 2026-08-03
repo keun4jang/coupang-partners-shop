@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { formatDisplayNumber } from "@/lib/format";
 import { getEarnings, won } from "@/lib/earnings";
+import { getPayoutStatus } from "@/lib/payout";
 import type { VideoItemWithProduct } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 const STATUS_LABEL: Record<string, string> = {
   pending: "대기",
   generating: "생성 중",
+  rendered: "업로드 예약", // 렌더 완료 - 정해진 슬롯 시간에 자동 발행
   completed: "완료",
   failed: "실패",
 };
@@ -28,6 +30,7 @@ export default async function AdminDashboard() {
     { count: clickCount },
     { data: recentVideos },
     earnings,
+    payout,
   ] = await Promise.all([
     db.from("products").select("*", { count: "exact", head: true }),
     db
@@ -42,7 +45,13 @@ export default async function AdminDashboard() {
       .order("display_number", { ascending: false })
       .limit(5),
     getEarnings(),
+    getPayoutStatus(),
   ]);
+
+  // 출금 진행률 바 (기준 10,000원 대비)
+  const payoutPct = payout.ok
+    ? Math.min(100, Math.round((payout.unpaidBalance / payout.threshold) * 100))
+    : 0;
 
   const stats = [
     { label: "전체 상품", value: productCount ?? 0 },
@@ -98,6 +107,59 @@ export default async function AdminDashboard() {
         ) : (
           <p className="text-sub text-sm mt-3">
             수익 정보를 불러오지 못했어요. {earnings.error}
+          </p>
+        )}
+      </section>
+
+      {/* 출금(지급) 현황 - 쿠팡파트너스는 월 마감 시 1만원 이상이면 자동 입금 */}
+      <section className="mt-8">
+        <h2 className="font-bold text-lg">🏦 출금까지</h2>
+        {payout.ok ? (
+          <div className="bg-card rounded-2xl p-4 border border-accent-soft mt-3">
+            <div className="flex items-baseline justify-between flex-wrap gap-1">
+              <span className="text-2xl font-extrabold text-primary-dark">
+                {won(payout.unpaidBalance)}
+              </span>
+              <span className="text-sub text-sm">
+                지급 기준 {won(payout.threshold)}
+              </span>
+            </div>
+
+            <div className="mt-3 h-2.5 w-full rounded-full bg-accent-soft overflow-hidden">
+              <div
+                className={`h-full rounded-full ${
+                  payout.reachedThreshold ? "bg-emerald-500" : "bg-primary"
+                }`}
+                style={{ width: `${payoutPct}%` }}
+              />
+            </div>
+
+            {payout.reachedThreshold ? (
+              <p className="text-sm mt-3 font-semibold text-emerald-700">
+                🎉 지급 기준을 넘었어요! {payout.expectedPayoutDate}에 등록 계좌로
+                자동 입금될 예정이에요.
+              </p>
+            ) : (
+              <p className="text-sm mt-3">
+                <span className="font-bold text-primary-dark">
+                  {won(payout.shortfall)}
+                </span>{" "}
+                더 모이면 지급 대상이에요.
+                <span className="text-sub">
+                  {" "}
+                  이번달에 못 넘으면 다음 달로 이월돼요.
+                </span>
+              </p>
+            )}
+
+            <p className="text-sub text-xs mt-2">
+              ※ 쿠팡파트너스는 별도 출금 신청이 없어요. 월 마감 기준 1만원을 넘으면
+              발생월의 다다음 달 15일에 원천징수 3.3%를 뺀 금액이 자동 입금돼요.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sub text-sm mt-3">
+            출금 현황을 불러오지 못했어요. {payout.error}
           </p>
         )}
       </section>

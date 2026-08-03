@@ -10,6 +10,7 @@ import {
 } from "@/lib/drive";
 import { formatDisplayNumber } from "@/lib/format";
 import { getEarnings, formatEarningsMessage } from "@/lib/earnings";
+import { getPayoutStatus, formatPayoutMessage } from "@/lib/payout";
 import { optionalEnv, requireEnv } from "@/lib/env";
 import { triggerRenderWorkflow } from "@/lib/renderTrigger";
 import type { Product, TemplateType, VideoItemWithProduct } from "@/types/db";
@@ -358,8 +359,14 @@ export async function POST(request: NextRequest) {
         break;
       case "수익":
       case "정산":
-        await sendTelegramMessage(formatEarningsMessage(await getEarnings()), chatId);
+      case "출금": {
+        const [earn, pay] = await Promise.all([getEarnings(), getPayoutStatus()]);
+        await sendTelegramMessage(
+          [formatEarningsMessage(earn), "", formatPayoutMessage(pay)].join("\n"),
+          chatId
+        );
         break;
+      }
       default:
         await sendTelegramMessage(
           [
@@ -367,7 +374,7 @@ export async function POST(request: NextRequest) {
             "",
             "업로드 - 새 상품 하나 골라 웹사이트 등록 + 영상 생성·업로드 (즉시)",
             "영상 - 업로드와 같음 (영상D 처럼 템플릿 지정 가능)",
-            "수익 - 쿠팡파트너스 오늘/이번주/이번달 커미션",
+            "수익 - 쿠팡파트너스 커미션 + 출금까지 남은 금액 (출금/정산 도 같음)",
             "최근영상 - 최근 생성된 영상과 드라이브 링크",
             "상태 - 전체 현황 요약",
             "",
