@@ -153,6 +153,23 @@ export async function fetchCommissionReport(
   }));
 }
 
+/**
+ * 쿠팡파트너스 링크에 subId 를 붙인다 (이미 있으면 건드리지 않음).
+ * subId 는 커미션 리포트에 그대로 실려 오므로 "어느 영상이 구매를 만들었는지"를
+ * 되짚는 유일한 수단이다. 없으면 수익이 한 덩어리로만 보인다.
+ */
+export function withSubId(partnerUrl: string, subId: string): string {
+  try {
+    const u = new URL(partnerUrl);
+    if (u.searchParams.has("subId")) return partnerUrl;
+    u.searchParams.set("subId", subId);
+    return u.toString();
+  } catch {
+    // URL 파싱이 안 되면 원본 그대로 (리다이렉트를 막지 않는다)
+    return partnerUrl;
+  }
+}
+
 /** 일반 쿠팡 상품 URL → 제휴 딥링크 (수동으로 URL 붙여넣을 때 사용) */
 export async function createDeeplink(coupangUrls: string[]): Promise<string[]> {
   const data = await request<Array<{ landingUrl?: string; shortenUrl?: string }>>(

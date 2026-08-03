@@ -78,8 +78,14 @@ create table if not exists click_logs (
   display_number integer not null,
   referrer text,
   user_agent text,
+  -- 랜딩에서 어느 자리를 눌렀는지: hero(원탭 히어로) / list(아래 목록) / search(번호검색)
+  -- 히어로가 실제로 전환에 기여하는지 판단하는 근거
+  slot text,
   created_at timestamptz not null default now()
 );
+
+-- 기존 배포에 컬럼 추가 (재실행해도 안전)
+alter table click_logs add column if not exists slot text;
 
 create index if not exists idx_click_logs_video_item_id on click_logs (video_item_id);
 create index if not exists idx_click_logs_display_number on click_logs (display_number);

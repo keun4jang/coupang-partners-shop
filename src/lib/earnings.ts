@@ -88,6 +88,35 @@ export function won(n: number): string {
   return `${Math.round(n).toLocaleString("ko-KR")}원`;
 }
 
+/**
+ * 영상 번호별 수익 (subId 기반).
+ * 클릭 리다이렉트가 쿠팡 링크에 subId=v{번호} 를 심으므로, 커미션 리포트의
+ * subId 를 되짚으면 "어느 영상이 실제로 구매를 만들었는지"를 알 수 있다.
+ * subId 도입(2026-08) 이전 수익은 subId 가 비어 있어 집계되지 않는다.
+ * @returns Map<영상번호, 커미션 합계>
+ */
+export async function getRevenueByVideo(
+  startDate: string,
+  endDate: string
+): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (!optionalEnv("COUPANG_ACCESS_KEY") || !optionalEnv("COUPANG_SECRET_KEY")) {
+    return out;
+  }
+  try {
+    const rows = await fetchCommissionReport(startDate, endDate);
+    for (const r of rows) {
+      const m = r.subId?.match(/^v(\d+)$/);
+      if (!m) continue;
+      const num = Number(m[1]);
+      out.set(num, (out.get(num) ?? 0) + r.commission);
+    }
+  } catch {
+    // 조회 실패 시 빈 값 - 화면은 클릭 지표만으로 계속 동작한다
+  }
+  return out;
+}
+
 /** 텔레그램용 수익 메시지 (수익 중심, 클릭은 쿠팡 유입만 참고로 1줄) */
 export function formatEarningsMessage(e: EarningsSummary): string {
   if (!e.ok) {

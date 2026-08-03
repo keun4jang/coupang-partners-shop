@@ -2,10 +2,26 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { formatDisplayNumber } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
+import { getRevenueByVideo, won } from "@/lib/earnings";
 import type { Product, VideoItemWithProduct } from "@/types/db";
 
 /** 워커의 기본 업로드 슬롯 (render-worker.ts DEFAULT_UPLOAD_SCHEDULE 과 같은 값) */
 const DEFAULT_UPLOAD_SCHEDULE = "07:30-10:00,12:00-14:00,20:00-22:30";
+
+/** 커미션 리포트 조회 범위: 최근 30일 (API 가 한 번에 30일까지만 허용) */
+function last30Days(): [string, string] {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const kst = new Date(Date.now() + 9 * 3600_000);
+  const fmt = (d: Date) =>
+    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
+  return [fmt(new Date(kst.getTime() - 29 * 86400_000)), fmt(kst)];
+}
+
+/** 노출일당 클릭 - 오래 걸려 있던 영상이 유리해 보이는 착시를 없앤 공정 비교 지표 */
+function clicksPerDay(clicks: number, createdAt: string): number {
+  const days = Math.max(1, (Date.now() - Date.parse(createdAt)) / 86400_000);
+  return clicks / days;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +50,7 @@ export default async function AdminVideos() {
   const uploadSchedule =
     (await getSetting("UPLOAD_SCHEDULE")) ?? DEFAULT_UPLOAD_SCHEDULE;
 
-  const [{ data: videos }, { data: clicks }, { data: candidates }] =
+  const [{ data: videos }, { data: clicks }, { data: candidates }, revenueByVideo] =
     await Promise.all([
       db
         .from("video_items")
@@ -46,6 +62,7 @@ export default async function AdminVideos() {
         .select("*")
         .eq("status", "candidate")
         .order("created_at", { ascending: false }),
+      getRevenueByVideo(...last30Days()),
     ]);
 
   const clickCount = new Map<string, number>();
@@ -163,6 +180,16 @@ export default async function AdminVideos() {
               <span className="font-bold">
                 클릭 {clickCount.get(v.id) ?? 0}회
               </span>
+              {/* 노출 기간 보정 - 오래된 영상이 무조건 유리해 보이지 않게 */}
+              <span className="text-sub">
+                하루 {clicksPerDay(clickCount.get(v.id) ?? 0, v.created_at).toFixed(2)}
+                회
+              </span>
+              {(revenueByVideo.get(v.display_number) ?? 0) > 0 && (
+                <span className="font-bold text-emerald-700">
+                  수익 {won(revenueByVideo.get(v.display_number) ?? 0)}
+                </span>
+              )}
               <span className="text-sub">문구 톤 {v.template_type}</span>
               {v.drive_video_url && (
                 <a

@@ -43,11 +43,20 @@ function shortDescription(item: VideoItemWithProduct): string {
  * 히어로 카드: 영상에서 막 넘어온 방문자를 위한 "원탭" 카드.
  * 카드 전체가 쿠팡 링크 - 사진 크게, 버튼 크게, 다른 행동 필요 없음.
  */
-function HeroCard({ item, label }: { item: VideoItemWithProduct; label: string }) {
+function HeroCard({
+  item,
+  label,
+  slot,
+}: {
+  item: VideoItemWithProduct;
+  label: string;
+  /** 히어로가 번호검색 결과인지(search) 최신 추천인지(hero) - 성과 비교용 */
+  slot: "hero" | "search";
+}) {
   const product: Product = item.products;
   return (
     <a
-      href={`/api/click?videoItemId=${item.id}`}
+      href={`/api/click?videoItemId=${item.id}&slot=${slot}`}
       rel="nofollow sponsored"
       className="block bg-card rounded-3xl overflow-hidden shadow-md border-2 border-primary/60 active:scale-[0.99] transition-transform"
     >
@@ -85,7 +94,7 @@ function ItemCard({ item }: { item: VideoItemWithProduct }) {
   const product: Product = item.products;
   return (
     <a
-      href={`/api/click?videoItemId=${item.id}`}
+      href={`/api/click?videoItemId=${item.id}&slot=list`}
       rel="nofollow sponsored"
       className="flex gap-3 items-center bg-card rounded-2xl p-3 shadow-sm border border-accent-soft active:scale-[0.99] transition-transform"
     >
@@ -202,7 +211,13 @@ export default async function Home({
       )}
 
       {/* 원탭 히어로 - 검색했으면 그 번호, 아니면 최신 추천 */}
-      {dbReady && hero && <HeroCard item={hero} label={heroLabel} />}
+      {dbReady && hero && (
+        <HeroCard
+          item={hero}
+          label={heroLabel}
+          slot={searched ? "search" : "hero"}
+        />
+      )}
 
       {/* 최근 제품 목록 (이전 영상에서 온 방문자용) */}
       {dbReady && listItems.length > 0 && (
