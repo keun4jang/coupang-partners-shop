@@ -1,15 +1,38 @@
 import type { Product } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 
-/** 숏폼에 우선 배정할 카테고리 */
+/**
+ * 숏폼에 우선 배정할 카테고리.
+ * 클릭 실적(노출일당 클릭) 기준 - 생활템·수납템이 가장 잘 나오고
+ * 육아생활템이 가장 낮아 아래 DEPRIORITIZED_CATEGORIES 로 뺐다.
+ */
 const PREFERRED_CATEGORIES = [
   "생활템",
   "청소템",
   "수납템",
   "주방템",
   "차량용품",
-  "육아생활템",
+  "캠핑",
+  "자취템",
 ];
+
+/**
+ * 비중을 줄일 카테고리 (감점).
+ * 완전히 배제하지는 않는다 - 다른 후보가 떨어졌을 때는 여전히 쓰인다.
+ */
+const DEPRIORITIZED_CATEGORIES = ["육아생활템"];
+
+/** 클릭이 잘 나오는 가격 하한 (원) - 3만원 미만은 감점 */
+const PREFERRED_MIN_PRICE = 30000;
+
+/** price_text("37,570원") → 숫자. 못 읽으면 null */
+export function parsePriceWon(priceText?: string | null): number | null {
+  if (!priceText) return null;
+  const digits = String(priceText).replace(/[^0-9]/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function score(product: Product): number {
   let s = 0;
@@ -23,6 +46,12 @@ function score(product: Product): number {
     s += 2;
   }
   if (PREFERRED_CATEGORIES.includes(product.category)) s += 2;
+  if (DEPRIORITIZED_CATEGORIES.includes(product.category)) s -= 4;
+
+  // 가격대 가산: 3만원 이상이 노출일당 클릭이 더 높게 나온다.
+  // (비싼 제품은 "가격 궁금해서 눌러보는" 클릭 미끼로도 작동)
+  const won = parsePriceWon(product.price_text);
+  if (won !== null && won >= PREFERRED_MIN_PRICE) s += 3;
   return s;
 }
 
@@ -108,7 +137,13 @@ export async function selectProductsForVideos(count: number): Promise<Product[]>
     list.push(p);
     byCategory.set(p.category, list);
   }
-  const categories = [...byCategory.keys()];
+  // 라운드로빈 순서: 비중을 줄일 카테고리는 항상 맨 뒤로 보낸다.
+  // (앞 카테고리에서 count 를 다 채우면 육아생활템은 그날 아예 안 뽑힌다)
+  const categories = [...byCategory.keys()].sort(
+    (a, b) =>
+      (DEPRIORITIZED_CATEGORIES.includes(a) ? 1 : 0) -
+      (DEPRIORITIZED_CATEGORIES.includes(b) ? 1 : 0)
+  );
 
   const picked: Product[] = [];
   for (let round = 0; picked.length < count; round++) {

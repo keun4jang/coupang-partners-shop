@@ -80,7 +80,9 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 비싼 제품은 오히려 "가격 궁금해서 눌러보는" 클릭 미끼로 좋다.
   // 상한 150만원은 클릭 잘 나올 프리미엄 가젯(고급 로봇청소기·액션캠·드론 등)까지
   // 허용하고, 영상으로 보여주기 애매한 초대형 가전/가구만 거른다.
-  const minPrice = opts.minPrice ?? 5000;
+  // 하한 3만원: 클릭 실적상 3만원 이상 구간이 노출일당 클릭이 더 높다.
+  // (1~3만원 구간에 영상이 제일 많이 들어갔는데 효율은 가장 낮았다)
+  const minPrice = opts.minPrice ?? 30_000;
   const maxPrice = opts.maxPrice ?? 1_500_000;
 
   const errors: string[] = [];
