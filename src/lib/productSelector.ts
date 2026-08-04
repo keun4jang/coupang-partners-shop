@@ -1,5 +1,6 @@
 import type { Product } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
+import { appealScore } from "./appeal";
 
 /**
  * 숏폼에 우선 배정할 카테고리.
@@ -21,9 +22,6 @@ const PREFERRED_CATEGORIES = [
  * 완전히 배제하지는 않는다 - 다른 후보가 떨어졌을 때는 여전히 쓰인다.
  */
 const DEPRIORITIZED_CATEGORIES = ["육아생활템"];
-
-/** 클릭이 잘 나오는 가격 하한 (원) - 3만원 미만은 감점 */
-const PREFERRED_MIN_PRICE = 30000;
 
 /**
  * KST 기준 일련일 (자정이 지나면 1 증가). 카테고리 회전 오프셋으로 쓴다.
@@ -56,10 +54,10 @@ function score(product: Product): number {
   if (PREFERRED_CATEGORIES.includes(product.category)) s += 2;
   if (DEPRIORITIZED_CATEGORIES.includes(product.category)) s -= 4;
 
-  // 가격대 가산: 3만원 이상이 노출일당 클릭이 더 높게 나온다.
-  // (비싼 제품은 "가격 궁금해서 눌러보는" 클릭 미끼로도 작동)
-  const won = parsePriceWon(product.price_text);
-  if (won !== null && won >= PREFERRED_MIN_PRICE) s += 3;
+  // "혹하는 정도"가 최우선 기준이다 (가격은 기준에서 뺐다 - 비싸도 상관없고,
+  //  필요한 사람은 어차피 산다. 중요한 건 눌러보고 싶게 만드는 아이템인지).
+  // 가중치를 크게 줘서 다른 항목보다 이 점수가 순위를 지배하게 한다.
+  s += appealScore(product.product_name) * 2;
   return s;
 }
 

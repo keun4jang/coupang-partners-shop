@@ -221,6 +221,20 @@ export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
   { keyword: "수납정리함", appCategory: "수납템" },
   { keyword: "욕실청소", appCategory: "청소템" },
   { keyword: "살림템", appCategory: "생활템" },
+  // "저게 뭐야?" 소리 나오는 아이템 - 가격 무관, 혹하는 힘만 본다.
+  // 움직임·변신·자동화가 있어야 15초 영상으로 보여줄 게 생긴다.
+  { keyword: "접이식 아이디어 상품", appCategory: "생활템" },
+  { keyword: "자동 주방 도구", appCategory: "주방템" },
+  { keyword: "전동 청소 브러쉬", appCategory: "청소템" },
+  { keyword: "무타공 자석 수납", appCategory: "수납템" },
+  { keyword: "회전 수납 정리대", appCategory: "수납템" },
+  { keyword: "압축 이불 정리", appCategory: "수납템" },
+  { keyword: "만능 다용도 도구", appCategory: "생활템" },
+  { keyword: "원터치 주방템", appCategory: "주방템" },
+  { keyword: "초소형 생활가전", appCategory: "생활템" },
+  { keyword: "센서 자동 조명", appCategory: "생활템" },
+  { keyword: "욕실 물때 제거템", appCategory: "청소템" },
+  { keyword: "창문 청소 도구", appCategory: "청소템" },
 ];
 
 /** 가격을 "21,990원" 형태로 */

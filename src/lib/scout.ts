@@ -6,6 +6,7 @@ import {
   priceText,
 } from "./coupang";
 import { dateFolderName } from "./format";
+import { appealScore } from "./appeal";
 
 /**
  * 스카우트(시장조사) — 주부가 많이 살 것 같은 카테고리 베스트에서
@@ -80,9 +81,9 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 비싼 제품은 오히려 "가격 궁금해서 눌러보는" 클릭 미끼로 좋다.
   // 상한 150만원은 클릭 잘 나올 프리미엄 가젯(고급 로봇청소기·액션캠·드론 등)까지
   // 허용하고, 영상으로 보여주기 애매한 초대형 가전/가구만 거른다.
-  // 하한 3만원: 클릭 실적상 3만원 이상 구간이 노출일당 클릭이 더 높다.
-  // (1~3만원 구간에 영상이 제일 많이 들어갔는데 효율은 가장 낮았다)
-  const minPrice = opts.minPrice ?? 30_000;
+  // 가격은 선정 기준이 아니다 (사장님 지침: 비싸도 상관없고 필요한 사람은 어차피 산다).
+  // 하한 5,000원은 부속품·소모품 낱개 같은 "영상 만들 게 없는" 항목만 걸러내는 용도.
+  const minPrice = opts.minPrice ?? 5_000;
   const maxPrice = opts.maxPrice ?? 1_500_000;
 
   const errors: string[] = [];
@@ -94,8 +95,14 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   for (const kw of SCOUT_KEYWORDS) {
     try {
       const products = await searchProducts(kw.keyword, perKeywordFetch);
+      // 검색 결과를 "혹하는 정도" 순으로 세워 두고 앞에서부터 담는다.
+      // (쿠팡 기본 정렬은 판매량 위주라, 잘 팔려도 영상으로 보여줄 게 없는
+      //  소모품이 앞에 오는 경우가 많다)
+      const ranked = [...products].sort(
+        (a, b) => appealScore(b.productName ?? "") - appealScore(a.productName ?? "")
+      );
       const bucket: ScoutCandidate[] = [];
-      for (const p of products) {
+      for (const p of ranked) {
         if (!passesFilter(p, minPrice, maxPrice)) continue;
         bucket.push({
           productId: p.productId,
