@@ -183,9 +183,9 @@ export const MOTION = {
 
 /** CTA 문구 템플릿 (ctaText 미전달 시 폴백 - 워커는 ai.ts ctaLine 변형을 넘긴다) */
 export const ctaTemplate = (_displayNumber: number): string =>
-  `지금 프로필 링크 누르면 이 제품이 맨 위에 떠요`;
+  `영상 속 제품은 프로필 링크에 정리해 뒀어요`;
 
-export const CTA_SUB_TEXT = "프로필 링크 → 맨 위 제품";
+export const CTA_SUB_TEXT = "프로필 링크에 제품 정보";
 
 /** CTA 화면 신뢰 문구 - 큐레이션 기준을 진실하게 전달 (허위 사용 후기 아님) */
 export const TRUST_TEXT = "가성비 좋고 후기까지 확인한 제품만 골라요";

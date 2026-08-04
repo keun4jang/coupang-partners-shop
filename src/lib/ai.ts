@@ -13,6 +13,46 @@ import { getSetting } from "./settings";
 
 const DEFAULT_MODEL = "claude-opus-4-8";
 
+/**
+ * 쿠팡파트너스 운영정책 위반 표현 (2026-08 공지 대응).
+ * 클릭 유도·긴급성·희소성·과장·오인성 표현은 계정 제재 사유라 코드로 막는다.
+ * 걸리면 안전한 프리셋 문구로 폴백한다(내보내지 않는다).
+ */
+// 부분 문자열로 검사하므로 "달려 있어요"·"담아두면" 같은 정상 표현이
+// 걸리지 않도록 명령형 형태까지 포함해 좁게 적는다.
+const POLICY_BANNED_PHRASES = [
+  // 클릭 명령·유도
+  "클릭",
+  "눌러보세요",
+  "누르세요",
+  "장바구니 담",
+  "지금 달려",
+  "달려가",
+  // 긴급성·희소성
+  "서둘러",
+  "품절되기 전",
+  "마지막 기회",
+  "놓치지 마",
+  "지나가면 못",
+  "다시 찾기 어려",
+  "한정수량",
+  "수량 한정",
+  "마감 임박",
+  "오늘만",
+  // 과장·오인성
+  "미쳤",
+  "실화",
+  "가격 오류",
+  "역대급",
+  "최저가",
+  "핫딜",
+  "특가",
+  "반값",
+  "떨이",
+  "쿠팡 사고",
+  "무조건",
+];
+
 /** 허위 후기/과장으로 보일 수 있어 금지하는 표현 */
 const BANNED_PHRASES = [
   "직접 써봤",
@@ -39,6 +79,17 @@ function singleLine(text: string): string {
   return text.replace(/\s*\n+\s*/g, " ").trim();
 }
 
+/**
+ * 캡션 맨 앞에 대가성 고지를 보장한다.
+ * AI 가 지시를 빠뜨려도 고지 없는 게시물이 나가지 않도록 코드에서 강제한다
+ * (표시광고법·쿠팡파트너스 운영정책상 고지 누락이 가장 큰 위험이다).
+ */
+function ensureDisclosure(captionText: string): string {
+  const caption = (captionText ?? "").trim();
+  if (caption.includes("쿠팡파트너스 활동")) return caption;
+  return `${DISCLOSURE_LINE}\n\n${caption}`;
+}
+
 function sanitizeCopy(copy: VideoCopy): VideoCopy {
   return {
     hookText: singleLine(copy.hookText),
@@ -47,7 +98,7 @@ function sanitizeCopy(copy: VideoCopy): VideoCopy {
     benefit2: singleLine(copy.benefit2),
     usageTip: singleLine(copy.usageTip),
     reviewLine: singleLine(copy.reviewLine),
-    captionText: copy.captionText,
+    captionText: ensureDisclosure(copy.captionText),
   };
 }
 
@@ -57,9 +108,6 @@ function sanitizeCopy(copy: VideoCopy): VideoCopy {
  * 실제 발행분 #1~59 를 세어보니 절반이 "~라면 / ~분들 / ~시죠?" 류의 순한 호명·동의구걸
  * 형태였다. 이런 훅은 궁금증을 만들지 않아 스크롤을 못 멈춘다.
  * 여기서 걸리면 교정 지시를 붙여 1회 재생성한다(generateVideoCopy).
- *
- * 주의: 패턴 ④ 손해 지목("아직도 맨손으로 건지세요?")은 강한 훅이라 통과시켜야 한다.
- * "아직도"가 있으면 ④로 보고 약함 판정에서 제외한다.
  */
 const WEAK_HOOK_PATTERNS: RegExp[] = [
   // 순한 호명: "~하는 집이라면", "~담고 싶다면"
@@ -102,6 +150,7 @@ const NEGATIVE_WORDS = [
   "지겹",
   "지친",
   "지쳐",
+  "지치",
   "힘들",
   "귀찮",
   "스트레스",
@@ -159,6 +208,24 @@ function containsBannedPhrase(copy: VideoCopy): boolean {
 }
 
 /**
+ * 쿠팡파트너스 운영정책 위반 표현 검사.
+ * 대가성 고지 문구에는 "제공받습니다" 같은 표현이 들어가므로 고지 줄은 제외하고 본다.
+ * @returns 걸린 표현 목록 (비어 있으면 통과)
+ */
+export function findPolicyViolations(copy: VideoCopy): string[] {
+  const body = [
+    copy.hookText,
+    copy.empathyLine,
+    copy.benefit1,
+    copy.benefit2,
+    copy.usageTip,
+    copy.reviewLine,
+    (copy.captionText ?? "").replace(DISCLOSURE_LINE, ""),
+  ].join("\n");
+  return POLICY_BANNED_PHRASES.filter((p) => body.includes(p));
+}
+
+/**
  * 스크립트 전문(줄 단위, 워커가 그대로 장면으로 사용):
  * 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 후기 → 번호 CTA (7줄)
  */
@@ -177,23 +244,34 @@ export function composeScriptText(copy: VideoCopy, displayNumber: number): strin
 // CTA 변형 3종 - 클릭을 부르는 심리 트리거를 하나씩 담아 번호로 회전한다.
 // 번호로 결정되므로 재렌더에도 같은 문장이 나오고(자막=나레이션 보장),
 // click_logs 가 번호 단위로 쌓여 어떤 CTA 가 클릭을 부르는지 비교할 수 있다.
+/**
+ * CTA 문구 (쿠팡파트너스 운영정책 준수).
+ *
+ * 2026-08 쿠팡파트너스 공지 대응으로 전면 교체했다. 아래는 정책이 명시적으로
+ * 금지하는 유형이라 쓰지 않는다:
+ *  - 클릭 명령형("지금 눌러보세요", "링크를 클릭하세요") → 무효클릭 유도 문구
+ *  - 긴급성·희소성("지나가면 못 찾아요", "마지막 기회") → 객관적 근거 없는 압박
+ *  - 정보 공백형("가격은 링크에서 확인") → 실질 정보 없이 호기심으로 클릭 유도
+ * 대신 "어디에 정리해 뒀는지"만 담백하게 안내한다(위치 안내는 정보 제공이다).
+ */
 const CTA_VARIANTS = [
-  // 즉시성+간편함: 누르면 바로 맨 위 - 행동 장벽 제거
-  "지금 프로필 링크 누르면 이 제품이 맨 위에 떠요",
-  // 가격 궁금증(열린 고리): 답은 링크 너머에 있게
-  "가격은 프로필 링크에서 확인해 보세요, 생각보다 착해요",
-  // 소멸성: 쇼츠 피드는 지나가면 다시 찾기 어렵다는 사실 그대로
-  "이 영상 지나가면 다시 찾기 어려워요, 프로필 링크에 있어요",
+  "영상 속 제품은 프로필 링크에 정리해 뒀어요",
+  "제품 정보는 프로필 링크에서 보실 수 있어요",
+  "자세한 정보는 프로필 링크에 있어요",
 ];
 
 export function ctaLine(displayNumber: number): string {
   // CTA 화면 자막과 나레이션이 완전히 같은 문장을 쓴다.
-  // 랜딩 원탭 개편: 링크만 누르면 맨 위에 뜨므로 "번호 검색" 대신 원탭 안내.
-  // (번호는 CTA 화면에 크게 표시되어 예전 영상 폴백 검색용으로 남는다)
   return CTA_VARIANTS[displayNumber % CTA_VARIANTS.length];
 }
 
-// 대가성 고지는 웹사이트(랜딩)에만 두고 SNS 캡션/영상에는 넣지 않는다(사장님 결정).
+/**
+ * 대가성 고지 (표시광고법·쿠팡파트너스 운영정책).
+ * 영상 화면과 SNS 캡션 양쪽에 반드시 들어간다. 랜딩에만 두면 정작 광고가
+ * 노출되는 SNS 게시물에는 고지가 없는 상태가 되어 위반 소지가 크다.
+ */
+export const DISCLOSURE_LINE =
+  "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
 
 /**
  * AI 미설정/실패 시 사용하는 폴백 문구.
@@ -236,12 +314,15 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   };
 
   copy.captionText = [
+    // 대가성 고지는 맨 앞 (캡션이 접혀도 보이는 자리)
+    DISCLOSURE_LINE,
+    "",
     `${copy.hookText} ${copy.empathyLine}.`,
     `${shortenProductName(product.product_name)}, ${copy.benefit1}. ${copy.benefit2}.`,
     copy.usageTip,
     "",
     "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요.",
-    `영상 속 제품은 프로필 링크 누르면 바로 확인할 수 있어요. (${displayNumber}번)`,
+    `영상 속 제품은 프로필 링크에 정리해 뒀어요. (${displayNumber}번)`,
     "",
     "#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템",
   ].join("\n");
@@ -284,7 +365,7 @@ const COPY_SCHEMA = {
     captionText: {
       type: "string",
       description:
-        "SNS 업로드용 캡션 전문. 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크 누르면 바로 확인할 수 있어요. (N번)' + 빈 줄 + 해시태그.",
+        "SNS 업로드용 캡션 전문. 반드시 첫 줄에 대가성 고지 '이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.' + 빈 줄 + 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크에 정리해 뒀어요. (N번)' + 빈 줄 + 해시태그.",
     },
   },
   required: [
@@ -323,12 +404,19 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
 - 장점은 "이걸 쓰면 내 삶이 이렇게 편해진다"를 구체적·생생하게(시간 절약, 힘 덜 듦, 집이 깔끔해짐 등).
 - 가성비/부담 없는 가격도 슬쩍 언급해 "사도 되겠다" 마음을 만든다.
 
-링크 클릭 부르는 법(중요) - 영상 끝의 "프로필 링크" CTA 를 누르게 만드는 게 최종 목표:
-- usageTip 은 소유 상상 장치다: 보는 사람이 "우리 집 어디에 두고 언제 쓸지"까지
-  머릿속에 그려지게 쓴다. 상상이 구체적일수록 링크를 누른다.
-- 정보 공백 하나는 링크 몫으로 남긴다: 정확한 가격·구성·옵션 중 하나는 대본에서 다 말하지
-  않는다(예: 가격을 훅에 안 썼다면 "가격도 생각보다 착해요" 뉘앙스까지만). 거짓·과장 금지.
-- 훅에서 가격(패턴 ⑥)을 이미 말했다면 대본에서 가격 반복은 금지 - 다른 공백을 남긴다.
+광고 규정 준수(가장 중요 - 어기면 계정이 정지된다):
+쿠팡파트너스는 "실질적인 정보 제공 없이 호기심·긴급성으로 클릭을 유도하는 광고"를
+금지한다. 아래는 절대 금지다.
+- 클릭 명령·유도: "지금 눌러보세요", "링크 클릭", "빨리", "지금 달려", "담아요"
+- 긴급성·희소성 압박: "품절되기 전에", "마지막 기회", "안 사면 후회", "서둘러",
+  "지나가면 못 찾아요" (재고·기간에 대한 객관적 근거가 없으면 전부 금지)
+- 과장·단정: "미쳤다", "실화냐", "가격 오류", "대박", "역대급", "무조건"
+- 확인되지 않은 사실: 할인율·특가·한정수량·판매량 창작. 상품 정보로 받은 값만 쓴다.
+- 정보를 일부러 감추고 궁금증만 남기는 방식(예: "가격은 링크에서 확인하세요")
+반대로 지켜야 할 것:
+- 이 영상만 보고도 "이게 무슨 제품이고 왜 좋은지" 알 수 있게 실질 정보를 충분히 담는다.
+  제품이 무엇인지, 어떤 점이 좋은지, 어떻게 쓰는지가 대본 안에서 다 설명돼야 한다.
+- usageTip 은 실제 사용 장면을 알려주는 정보다(언제·어디서·어떻게 쓰는지).
 
 영상 구성(중요) - 7줄이 이 순서로 나온다:
 1. hookText: 스크롤을 멈추게 하는 첫 문장. 썸네일에 초대형으로 박히므로 "18자 이내 1줄 구어체".
@@ -341,8 +429,9 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
       (시청자를 탓하는 "아직도 ~하세요?" 형태는 쓰지 않는다)
    ⑤ 발견·소개: "이런 게 있더라고요", "찾았어요" — 예) "이런 게 다 있더라고요"
       다른 방식·제품을 깎아내리는 "○○ 버리세요" 형태는 쓰지 않는다.
-   ⑥ 가격 반전: 제공된 가격대가 실제 값이고 놀랄 만큼 착하면(대략 2만원 이하) 그 값 그대로 —
-      예) "이게 9,900원이라고?". 제공된 가격대 외의 숫자·가격 창작은 절대 금지.
+   ⑥ 기능 요약: 이 제품이 하는 일을 한 줄로 — 예) "빨래를 반으로 접어 보관하는 박스"
+      (가격을 훅에 쓰지 않는다. 쿠팡 판매가는 수시로 바뀌는데 영상은 계속 남아 있어
+       나중에 실제 가격과 달라지면 오인성 표현이 된다)
    훅 금지(매우 중요 - 실제로 가장 많이 어기는 지점이다):
      아래 종결·형태는 전부 탈락이다. 대상을 부르거나 상황에 공감만 하면 궁금증이 안 생긴다.
      ✗ "~라면" / "~다면"        예) "아기 키우는 집이라면", "담고 싶다면"
@@ -383,7 +472,9 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
 - 첫 문장이 접힌 캡션에서 유일하게 보이는 줄이다 - 훅의 궁금증을 이어받아 더보기를 누르게 쓴다.
 - "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요." 같은 큐레이션 기준 문장 포함
   (직접 사용해봤다는 표현은 금지 - 고른 기준만 말한다).
-- 반드시 "영상 속 제품은 프로필 링크 누르면 바로 확인할 수 있어요. ({번호}번)" 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
+- 반드시 첫 줄에 대가성 고지를 넣는다: "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
+- 반드시 "영상 속 제품은 프로필 링크에 정리해 뒀어요. ({번호}번)" 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
+- 캡션에도 클릭 유도·긴급성·과장 표현을 쓰지 않는다(영상 본문과 같은 규정 적용).
 - 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;
 
 /** Gemini responseSchema 는 OpenAPI 서브셋(타입 대문자, additionalProperties 미지원) */
@@ -429,30 +520,15 @@ const HOOK_PATTERN_HINTS = [
   "③ 결과 예고 ('~하면 사라지는 것', '~된 이유')",
   "④ 방법 제시 ('~하는 법', '~되는 방법')",
   "⑤ 발견·소개 ('이런 게 다 있더라고요', '찾았어요')",
-  "⑥ 가격 반전 ('이게 ○○원이라고?')",
+  "⑥ 기능 요약 (제품이 하는 일을 한 줄로)",
 ];
 
-/** price_text 에서 원 단위 숫자 추출 (가격 반전 훅 가능 여부 판단용) */
-function parsePriceWon(priceText?: string | null): number | null {
-  if (!priceText) return null;
-  const digits = priceText.replace(/[^0-9]/g, "");
-  if (!digits) return null;
-  const n = Number(digits);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-function hookPatternHint(displayNumber: number, priceText?: string | null): string {
-  const price = parsePriceWon(priceText);
-  const cheapEnough = price !== null && price <= 20000;
-  let idx = displayNumber % HOOK_PATTERN_HINTS.length;
-  // 가격 반전은 실제로 놀랄 만한 값일 때만 - 아니면 다음 패턴으로 넘긴다
-  if (idx === 5 && !cheapEnough) idx = displayNumber % 5;
+function hookPatternHint(displayNumber: number): string {
+  const idx = displayNumber % HOOK_PATTERN_HINTS.length;
   return [
     `이번 영상 권장 훅 패턴: ${HOOK_PATTERN_HINTS[idx]}`,
     "그 패턴이 이 상품에 도저히 안 맞으면 다른 패턴을 써도 되지만, 금지 종결(~라면/~분들/~시죠?/~할 때/평서형)은 어느 경우에도 불가.",
-    cheapEnough
-      ? "가격 반전을 쓸 경우 값은 제공된 가격대 그대로만 쓴다(창작 금지)."
-      : "이 상품은 가격 반전 훅(⑥) 대상이 아니다 - 가격을 훅에 쓰지 마라.",
+    "훅에 가격·할인율·한정수량을 쓰지 않는다(쿠팡 판매가는 수시로 바뀌어 나중에 실제와 달라진다).",
   ].join("\n");
 }
 
@@ -484,7 +560,7 @@ function buildUserPrompt(
     "보는 사람이 '아, 이래서 좋은 거구나' 하고 제품을 이해하게 제품 설명을 충분히 넣어라.",
     "hookText 는 매번 새롭고 다르게, 뻔한 첫 문장(예: '이거 하나면')은 피해라.",
     "hookText 는 18자 이내로 짧게 - 썸네일에 초대형으로 박힌다.",
-    hookPatternHint(displayNumber, product.price_text),
+    hookPatternHint(displayNumber),
   ].join("\n");
 }
 
@@ -672,6 +748,16 @@ export async function generateVideoCopy(
     if (!raw) return fallbackCopy(product, displayNumber);
     let copy = sanitizeCopy(raw);
     if (containsBannedPhrase(copy)) {
+      return fallbackCopy(product, displayNumber);
+    }
+
+    // 운영정책 위반 표현(클릭유도·긴급성·과장)은 재생성 없이 바로 안전한
+    // 프리셋 문구로 간다. 계정 제재 위험이라 "한 번 더 시도"할 사안이 아니다.
+    const violations = findPolicyViolations(copy);
+    if (violations.length > 0) {
+      console.warn(
+        `쿠팡 운영정책 위반 표현 감지(${violations.join(", ")}) - 프리셋 문구로 폴백`
+      );
       return fallbackCopy(product, displayNumber);
     }
 

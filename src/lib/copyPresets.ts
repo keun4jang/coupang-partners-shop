@@ -112,7 +112,7 @@ export const CATEGORY_VARIANTS: Record<string, CategoryVariants> = {
     ],
     empathies: [
       "허리 숙여서 쓸고 닦다 보면 하루가 다 가잖아요",
-      "락스 냄새 맡아가며 박박 문지르기도 이제 지치죠",
+      "힘 안 들이고 개운하게 끝나면 좋겠다 싶잖아요",
       "한 번 해두고 오래 깔끔하면 좋겠다 싶잖아요",
     ],
     b1: "손에 물 한 방울 안 묻히고 쓱 밀기만 해도 눈에 띄게 깨끗해져요",

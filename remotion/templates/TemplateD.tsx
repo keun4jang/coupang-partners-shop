@@ -13,6 +13,7 @@ import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { Narration } from "../components/Narration";
 import { CoverFrame } from "../components/CoverFrame";
+import { Disclosure } from "../components/Disclosure";
 
 /**
  * Template D: 실사용 영상형
@@ -140,6 +141,10 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
         <Narration src={props.narration?.[6]} />
       </Sequence>
+
+      {/* 대가성 고지 - 영상 내내 하단에 표시 (표시광고법·쿠팡파트너스 운영정책).
+          커버 프레임보다 아래 레이어라 썸네일에는 안 잡히고 본편에만 보인다. */}
+      <Disclosure />
 
       {/* 첫 프레임 썸네일용 커버 - 맨 위 레이어라 1프레임 동안 다른 요소를 전부 가림 */}
       <Sequence durationInFrames={COVER_FRAME_COUNT}>

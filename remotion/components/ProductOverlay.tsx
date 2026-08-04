@@ -151,11 +151,12 @@ export const ProductOverlay: React.FC<{
         {productName}
       </div>
 
-      {/* 번호 배지 - 마지막 CTA 전에 이탈하는 시청자도 클릭 경로를 보도록
-          장점~후기 구간 내내 "어디서 사는지"를 함께 노출한다 */}
+      {/* 번호 배지 - 이 영상이 몇 번 제품인지 알려주는 식별 표시.
+          ("링크 누르세요" 류의 클릭 유도 문구는 쿠팡파트너스 운영정책상 금지라
+           번호 안내로만 둔다) */}
       <div style={{ textAlign: "center", marginTop: 14 }}>
         <Badge
-          label={`프로필 링크 → ${displayNumber}번`}
+          label={`오늘의 살림템 ${displayNumber}번`}
           bg={PALETTE.badgeCoral}
           color="#FFFFFF"
           fontSize={FONT_SIZES.numberBadge}
