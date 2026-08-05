@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { optionalEnv, requireEnv } from "./env";
 import { getSetting, setSetting } from "./settings";
 import { dhashFromUrl, hammingDistance, MATCH_THRESHOLD } from "./imageHash";
+import { geminiGenerateJson } from "./ai";
 
 /**
  * 알리익스프레스 드롭시핑(DS) API - "같은 제품" 판매자 데모 영상 자동 소싱.
@@ -293,6 +294,43 @@ export interface AliProduct {
   imageUrl: string;
 }
 
+/**
+ * 한국어 상품명 → 알리 검색용 영어 일반명 (Gemini, 무료 등급).
+ *
+ * 알리는 국제 플랫폼이라 "무핑", "코멧", "Sonipure" 같은 한국 브랜드명으로 검색하면
+ * 전혀 무관한 상품이 잡힌다(실측: 후보 20개의 이미지 거리 최소 15~24, 임계 10 초과).
+ * 브랜드를 떼고 "제품이 무엇인지"만 영어로 뽑아 검색 적중률을 올린다.
+ * 실패하면 기존 한국어 토큰 방식으로 폴백한다.
+ */
+export async function aliSearchKeywords(productName: string): Promise<string> {
+  const fallback = keywordsFromProductName(productName);
+  try {
+    const out = await geminiGenerateJson<{ query: string }>({
+      system:
+        "너는 한국 쇼핑몰 상품명을 AliExpress 검색어로 바꾸는 도구다. " +
+        "브랜드명·판매자명·옵션·수량은 버리고, 그 물건이 무엇인지만 영어 일반명으로 답한다.",
+      prompt: [
+        `상품명: ${productName}`,
+        "",
+        "이 상품을 AliExpress 에서 찾을 영어 검색어를 2~4단어로 만들어라.",
+        "예) '무핑 방충망청소 청소솔 모기장 다용도 청소브러쉬' → 'window screen cleaning brush'",
+        "예) '코멧 오리지널 유아용 아기물티슈 캡형' → 'baby wet wipes'",
+        "브랜드명(무핑·코멧·Sonipure 등)은 절대 넣지 마라.",
+      ].join("\n"),
+      schema: {
+        type: "OBJECT",
+        properties: { query: { type: "STRING" } },
+        required: ["query"],
+      },
+      temperature: 0.2,
+    });
+    const q = out?.query?.trim();
+    return q && q.length >= 3 ? q : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** 상품명 → 검색 키워드 (옵션/수량/괄호 제거, 앞쪽 핵심 토큰) */
 export function keywordsFromProductName(name: string): string {
   const cleaned = name
@@ -370,7 +408,7 @@ export async function findMatchingAliVideo(
   const ourHash = await dhashFromUrl(productImageUrl);
   if (ourHash === null) return null;
 
-  const keywords = keywordsFromProductName(productName);
+  const keywords = await aliSearchKeywords(productName);
   let candidates: AliProduct[];
   try {
     candidates = await searchAliProducts(keywords, token);
@@ -387,24 +425,49 @@ export async function findMatchingAliVideo(
   }
   console.log(`알리 검색 "${keywords}": 후보 ${candidates.length}개`);
 
-  // 이미지가 일치하는 상품을 거리순으로 정렬해 상위부터 영상 확인
+  // 이미지가 일치하는 상품을 거리순으로 정렬해 상위부터 영상 확인.
+  //
+  // 실패 원인을 구분해 남긴다. 예전엔 "일치+영상 있는 상품 없음" 한 줄만 찍혀서
+  // ①검색이 엉뚱한 상품을 물어온 건지 ②이미지가 안 닮은 건지 ③닮았는데 영상이
+  // 없는 건지 알 수 없었다(상품 143개 전부 실패인데 원인 미상이었던 이유).
   const scored: Array<{ p: AliProduct; distance: number }> = [];
+  let hashFailed = 0;
+  let minDistance = Number.POSITIVE_INFINITY;
   for (const p of candidates.slice(0, 15)) {
     const h = await dhashFromUrl(p.imageUrl);
-    if (h === null) continue;
+    if (h === null) {
+      hashFailed++;
+      continue;
+    }
     const distance = hammingDistance(ourHash, h);
+    if (distance < minDistance) minDistance = distance;
     if (distance <= MATCH_THRESHOLD) scored.push({ p, distance });
   }
   scored.sort((a, b) => a.distance - b.distance);
 
+  if (scored.length === 0) {
+    console.log(
+      `알리 매칭 실패[이미지 불일치]: 후보 ${candidates.length}개 중 ` +
+        `해시실패 ${hashFailed}개, 최소거리 ${
+          Number.isFinite(minDistance) ? minDistance : "-"
+        } > 임계 ${MATCH_THRESHOLD} → 폴백`
+    );
+    return null;
+  }
+
   const token2 = (await currentAliToken()) ?? token;
+  let noVideo = 0;
   for (const { p, distance } of scored) {
     const videoUrl = await getAliProductVideo(p.productId, token2);
     if (videoUrl) {
       console.log(`알리 매칭 성공 (거리 ${distance}): ${p.title.slice(0, 50)}`);
       return { videoUrl, matchedTitle: p.title, distance };
     }
+    noVideo++;
   }
-  console.log("알리 매칭: 일치+영상 있는 상품 없음 → 폴백");
+  console.log(
+    `알리 매칭 실패[영상 없음]: 이미지 일치 ${scored.length}개(최소거리 ${minDistance}) ` +
+      `전부 영상 없음(${noVideo}개 확인) → 폴백`
+  );
   return null;
 }

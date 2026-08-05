@@ -7,6 +7,9 @@ import { findMatchingAliVideo, hasAliexpressEnv } from "./aliexpress";
 import { findCoupangProductVideo, hasCoupangScraperEnv } from "./coupangVideo";
 import { supabaseAdmin } from "./supabase";
 
+/** 소싱 실패한 상품을 다시 확인하기까지의 간격(일) */
+const RESOURCE_RECHECK_DAYS = 30;
+
 /**
  * 상품 영상 완전자동 소싱 오케스트레이터 (렌더 워커 전용 - Node/ffmpeg 사용).
  *
@@ -690,6 +693,19 @@ export async function sourceProductClips(
   displayNumber: number,
   count: number
 ): Promise<SourcedClips> {
+  // 최근에 확인해서 못 찾은 상품은 한동안 건너뛴다(위 ④ 참고).
+  if (!product.source_video_url && product.source_video_checked_at) {
+    const days =
+      (Date.now() - Date.parse(product.source_video_checked_at)) / 86400_000;
+    if (days < RESOURCE_RECHECK_DAYS) {
+      console.log(
+        `상품 영상 소싱 건너뜀: ${days.toFixed(0)}일 전 확인했으나 없었음 ` +
+          `(${RESOURCE_RECHECK_DAYS}일 후 재확인)`
+      );
+      return { files: [], origin: "스톡" };
+    }
+  }
+
   // ① 캐시된 소스 영상
   if (product.source_video_url) {
     const files = await segmentRemoteVideo(
@@ -707,6 +723,12 @@ export async function sourceProductClips(
   }
 
   // ② 쿠팡 상세페이지 판매자 영상 (프록시 설정 시) - 그 상품 자체의 영상이라 최우선
+  //
+  // 키가 없어 건너뛴 것과 실제로 못 찾은 것을 구분해 남긴다. 예전엔 아무 로그도
+  // 없어서 "왜 항상 스톡 배경인가"를 알 수 없었다(SCRAPER_PROXY_URL 미설정이 원인).
+  if (!hasCoupangScraperEnv()) {
+    console.log("쿠팡 상세영상 소싱 건너뜀: SCRAPER_PROXY_URL 미설정");
+  }
   if (hasCoupangScraperEnv()) {
     try {
       const videoUrl = await findCoupangProductVideo(product.coupang_partner_url);
@@ -724,6 +746,11 @@ export async function sourceProductClips(
   }
 
   // ③ 알리익스프레스 이미지 매칭
+  if (!hasAliexpressEnv()) {
+    console.log("알리 소싱 건너뜀: ALIEXPRESS_APP_KEY/SECRET 미설정");
+  } else if (!product.image_url) {
+    console.log("알리 소싱 건너뜀: 상품 이미지 없음(이미지 매칭 불가)");
+  }
   if (hasAliexpressEnv() && product.image_url) {
     try {
       const match = await findMatchingAliVideo(
@@ -748,5 +775,10 @@ export async function sourceProductClips(
   }
 
   // ④ 호출부 폴백 (Pexels 스톡)
+  //
+  // 실패를 기록해 같은 상품을 매 렌더마다 다시 뒤지지 않게 한다.
+  // 소싱 1회당 알리 검색 + 이미지 해시 15장 + Gemini 번역으로 6~10초가 드는데,
+  // 상품 143개 표본에서 성공 0건이라 재시도 가치가 낮다(RESOURCE_RECHECK_DAYS 마다만 재확인).
+  await cacheSourceVideo(product.id, null, null);
   return { files: [], origin: "스톡" };
 }
