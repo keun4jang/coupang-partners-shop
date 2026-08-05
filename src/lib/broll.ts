@@ -19,8 +19,19 @@ async function resolveKey(name: string): Promise<string | undefined> {
 
 const PEXELS_SEARCH = "https://api.pexels.com/videos/search";
 const BROLL_DIR = path.resolve("public/assets/broll");
-/** 우리 영상(15~18초)을 루프 없이 덮을 수 있는 최소 길이 */
-const MIN_DURATION_SEC = 16;
+/**
+ * 스톡 클립 최소 길이.
+ *
+ * 예전 16초는 "영상 전체를 클립 하나로 덮던 시절"의 값이다. 지금 포맷 D 는
+ * 4컷으로 나눠 각 클립이 5~12초 구간만 담당하고, Background 의 OffthreadVideo 가
+ * loop 로 이어 붙이므로 짧아도 정지화면이 되지 않는다.
+ *
+ * 실측(2026-08-05, Pexels 세로 30건 기준): 16초 이상만 받으면 후보가
+ * "scrubbing cleaning brush" 5건 / "organizing storage boxes" 6건까지 줄어드는데,
+ * 8초 이상으로 낮추면 각각 29건 / 28건으로 늘어난다. 후보가 적으면 같은 배경이
+ * 반복되고, 검색이 아예 실패해 블러 배경으로 떨어지는 일도 잦아진다.
+ */
+const MIN_DURATION_SEC = 8;
 const MAX_DURATION_SEC = 60;
 
 /**
@@ -77,6 +88,11 @@ const SEARCH_QUERY_BY_CATEGORY: Record<string, string[]> = {
  * (위에서부터 먼저 매칭되는 것을 사용)
  */
 const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
+  // 차량템은 맨 앞에 둔다. 뒤에 두면 "차량용 미니 청소기"가 아래 /청소기/ 규칙에
+  // 먼저 걸려 집안 바닥 청소기 영상이 배경으로 깔린다(실측 확인).
+  // 같은 이유로 "차량용 방향제 거치대"는 /거치대/ 에, "자동차 트렁크 정리함"은
+  // /정리함/ 에 잡혔다.
+  [/차량|자동차|차량용|트렁크|대시보드/, "car interior clean"],
   [/기저귀/, "baby diaper changing"],
   [/물티슈/, "wiping cleaning hands baby"],
   [/턱받이|이유식|아기\s*식판/, "baby feeding highchair"],
@@ -94,7 +110,6 @@ const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
   [/주걱|국자|뒤집개|조리도구|프라이팬|후라이팬|냄비|도마|칼/, "cooking kitchen utensils home"],
   [/드라이기|헤어/, "hair dryer bathroom vanity"],
   [/텀블러|물병|컵/, "pouring water drink kitchen"],
-  [/차량|자동차|차\s/, "car interior clean"],
 ];
 
 /** 상품명 키워드에 맞는 구체 검색어 (없으면 null) */
@@ -156,6 +171,36 @@ function pickFile(video: PexelsVideo): PexelsVideoFile | null {
       return score(a) - score(b);
     });
   return portrait[0] ?? null;
+}
+
+/**
+ * 받아둔 클립 보관 개수 상한.
+ *
+ * 다운로드한 클립을 지우는 코드가 없어 public/assets/broll 이 계속 불어난다
+ * (2026-08-05 기준 로컬 975MB / 69개). 이 디렉터리는 Remotion 번들에 통째로
+ * 복사되므로 렌더가 느려지고 디스크도 낭비된다. 오래된 것부터 정리해 상한을 지킨다.
+ * (지워져도 다음 렌더에서 필요하면 다시 받으므로 안전하다)
+ */
+const MAX_CACHED_CLIPS = 12;
+
+/** 오래된 클립부터 지워 MAX_CACHED_CLIPS 개만 남긴다 */
+function pruneOldClips(keepFilenames: string[] = []): void {
+  try {
+    if (!fs.existsSync(BROLL_DIR)) return;
+    const keep = new Set(keepFilenames);
+    const files = fs
+      .readdirSync(BROLL_DIR)
+      .filter((f) => f.endsWith(".mp4") && !keep.has(f))
+      .map((f) => ({ f, mtime: fs.statSync(path.join(BROLL_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime); // 최신 우선
+
+    for (const { f } of files.slice(Math.max(0, MAX_CACHED_CLIPS - keep.size))) {
+      fs.unlinkSync(path.join(BROLL_DIR, f));
+    }
+  } catch (e) {
+    // 정리 실패가 렌더를 막지는 않는다
+    console.warn("스톡 클립 정리 실패(무시):", (e as Error).message.slice(0, 120));
+  }
 }
 
 async function downloadClip(
@@ -341,5 +386,7 @@ export async function fetchStockBrolls(
   } else {
     console.log(`스톡 클립 ${out.length}개: ${out.map((c) => c.file).join(", ")}`);
   }
+  // 이번에 쓸 클립은 남기고 오래된 것부터 정리 (번들 크기·디스크 관리)
+  pruneOldClips(out.map((c) => c.file));
   return out;
 }

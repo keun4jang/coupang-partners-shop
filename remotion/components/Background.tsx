@@ -3,6 +3,7 @@ import {
   AbsoluteFill,
   Audio,
   Img,
+  Loop,
   OffthreadVideo,
   Sequence,
   interpolate,
@@ -114,9 +115,10 @@ export const Background: React.FC<{
   bgImageUrl?: string | null;
   /** 멀티컷 배경 클립 목록 (있으면 brollFile 보다 우선) */
   brollFiles?: string[] | null;
+  brollDurations?: number[] | null;
   /** 각 컷의 시작 시각(초). 길이 = 컷 수, 첫 값은 0 */
   cutSeconds?: number[];
-}> = ({ brollFile, bgImageUrl, brollFiles, cutSeconds }) => {
+}> = ({ brollFile, bgImageUrl, brollFiles, brollDurations, cutSeconds }) => {
   const { durationInFrames, fps } = useVideoConfig();
   const frame = useCurrentFrame();
   // 배경만 아주 천천히 확대(zoom-in) - 정적인 배경에 은은한 생동감
@@ -135,6 +137,9 @@ export const Background: React.FC<{
               ? Math.round(cutSeconds[i + 1] * fps)
               : durationInFrames,
           file: brollFiles[i % brollFiles.length],
+          clipFrames: brollDurations?.[i % brollFiles.length]
+            ? Math.max(1, Math.round(brollDurations[i % brollFiles.length] * fps))
+            : null,
         }))
       : null;
 
@@ -152,11 +157,24 @@ export const Background: React.FC<{
                 from={cut.fromFrame}
                 durationInFrames={cut.toFrame - cut.fromFrame}
               >
-                <OffthreadVideo
-                  src={staticFile(`assets/broll/${cut.file}`)}
-                  muted
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+                {/* 클립이 컷 구간보다 짧으면 마지막 프레임에서 멈춰 정지화면처럼
+                    보인다. Loop 로 이어 붙여 배경이 계속 움직이게 한다.
+                    (이 덕분에 스톡 검색 최소 길이를 16초 → 8초로 낮출 수 있었다) */}
+                {cut.clipFrames && cut.clipFrames < cut.toFrame - cut.fromFrame ? (
+                  <Loop durationInFrames={cut.clipFrames}>
+                    <OffthreadVideo
+                      src={staticFile(`assets/broll/${cut.file}`)}
+                      muted
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </Loop>
+                ) : (
+                  <OffthreadVideo
+                    src={staticFile(`assets/broll/${cut.file}`)}
+                    muted
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
               </Sequence>
             ))}
           </>

@@ -31,6 +31,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
       <Background
         brollFile={props.brollFile}
         brollFiles={props.brollFiles}
+        brollDurations={props.brollDurations}
         cutSeconds={[0, T.empathy.to, T.product.to, T.benefit2.to]}
         bgImageUrl={
           props.brollFiles?.length || props.brollFile

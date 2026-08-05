@@ -42,6 +42,8 @@ export type ShortsProps = {
   brollFile: string | null;
   /** (포맷 D) 4컷 배경용 스톡 클립 파일명 목록 - 장면 경계마다 다음 클립으로 전환 */
   brollFiles?: string[] | null;
+  /** brollFiles 각 클립의 길이(초). 컷 구간보다 짧으면 Loop 로 이어 붙인다. */
+  brollDurations?: number[] | null;
   /**
    * 장면별 나레이션 오디오 (data URI mp3).
    * 순서: [후킹, 공감, 장점1, 장점2, 사용팁, 후기, CTA] (7개, 사용팁 없으면 null).
@@ -66,6 +68,7 @@ export const defaultShortsProps: ShortsProps = {
   category: "차량용품",
   brollFile: null,
   brollFiles: null,
+  brollDurations: null,
   narration: null,
   timing: null,
 };

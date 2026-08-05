@@ -195,21 +195,18 @@ export const DISCLOSURE_TEXT =
   "쿠팡파트너스 활동으로 수수료를 받을 수 있습니다.";
 
 /**
- * 카테고리별 B-roll 후보 파일 (public/assets/broll/ 아래).
- * 파일이 없으면 그라디언트 모션 배경으로 자동 대체된다.
+ * (사용 안 함) 카테고리별 B-roll 후보 파일 목록이었다.
+ *
+ * 여기 적힌 30개 파일(car.mp4, cleaning.mp4 …)은 실제로 만들어진 적이 없다.
+ * 2026-08-05 확인: public/assets/broll 에 존재하는 개수 0/30.
+ * 실제 배경은 렌더 시점에 Pexels/Pixabay 에서 받아오고(src/lib/broll.ts
+ * fetchStockBrolls), 받은 파일은 pexels-<id>.mp4 형식이라 이 목록과 이름이 다르다.
+ *
+ * 그래서 이 매핑을 참조하던 pickBrollFile() 은 항상 null 을 돌려주고 있었다.
+ * 파일명만 채워 넣어 되살리는 건 권하지 않는다 - 받아둔 클립에는 카테고리 정보가
+ * 없어서, 차량 상품에 주방 영상이 깔리는 식의 엇갈림이 생긴다. 엇갈린 배경보다
+ * 중립적인 블러 배경이 낫다는 판단으로 이 경로를 걷어냈다.
  */
-export const BROLL_BY_CATEGORY: Record<string, string[]> = {
-  차량용품: ["car.mp4", "driving.mp4", "car-interior.mp4"],
-  청소템: ["cleaning.mp4", "bathroom.mp4", "sink.mp4", "tiles.mp4"],
-  수납템: ["storage.mp4", "room.mp4", "organizing.mp4"],
-  주방템: ["kitchen.mp4", "cooking.mp4", "sink.mp4"],
-  자취템: ["small-room.mp4", "desk.mp4", "daily-life.mp4"],
-  육아생활템: ["kids-room.mp4", "family-home.mp4", "organizing.mp4"],
-  생활템: ["daily-life.mp4", "room.mp4", "organizing.mp4"],
-  반려동물: ["pet.mp4", "home.mp4", "cleaning.mp4"],
-  뷰티: ["bathroom.mp4", "mirror.mp4", "skincare.mp4"],
-  캠핑: ["outdoor.mp4", "camping.mp4"],
-};
 
 /** 템플릿별 상단 배지 문구 */
 export const TEMPLATE_BADGE: Record<"A" | "B" | "C", string | null> = {

@@ -68,7 +68,7 @@ import {
 import { maybeRefreshAliToken, loadAliexpressCredsFromSettings } from "../src/lib/aliexpress";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
-import { BROLL_BY_CATEGORY, VIDEO } from "../remotion/config/videoConfig";
+import { VIDEO } from "../remotion/config/videoConfig";
 import type { ShortsProps } from "../remotion/types";
 import type { Product, VideoItem, VideoItemWithProduct } from "../src/types/db";
 
@@ -110,16 +110,6 @@ async function notify(text: string): Promise<void> {
   }
 }
 
-/** public/assets/broll 에 실제 존재하는 카테고리 B-roll 파일 선택 */
-function pickBrollFile(category: string): string | null {
-  const candidates = BROLL_BY_CATEGORY[category] ?? BROLL_BY_CATEGORY["생활템"] ?? [];
-  for (const file of candidates) {
-    if (fs.existsSync(path.resolve("public", "assets", "broll", file))) {
-      return file;
-    }
-  }
-  return null;
-}
 
 /**
  * script_text (후킹\n공감\n장점1\n장점2\nCTA) → 렌더 props.
@@ -153,7 +143,9 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     ctaText: ctaLine(item.display_number),
     productImageUrl: product.image_url,
     category: product.category,
-    brollFile: pickBrollFile(product.category),
+    // 배경은 렌더 직전에 스톡 검색으로 brollFiles(4컷)에 채운다.
+    // 정적 폴백 경로(pickBrollFile)는 가리키는 파일이 하나도 없어 걷어냈다.
+    brollFile: null,
   };
 }
 
@@ -282,6 +274,7 @@ async function renderVideo(
       );
       if (brolls.length > 0) {
         inputProps.brollFiles = brolls.map((b) => b.file);
+        inputProps.brollDurations = brolls.map((b) => b.durationSec);
         // 새로 받은 클립이 번들에 포함되도록 번들 캐시 무효화
         cachedBundle = null;
         brollOrigin = "실사용 스톡(Pexels)";
