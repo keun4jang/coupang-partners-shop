@@ -79,17 +79,6 @@ function singleLine(text: string): string {
   return text.replace(/\s*\n+\s*/g, " ").trim();
 }
 
-/**
- * 캡션 맨 앞에 대가성 고지를 보장한다.
- * AI 가 지시를 빠뜨려도 고지 없는 게시물이 나가지 않도록 코드에서 강제한다
- * (표시광고법·쿠팡파트너스 운영정책상 고지 누락이 가장 큰 위험이다).
- */
-function ensureDisclosure(captionText: string): string {
-  const caption = (captionText ?? "").trim();
-  if (caption.includes("쿠팡파트너스 활동")) return caption;
-  return `${DISCLOSURE_LINE}\n\n${caption}`;
-}
-
 function sanitizeCopy(copy: VideoCopy): VideoCopy {
   return {
     hookText: singleLine(copy.hookText),
@@ -98,7 +87,7 @@ function sanitizeCopy(copy: VideoCopy): VideoCopy {
     benefit2: singleLine(copy.benefit2),
     usageTip: singleLine(copy.usageTip),
     reviewLine: singleLine(copy.reviewLine),
-    captionText: ensureDisclosure(copy.captionText),
+    captionText: (copy.captionText ?? "").trim(),
   };
 }
 
@@ -266,9 +255,17 @@ export function ctaLine(displayNumber: number): string {
 }
 
 /**
- * 대가성 고지 (표시광고법·쿠팡파트너스 운영정책).
- * 영상 화면과 SNS 캡션 양쪽에 반드시 들어간다. 랜딩에만 두면 정작 광고가
- * 노출되는 SNS 게시물에는 고지가 없는 상태가 되어 위반 소지가 크다.
+ * 대가성 고지 문구.
+ *
+ * 현재 SNS(영상·캡션)에는 넣지 않는다 — 사장님 결정(2026-08-05).
+ * 고지는 랜딩 페이지(src/app/page.tsx 하단)에만 둔다.
+ * 이 상수는 소급 적용 스크립트(scripts/yt-disclosure-backfill.ts)와
+ * 나중에 되돌릴 때를 위해 남겨둔다.
+ *
+ * 참고(되돌릴 판단이 필요할 때): 공정위 「추천·보증 등에 관한 표시·광고 심사지침」은
+ * "게시물의 제목 또는 동영상 내에 표시문구를 포함"하도록 정하고,
+ * "'더보기'를 눌러야만 확인할 수 있는 경우"는 부적절하다고 본다.
+ * 즉 랜딩에만 두는 현재 구성은 지침에 부합하지 않는다.
  */
 export const DISCLOSURE_LINE =
   "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
@@ -314,9 +311,6 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   };
 
   copy.captionText = [
-    // 대가성 고지는 맨 앞 (캡션이 접혀도 보이는 자리)
-    DISCLOSURE_LINE,
-    "",
     `${copy.hookText} ${copy.empathyLine}.`,
     `${shortenProductName(product.product_name)}, ${copy.benefit1}. ${copy.benefit2}.`,
     copy.usageTip,
@@ -365,7 +359,7 @@ const COPY_SCHEMA = {
     captionText: {
       type: "string",
       description:
-        "SNS 업로드용 캡션 전문. 반드시 첫 줄에 대가성 고지 '이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.' + 빈 줄 + 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크에 정리해 뒀어요. (N번)' + 빈 줄 + 해시태그.",
+        "SNS 업로드용 캡션 전문. 본문 2~3문장 + 빈 줄 + '영상 속 제품은 프로필 링크에 정리해 뒀어요. (N번)' + 빈 줄 + 해시태그.",
     },
   },
   required: [
@@ -472,7 +466,6 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
 - 첫 문장이 접힌 캡션에서 유일하게 보이는 줄이다 - 훅의 궁금증을 이어받아 더보기를 누르게 쓴다.
 - "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요." 같은 큐레이션 기준 문장 포함
   (직접 사용해봤다는 표현은 금지 - 고른 기준만 말한다).
-- 반드시 첫 줄에 대가성 고지를 넣는다: "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
 - 반드시 "영상 속 제품은 프로필 링크에 정리해 뒀어요. ({번호}번)" 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
 - 캡션에도 클릭 유도·긴급성·과장 표현을 쓰지 않는다(영상 본문과 같은 규정 적용).
 - 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;

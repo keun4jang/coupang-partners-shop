@@ -13,7 +13,6 @@ import { ProductOverlay } from "../components/ProductOverlay";
 import { CtaScene } from "../components/CtaScene";
 import { Narration } from "../components/Narration";
 import { CoverFrame } from "../components/CoverFrame";
-import { Disclosure } from "../components/Disclosure";
 
 /**
  * Template D: 실사용 영상형
@@ -142,9 +141,12 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[6]} />
       </Sequence>
 
-      {/* 대가성 고지 - 영상 내내 하단에 표시 (표시광고법·쿠팡파트너스 운영정책).
-          커버 프레임보다 아래 레이어라 썸네일에는 안 잡히고 본편에만 보인다. */}
-      <Disclosure />
+      {/* 대가성 고지는 영상 화면에 넣지 않는다(사장님 결정 2026-08-05).
+          고지는 SNS 캡션(ai.ts DISCLOSURE_LINE)과 랜딩 페이지에만 둔다.
+          참고: 공정위 「추천·보증 등에 관한 표시·광고 심사지침」은 "게시물의 제목 또는
+          동영상 내에 표시문구를 포함"하도록 정하고 있어, 캡션만 두는 현재 구성은
+          지침에 부합하지 않는다. 되돌리려면 아래 한 줄을 다시 살리면 된다.
+          <Disclosure /> */}
 
       {/* 첫 프레임 썸네일용 커버 - 맨 위 레이어라 1프레임 동안 다른 요소를 전부 가림 */}
       <Sequence durationInFrames={COVER_FRAME_COUNT}>
