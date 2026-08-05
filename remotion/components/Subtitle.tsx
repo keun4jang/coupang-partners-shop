@@ -94,10 +94,15 @@ export const Subtitle: React.FC<{
               textWrap: "balance",
               color: "#FFFFFF",
               textShadow: `0 4px 24px ${COLORS.subtitleShadow}, 0 2px 10px rgba(0,0,0,0.55), 0 0 30px rgba(0,0,0,0.28)`,
+              // 배경이 밝은 컷에서 흰 자막이 묻힌다. 실측(#75 실제 게시본): 자막 밴드
+              // 평균 밝기가 13% 구간 124, 26% 구간 186 으로 흰색(255)과 대비가 부족하다.
+              // 그림자만으로는 부족해 모든 자막에 얇은 외곽선을 기본으로 깐다
+              // (훅은 썸네일에 박히므로 아래 strong 으로 더 두껍게).
+              WebkitTextStroke: "3px rgba(0,0,0,0.8)",
+              paintOrder: "stroke fill" as const,
               ...(strong
                 ? {
                     WebkitTextStroke: "8px rgba(0,0,0,0.88)",
-                    paintOrder: "stroke fill" as const,
                     lineHeight: 1.2,
                   }
                 : {}),

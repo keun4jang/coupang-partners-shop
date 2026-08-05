@@ -375,8 +375,12 @@ export async function fetchStockBrolls(
   // 슬롯마다 (검색어 · 제공자 · 시드)를 회전시켜 서로 다른 장면/소스가 섞이게 한다.
   const maxAttempts = count * 4 + 8;
   for (let attempt = 0; out.length < count && attempt < maxAttempts; attempt++) {
+    // 검색어와 제공자를 같은 attempt 로 돌리면 조합의 절반에 영원히 도달하지 못한다.
+    // (검색어 4 × 제공자 2 일 때 8조합 중 4개만 나옴 → 검색어 절반이 죽고 배경이 단조로워짐)
+    // 제공자는 검색어를 한 바퀴 돈 뒤에 넘어가게 해 모든 조합을 커버한다.
     const query = queries[attempt % queries.length];
-    const provider = providers[attempt % providers.length];
+    const provider =
+      providers[Math.floor(attempt / queries.length) % providers.length];
     const seed = displayNumber * 101 + attempt * 17;
     try {
       const clip = await provider.fetch(query, seed);

@@ -30,7 +30,8 @@ const MIN_SOURCE_SECONDS = 8;
 /** 소스 영상 최소 가로 해상도 - 저화질 배경 방지 */
 const MIN_WIDTH = 500;
 /** 세그먼트 하나 길이(초) - 장면(2~4초)을 여유 있게 덮는다 */
-const SEGMENT_SECONDS = 4.5;
+/** 소재를 잘라낼 조각 길이(초). 워커가 Loop 판단에 쓰도록 내보낸다 */
+export const SEGMENT_SECONDS = 4.5;
 /** 가장자리 크롭 비율 - 모서리 워터마크/자막 제거용 (86%만 남김) */
 const EDGE_KEEP = 0.86;
 /** 다운로드 용량 상한 */

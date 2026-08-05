@@ -60,6 +60,7 @@ import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls } from "../src/lib/broll";
+import { SEGMENT_SECONDS as FOOTAGE_SEGMENT_SECONDS } from "../src/lib/videoSource";
 import {
   deleteFootageFiles,
   segmentsFromFootage,
@@ -249,16 +250,23 @@ async function renderVideo(
 
   // 포맷 D 배경 우선순위:
   // ⓪ 직접 업로드 소재(스튜디오) → ① 상품 영상 자동 소싱 → ② 스톡 → ③ 블러 상품사진
+  //
+  // 세 경로 모두 컷 수(TemplateD cutSeconds = 6)와 같은 개수를 만들어야 한다.
+  // 모자라면 Background 가 앞 클립을 재사용해 "되감긴 것처럼" 보인다.
+  const BROLL_CUT_COUNT = 6;
   let brollOrigin = "배경 없음(블러 사진)";
   if (effectiveTemplate === "D" && item.footage_paths?.length) {
     console.log(`직접 업로드 소재 처리 중 (${item.footage_paths.length}개)...`);
     const files = await segmentsFromFootage(
       item.footage_paths,
       item.display_number,
-      4
+      BROLL_CUT_COUNT
     );
     if (files.length > 0) {
       inputProps.brollFiles = files;
+      // 잘라낸 조각은 SEGMENT_SECONDS 고정 길이라 컷보다 짧을 수 있다.
+      // 길이를 넘겨야 Background 가 Loop 로 이어 붙여 정지화면을 막는다.
+      inputProps.brollDurations = files.map(() => FOOTAGE_SEGMENT_SECONDS);
       cachedBundle = null;
       brollOrigin = "직접 업로드 소재";
       console.log(`직접 소재 사용: ${files.join(", ")}`);
@@ -268,20 +276,23 @@ async function renderVideo(
   }
   if (effectiveTemplate === "D" && !inputProps.brollFiles) {
     console.log("상품 영상 자동 소싱 중...");
-    const sourced = await sourceProductClips(product, item.display_number, 4);
+    const sourced = await sourceProductClips(
+      product,
+      item.display_number,
+      BROLL_CUT_COUNT
+    );
     if (sourced.files.length > 0) {
       inputProps.brollFiles = sourced.files;
+      inputProps.brollDurations = sourced.files.map(() => FOOTAGE_SEGMENT_SECONDS);
       cachedBundle = null;
       brollOrigin = sourced.origin;
       console.log(`상품 영상 사용 (${sourced.origin}): ${sourced.files.join(", ")}`);
     } else {
       console.log("실사용 스톡 영상 검색 중 (4컷)...");
-      // 컷 수(TemplateD cutSeconds)와 맞춘다 - 6컷이라 클립도 6개.
-      // 모자라면 Background 가 순환시키지만, 그만큼 같은 배경이 반복된다.
       const brolls = await fetchStockBrolls(
         product.category,
         item.display_number,
-        6,
+        BROLL_CUT_COUNT,
         product.product_name
       );
       if (brolls.length > 0) {
