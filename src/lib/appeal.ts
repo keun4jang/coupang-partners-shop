@@ -68,3 +68,43 @@ export function appealDetail(productName: string): AppealResult {
 export function appealScore(productName: string): number {
   return appealDetail(productName).score;
 }
+
+/**
+ * 검색 노출만 노리고 키워드를 도배한 "스팸성 제목" 판정.
+ *
+ * 이런 제목은 두 군데서 손해가 난다:
+ *  1) 영상 카드에 쓸 짧은 이름이 어색하게 나온다
+ *     (예: "H HNMA HN 원목 손잡이 실리콘 주방용품 세트 … 프로모션 여름 대형 할인 패션 위크 조리도구")
+ *  2) 대본 생성이 상품명을 근거로 삼는데, 도배된 제목은 근거가 안 돼 훅이 뭉개진다
+ *
+ * 실제 등록 상품 143개 기준으로 잡은 선: 단어 수 중앙값 6개, 95% 지점이 12개다.
+ * 아래 기준에 걸리는 건 143개 중 4개(2.8%)뿐이라 후보 풀에 영향이 거의 없다.
+ */
+const SPAM_FILLER_WORD =
+  /^(프로모션|할인|특가|세일|이벤트|베스트|신상|위크|패션|인기|추천|사은품|무료배송|최저가|국내최초|1위|정품인증|초특가|핫딜)$/;
+const SPAM_MAX_WORDS = 20;
+const SPAM_MAX_REPEAT = 3;
+const SPAM_MAX_FILLER = 3;
+
+/** 스팸성 제목이면 사유, 아니면 null (로그/리포트에 그대로 쓴다) */
+export function spamTitleReason(productName: string): string | null {
+  // 옵션(쉼표/괄호 뒤)은 어차피 표시에서 잘리므로 본문만 본다
+  const head = (productName ?? "").split(/[,(]/)[0].trim();
+  const words = head.split(/\s+/).filter(Boolean);
+  if (words.length >= SPAM_MAX_WORDS) return `제목 단어 ${words.length}개(도배)`;
+
+  const count = new Map<string, number>();
+  for (const w of words) count.set(w, (count.get(w) ?? 0) + 1);
+  const [topWord, topCount] = [...count.entries()].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  if (topCount >= SPAM_MAX_REPEAT) return `"${topWord}" ${topCount}회 반복`;
+
+  const filler = words.filter((w) => SPAM_FILLER_WORD.test(w));
+  if (filler.length >= SPAM_MAX_FILLER) return `홍보 문구 ${filler.length}개(${filler.join("/")})`;
+
+  return null;
+}
+
+/** 스팸성 제목이면 true (스카우트 수집·영상 선정에서 제외) */
+export function isSpamTitle(productName: string): boolean {
+  return spamTitleReason(productName) !== null;
+}

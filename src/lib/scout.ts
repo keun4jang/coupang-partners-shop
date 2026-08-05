@@ -6,7 +6,7 @@ import {
   priceText,
 } from "./coupang";
 import { dateFolderName } from "./format";
-import { appealScore } from "./appeal";
+import { appealScore, isSpamTitle } from "./appeal";
 
 /**
  * 스카우트(시장조사) — 주부가 많이 살 것 같은 카테고리 베스트에서
@@ -42,6 +42,8 @@ export interface ScoutResult {
   registered: ScoutCandidate[];
   skippedDuplicate: number;
   skippedFiltered: number;
+  /** 키워드 도배 제목이라 아예 후보로 안 받은 수 (필터 조정 근거) */
+  skippedSpamTitle: number;
   errors: string[];
 }
 
@@ -87,6 +89,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   const maxPrice = opts.maxPrice ?? 1_500_000;
 
   const errors: string[] = [];
+  let skippedSpamTitle = 0;
   const known = await loadKnownProductIds();
   const today = dateFolderName();
 
@@ -104,6 +107,12 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       const bucket: ScoutCandidate[] = [];
       for (const p of ranked) {
         if (!passesFilter(p, minPrice, maxPrice)) continue;
+        // 검색 노출용으로 키워드를 도배한 제목은 아예 후보로 받지 않는다
+        // (카드에 쓸 짧은 이름도, 대본 근거도 안 나온다)
+        if (isSpamTitle(p.productName)) {
+          skippedSpamTitle++;
+          continue;
+        }
         bucket.push({
           productId: p.productId,
           product_name: p.productName.trim(),
@@ -163,7 +172,11 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     if (error) throw new Error(`후보 저장 실패: ${error.message}`);
   }
 
-  return { registered, skippedDuplicate, skippedFiltered, errors };
+  if (skippedSpamTitle > 0) {
+    console.log(`스팸성 제목 ${skippedSpamTitle}건 수집 제외`);
+  }
+
+  return { registered, skippedDuplicate, skippedFiltered, skippedSpamTitle, errors };
 }
 
 /** 텔레그램 요약 메시지 */

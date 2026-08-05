@@ -1,6 +1,6 @@
 import type { Product } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
-import { appealScore } from "./appeal";
+import { appealScore, spamTitleReason } from "./appeal";
 
 /**
  * 숏폼에 우선 배정할 카테고리.
@@ -38,6 +38,29 @@ export function parsePriceWon(priceText?: string | null): number | null {
   if (!digits) return null;
   const n = Number(digits);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * 스팸성 제목(검색 노출용 키워드 도배) 상품을 후보에서 뺀다.
+ * 스카우트 단계에서도 막지만, 그 필터가 생기기 전에 쌓인 후보가 DB 에 남아 있어
+ * 선정 시점에도 한 번 더 거른다. 무엇이 왜 빠졌는지는 로그로 남긴다.
+ */
+function dropSpamTitles(products: Product[]): Product[] {
+  const kept: Product[] = [];
+  for (const p of products) {
+    const reason = spamTitleReason(p.product_name);
+    if (reason) {
+      console.log(`제외(스팸성 제목 · ${reason}): ${p.product_name.slice(0, 60)}`);
+      continue;
+    }
+    kept.push(p);
+  }
+  // 전부 걸러졌다면 필터가 과했다는 뜻이므로 원본을 그대로 쓴다 (발행이 멈추면 안 된다)
+  if (kept.length === 0 && products.length > 0) {
+    console.warn("후보가 전부 스팸성 제목으로 걸러져 필터를 건너뜁니다");
+    return products.slice();
+  }
+  return kept;
 }
 
 function score(product: Product): number {
@@ -88,7 +111,7 @@ export async function selectProductForVideo(): Promise<Product | null> {
     countByProduct.set(row.product_id, (countByProduct.get(row.product_id) ?? 0) + 1);
   }
 
-  const sorted = (products as Product[]).slice().sort((a, b) => {
+  const sorted = dropSpamTitles(products as Product[]).sort((a, b) => {
     const scoreDiff = score(b) - score(a);
     if (scoreDiff !== 0) return scoreDiff;
     const countDiff =
@@ -124,9 +147,9 @@ export async function selectProductsForVideos(count: number): Promise<Product[]>
   if (vcError) throw new Error(`영상 수 조회 실패: ${vcError.message}`);
   const usedProductIds = new Set((videoRows ?? []).map((r) => r.product_id));
 
-  // 아직 영상이 없고 이미지가 있는 후보만
-  const fresh = (products as Product[]).filter(
-    (p) => !usedProductIds.has(p.id) && p.image_url
+  // 아직 영상이 없고 이미지가 있는 후보만 (스팸성 제목은 여기서 제외)
+  const fresh = dropSpamTitles(
+    (products as Product[]).filter((p) => !usedProductIds.has(p.id) && p.image_url)
   );
   if (fresh.length === 0) return [];
 
