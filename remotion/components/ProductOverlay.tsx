@@ -50,12 +50,17 @@ export const ProductOverlay: React.FC<{
   // 제품 이미지: 0.95 → 1.0 로 살짝 pop
   const pop = spring({ frame, fps, config: { damping: 18, mass: 0.6 } });
 
-  // 디테일 컷: 한 장을 전체→부분확대로 "딱딱" 전환(움직임 없이 하드컷)
+  // 디테일 컷: 한 장을 전체→부분확대로 "딱딱" 전환(움직임 없이 하드컷).
+  //
+  // 쿠팡이 주는 이미지는 상품당 1장뿐이라 이 확대 컷이 "여러 장처럼" 보이게 하는
+  // 유일한 수단이다. 다만 예전 설정(2.1~2.2배 + 구석 크롭)은 확대가 과해서
+  // 제품 형태가 안 보이고 배경만 잡히는 컷이 나왔다 → 배율을 낮추고 중앙 쪽으로
+  // 모아, 어느 컷에서든 제품이 보이게 한다.
   const shots = [
-    { z: 1.0, cx: 0.5, cy: 0.5 },
-    { z: 1.6, cx: 0.5, cy: 0.5 },
-    { z: 2.1, cx: 0.32, cy: 0.3 },
-    { z: 2.2, cx: 0.66, cy: 0.68 },
+    { z: 1.0, cx: 0.5, cy: 0.5 }, // 전체
+    { z: 1.35, cx: 0.5, cy: 0.48 }, // 살짝 당김
+    { z: 1.5, cx: 0.42, cy: 0.45 }, // 왼쪽 위 디테일
+    { z: 1.5, cx: 0.58, cy: 0.55 }, // 오른쪽 아래 디테일
   ];
   const shot = shots[Math.floor(frame / Math.round(fps * 2.2)) % shots.length];
   const tx = (0.5 - shot.cx * shot.z) * 100;
@@ -146,6 +151,12 @@ export const ProductOverlay: React.FC<{
           letterSpacing: "-0.02em",
           wordBreak: "keep-all",
           textWrap: "balance",
+          // 상품명이 길어 3줄 이상이 되면 카드가 늘어나 번호 배지·대가성 고지와
+          // 겹친다. 2줄로 잘라 카드 높이를 예측 가능하게 유지한다.
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
         }}
       >
         {productName}

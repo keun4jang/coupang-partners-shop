@@ -25,6 +25,63 @@ function youtubeClient() {
   return google.youtube({ version: "v3", auth: oauth2 });
 }
 
+export type DescriptionUpdateResult =
+  | "updated"
+  | "alreadyHas"
+  | "notFound"
+  | "failed";
+
+/**
+ * 이미 게시된 영상의 설명(캡션)에 문구를 덧붙인다.
+ * 대가성 고지 소급 적용용 - 영상 재렌더·재업로드 없이 설명만 고친다.
+ *
+ * 비용(units): videos.list = 1, videos.update = 50.
+ * update 는 snippet 전체를 덮어쓰므로 title·categoryId·tags 를 그대로 되돌려 보낸다
+ * (빠뜨리면 제목이 지워지거나 카테고리가 초기화된다).
+ *
+ * @param marker 이 문자열이 설명에 이미 있으면 건드리지 않는다(중복 방지)
+ */
+export async function prependToDescription(
+  videoId: string,
+  text: string,
+  marker: string
+): Promise<DescriptionUpdateResult> {
+  const youtube = youtubeClient();
+  if (!youtube) return "failed";
+  try {
+    const { data } = await youtube.videos.list({
+      part: ["snippet"],
+      id: [videoId],
+    });
+    const item = data.items?.[0];
+    if (!item?.snippet) return "notFound";
+
+    const snippet = item.snippet;
+    const description = snippet.description ?? "";
+    if (description.includes(marker)) return "alreadyHas";
+
+    await youtube.videos.update({
+      part: ["snippet"],
+      requestBody: {
+        id: videoId,
+        snippet: {
+          title: snippet.title ?? "",
+          categoryId: snippet.categoryId ?? CATEGORY_HOWTO_STYLE,
+          tags: snippet.tags ?? undefined,
+          defaultLanguage: snippet.defaultLanguage ?? undefined,
+          description: `${text}\n\n${description}`.trim(),
+        },
+      },
+    });
+    return "updated";
+  } catch (e) {
+    const msg = (e as Error).message ?? "";
+    if (/not found|videoNotFound/i.test(msg)) return "notFound";
+    console.warn(`설명 수정 실패(${videoId}): ${msg.slice(0, 150)}`);
+    return "failed";
+  }
+}
+
 export function hasYoutubeEnv(): boolean {
   return Boolean(
     optionalEnv("YOUTUBE_OAUTH_CLIENT_ID") && optionalEnv("YOUTUBE_OAUTH_REFRESH_TOKEN")
