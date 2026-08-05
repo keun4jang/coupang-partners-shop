@@ -181,7 +181,7 @@ function pickFile(video: PexelsVideo): PexelsVideoFile | null {
  * 복사되므로 렌더가 느려지고 디스크도 낭비된다. 오래된 것부터 정리해 상한을 지킨다.
  * (지워져도 다음 렌더에서 필요하면 다시 받으므로 안전하다)
  */
-const MAX_CACHED_CLIPS = 12;
+const MAX_CACHED_CLIPS = 18;
 
 /** 오래된 클립부터 지워 MAX_CACHED_CLIPS 개만 남긴다 */
 function pruneOldClips(keepFilenames: string[] = []): void {
@@ -244,17 +244,25 @@ async function fetchFromPixabay(
       videos: Record<string, { url: string; width: number; height: number }>;
     }>;
   };
+  // 세로(9:16) 렌디션이 있는 것만 후보로 둔다.
+  // 예전엔 세로가 없으면 가로 파일을 받아 왔는데, 배경은 objectFit:cover 라
+  // 16:9 를 9:16 에 맞추면 좌우가 70% 잘리고 1.9배 확대돼 정작 보여줄 피사체가
+  // 화면 밖으로 나갔다. 세로가 없으면 그 후보는 건너뛰고 다음 시드·검색어로 간다.
   const candidates = (data.hits ?? []).filter(
-    (v) => v.duration >= MIN_DURATION_SEC && v.duration <= MAX_DURATION_SEC
+    (v) =>
+      v.duration >= MIN_DURATION_SEC &&
+      v.duration <= MAX_DURATION_SEC &&
+      Object.values(v.videos).some((f) => f.url && f.height > f.width)
   );
   if (candidates.length === 0) return null;
   const video = candidates[Math.abs(seed) % candidates.length];
-  // 세로 파일 우선, 없으면 큰 해상도(가로여도 cover 크롭)
-  const files = Object.values(video.videos).filter((f) => f.url);
-  const portrait = files.filter((f) => f.height > f.width);
-  const pick =
-    portrait.sort((a, b) => Math.abs(a.width - 1080) - Math.abs(b.width - 1080))[0] ??
-    files.sort((a, b) => b.height - a.height)[0];
+  const portrait = Object.values(video.videos).filter(
+    (f) => f.url && f.height > f.width
+  );
+  // 1080 폭에 가장 가까운 세로 렌디션
+  const pick = portrait.sort(
+    (a, b) => Math.abs(a.width - 1080) - Math.abs(b.width - 1080)
+  )[0];
   if (!pick) return null;
   const filename = await downloadClip(pick.url, `pixabay-${video.id}.mp4`);
   if (!filename) return null;

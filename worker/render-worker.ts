@@ -223,6 +223,11 @@ async function getBundle(): Promise<string> {
   console.log("Remotion 번들 생성 중...");
   cachedBundle = await bundle({
     entryPoint: path.resolve("remotion/index.ts"),
+    // public/ 을 복사하지 않고 심볼릭 링크로 연결한다.
+    // 기본값(false)이면 번들을 만들 때마다 public 폴더 전체를 /tmp 로 복사하는데,
+    // 배경 클립이 들어 있어 번들 하나가 1GB 가까이 나오고 정리도 안 돼
+    // /tmp 에 계속 쌓였다(2026-08-05 확인: 번들 47개, 최대 997MB).
+    symlinkPublicDir: true,
   });
   return cachedBundle;
 }
@@ -230,7 +235,12 @@ async function getBundle(): Promise<string> {
 async function renderVideo(
   item: VideoItem,
   product: Product
-): Promise<{ videoPath: string; thumbnailPath: string; brollOrigin: string }> {
+): Promise<{
+  videoPath: string;
+  thumbnailPath: string;
+  brollOrigin: string;
+  brollFiles: string[];
+}> {
   const inputProps = buildProps(item, product);
 
   // 렌더할 실제 템플릿. FORCE_TEMPLATE 로 배치 렌더 시 강제 지정 가능
@@ -266,10 +276,12 @@ async function renderVideo(
       console.log(`상품 영상 사용 (${sourced.origin}): ${sourced.files.join(", ")}`);
     } else {
       console.log("실사용 스톡 영상 검색 중 (4컷)...");
+      // 컷 수(TemplateD cutSeconds)와 맞춘다 - 6컷이라 클립도 6개.
+      // 모자라면 Background 가 순환시키지만, 그만큼 같은 배경이 반복된다.
       const brolls = await fetchStockBrolls(
         product.category,
         item.display_number,
-        4,
+        6,
         product.product_name
       );
       if (brolls.length > 0) {
@@ -364,7 +376,13 @@ async function renderVideo(
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });
 
-  return { videoPath, thumbnailPath, brollOrigin };
+  return {
+    videoPath,
+    thumbnailPath,
+    brollOrigin,
+    // 어떤 배경이 실제로 쓰였는지 DB 에 남긴다 (사후 검증용)
+    brollFiles: inputProps.brollFiles ?? [],
+  };
 }
 
 /**
@@ -531,7 +549,10 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       item = await fillVideoCopy(item, product);
     }
 
-    const { videoPath, thumbnailPath, brollOrigin } = await renderVideo(item, product);
+    const { videoPath, thumbnailPath, brollOrigin, brollFiles } = await renderVideo(
+      item,
+      product
+    );
     const captionText = item.caption_text ?? "";
 
     let driveVideoUrl: string | null = null;
@@ -591,6 +612,8 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         .from("video_items")
         .update({
           video_status: "rendered",
+          broll_origin: brollOrigin,
+          broll_files: brollFiles,
           drive_video_url: driveVideoUrl,
           drive_video_file_id: driveVideoFileId,
           drive_caption_url: driveCaptionUrl,
@@ -635,6 +658,8 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       .from("video_items")
       .update({
         video_status: "completed",
+        broll_origin: brollOrigin,
+        broll_files: brollFiles,
         drive_video_url: driveVideoUrl,
         drive_video_file_id: driveVideoFileId,
         drive_caption_url: driveCaptionUrl,

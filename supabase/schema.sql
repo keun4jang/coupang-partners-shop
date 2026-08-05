@@ -55,6 +55,10 @@ create table if not exists video_items (
   instagram_error text,
   facebook_url text,
   facebook_error text,
+  -- 실제로 쓰인 배경 자료화면 기록 (사후 검증용)
+  -- broll_origin: "실사용 스톡(Pexels)" / "직접 업로드 소재" / "배경 없음(블러 사진)" 등
+  broll_origin text,
+  broll_files jsonb,
   landing_visible boolean not null default false,
   -- 텔레그램 "업로드" 등 수동 요청 여부. 수동 항목은 업로드 슬롯 게이트를 우회한다.
   manual boolean not null default false,
@@ -86,6 +90,8 @@ create table if not exists click_logs (
 
 -- 기존 배포에 컬럼 추가 (재실행해도 안전)
 alter table click_logs add column if not exists slot text;
+alter table video_items add column if not exists broll_origin text;
+alter table video_items add column if not exists broll_files jsonb;
 
 create index if not exists idx_click_logs_video_item_id on click_logs (video_item_id);
 create index if not exists idx_click_logs_display_number on click_logs (display_number);

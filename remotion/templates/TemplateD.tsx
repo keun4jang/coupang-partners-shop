@@ -32,7 +32,20 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         brollFile={props.brollFile}
         brollFiles={props.brollFiles}
         brollDurations={props.brollDurations}
-        cutSeconds={[0, T.empathy.to, T.product.to, T.benefit2.to]}
+        // 배경 컷 경계. 예전엔 4개뿐이라 마지막 컷이 영상의 49%(21초 중 10.2초)를
+        // 혼자 차지해 후반 내내 같은 배경이 깔렸다. 사용팁·후기 경계를 넣어 고르게 나눈다.
+        // 사용팁이 없는 구버전 대본은 tip.to === benefit2.to 라 0초 컷이 생기므로
+        // 중복을 제거한다.
+        cutSeconds={[
+          ...new Set([
+            0,
+            T.empathy.to,
+            T.product.to,
+            T.benefit2.to,
+            T.tip.to,
+            T.review.to,
+          ]),
+        ]}
         bgImageUrl={
           props.brollFiles?.length || props.brollFile
             ? null
