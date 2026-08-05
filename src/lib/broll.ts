@@ -128,14 +128,19 @@ function categoryQueries(category: string): string[] {
 
 /**
  * 생활감 보정: 산업/상업 시설 장면(공장 세탁실, 업소 주방 등)이 걸리지 않도록
- * 집안 장면이 어울리는 검색어에는 "home domestic" 힌트를 강제한다.
+ * 집안 장면이 어울리는 검색어에 "home" 힌트를 강제한다.
  * (10번 영상에서 세탁세제 배경이 산업용 세탁공장으로 나온 문제의 재발 방지)
+ *
+ * 예전엔 "domestic" 도 함께 붙였는데 실측 결과 빼는 게 낫다(2026-08-05):
+ *  - Pexels(주력): 붙이든 안 붙이든 총 결과가 8000 으로 같다. 산업 장면을 걸러내는
+ *    효과는 없고 상위 랭킹만 흔들었다.
+ *  - Pixabay: 태그 매칭이라 domestic 이 "domestic cat/animal" 에 걸린다. 게다가
+ *    세로 후보를 오히려 줄였다("organizing home closet" 기준 1개 → 0개).
  */
 const NON_HOME_QUERY = /\b(car|camping|outdoor|stroller)\b/;
 function domesticize(query: string): string {
   if (NON_HOME_QUERY.test(query)) return query;
-  const withHome = query.includes("home") ? query : `${query} home`;
-  return withHome.includes("domestic") ? withHome : `${withHome} domestic`;
+  return query.includes("home") ? query : `${query} home`;
 }
 
 interface PexelsVideoFile {
@@ -241,6 +246,7 @@ async function fetchFromPixabay(
     hits?: Array<{
       id: number;
       duration: number;
+      tags?: string;
       videos: Record<string, { url: string; width: number; height: number }>;
     }>;
   };
@@ -248,10 +254,14 @@ async function fetchFromPixabay(
   // 예전엔 세로가 없으면 가로 파일을 받아 왔는데, 배경은 objectFit:cover 라
   // 16:9 를 9:16 에 맞추면 좌우가 70% 잘리고 1.9배 확대돼 정작 보여줄 피사체가
   // 화면 밖으로 나갔다. 세로가 없으면 그 후보는 건너뛰고 다음 시드·검색어로 간다.
+  // 동물 태그 제외: 살림템 배경에 고양이·강아지 영상이 섞이면 맥락이 어긋난다.
+  // (세로 필터로 이미 대부분 걸러지지만 저비용 안전장치로 남긴다)
+  const ANIMAL_TAGS = /\b(cat|dog|pet|animal|kitten|puppy)\b/i;
   const candidates = (data.hits ?? []).filter(
     (v) =>
       v.duration >= MIN_DURATION_SEC &&
       v.duration <= MAX_DURATION_SEC &&
+      !ANIMAL_TAGS.test(v.tags ?? "") &&
       Object.values(v.videos).some((f) => f.url && f.height > f.width)
   );
   if (candidates.length === 0) return null;
