@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
  * video_item_id + display_number 를 함께 기록한다.
  *
  * slot: 랜딩에서 어느 자리를 눌렀는지 (hero=원탭 히어로 / list=아래 목록 /
- *       search=번호 검색 결과). 히어로가 실제로 먹히는지 판단하는 근거가 된다.
+ *       search=번호 검색 결과 / direct=영상 설명란의 /n/{번호} 직행 링크).
+ *       히어로가 실제로 먹히는지, 직행 링크가 경로를 줄여주는지 판단하는 근거.
  *
  * subId: 쿠팡파트너스 링크에 영상 번호를 심어 "어느 영상이 실제로 돈을 벌었는지"를
  *        커미션 리포트에서 되짚을 수 있게 한다. 이게 없으면 수익이 한 덩어리로만
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
  */
 
 /** 허용 slot 값 (임의 문자열이 DB 에 들어가지 않게 화이트리스트) */
-const SLOTS = new Set(["hero", "list", "search"]);
+const SLOTS = new Set(["hero", "list", "search", "direct"]);
 
 export async function GET(request: NextRequest) {
   const videoItemId = request.nextUrl.searchParams.get("videoItemId");

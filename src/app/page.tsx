@@ -50,8 +50,11 @@ function HeroCard({
 }: {
   item: VideoItemWithProduct;
   label: string;
-  /** 히어로가 번호검색 결과인지(search) 최신 추천인지(hero) - 성과 비교용 */
-  slot: "hero" | "search";
+  /**
+   * 히어로가 어디서 왔는지 - 성과 비교용.
+   * direct=영상 설명란 /n/{번호} 직행 / search=번호검색 / hero=최신 추천
+   */
+  slot: "hero" | "search" | "direct";
 }) {
   const product: Product = item.products;
   return (
@@ -128,9 +131,9 @@ function ItemCard({ item }: { item: VideoItemWithProduct }) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; s?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, s } = await searchParams;
 
   let result: VideoItemWithProduct | null = null;
   let items: VideoItemWithProduct[] = [];
@@ -147,6 +150,9 @@ export default async function Home({
   //  검색 안 했으면 최신 제품을 보여주고 라벨은 오해 없게 "오늘의 추천"으로 둔다)
   const hero = result ?? items[0] ?? null;
   const searched = Boolean(result);
+  // /n/{번호} 직행으로 들어온 방문 (영상 설명란 링크). 번호 검색과 화면은 같지만
+  // 유입 경로가 달라 클릭 로그에서 구분해야 효과를 잴 수 있다.
+  const direct = searched && s === "direct";
   const heroLabel = searched
     ? `🔎 ${result!.display_number}번, 이 제품이에요!`
     : "🔥 오늘의 추천 살림템";
@@ -215,7 +221,7 @@ export default async function Home({
         <HeroCard
           item={hero}
           label={heroLabel}
-          slot={searched ? "search" : "hero"}
+          slot={direct ? "direct" : searched ? "search" : "hero"}
         />
       )}
 

@@ -35,8 +35,23 @@ type Row = {
   display_number: number;
   slot: string | null;
   user_agent: string | null;
+  referrer: string | null;
   created_at: string;
 };
+
+/**
+ * 유입 채널 판정. 랜딩 진입 URL 이 referer 헤더에 통째로 남아(동일 출처 이동),
+ * 인스타 바이오 링크에 붙여둔 utm_source=ig 가 그대로 실려 온다.
+ * → DB 컬럼을 새로 파지 않고도 채널을 가를 수 있다.
+ */
+function sourceOf(referrer: string | null): string {
+  const r = referrer ?? "";
+  if (/utm_source=ig|fbclid=|instagram/i.test(r)) return "인스타";
+  if (/utm_source=(yt|youtube)|youtube\.com/i.test(r)) return "유튜브";
+  if (/[?&]s=direct|\/n\//.test(r)) return "영상 직행링크";
+  if (r) return "출처표시 없음";
+  return "(referrer 없음)";
+}
 
 function classify(rows: Row[]) {
   const crawl = new Set<number>();
@@ -80,7 +95,7 @@ function classify(rows: Row[]) {
 async function main() {
   const { data, error } = await supabaseAdmin()
     .from("click_logs")
-    .select("display_number, slot, user_agent, created_at")
+    .select("display_number, slot, user_agent, referrer, created_at")
     .order("created_at");
   if (error) throw new Error(error.message);
   const all = (data ?? []) as Row[];
@@ -109,6 +124,12 @@ async function main() {
   const m = new Map<string, number>();
   for (const r of slotted) m.set(r.slot ?? "(미기록)", (m.get(r.slot ?? "(미기록)") ?? 0) + 1);
   for (const [k, v] of [...m].sort((a, b) => b[1] - a[1])) console.log(`  ${k.padEnd(12)} ${v}건`);
+
+  console.log("\n유입 채널 (실제 의도 기준):");
+  const src = new Map<string, number>();
+  for (const r of kept) src.set(sourceOf(r.referrer), (src.get(sourceOf(r.referrer)) ?? 0) + 1);
+  for (const [k, v] of [...src].sort((a, b) => b[1] - a[1]))
+    console.log(`  ${k.padEnd(16)} ${v}건`);
 
   console.log("\n일자별 실제 클릭 의도:");
   const day = new Map<string, number>();
