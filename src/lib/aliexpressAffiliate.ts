@@ -28,24 +28,27 @@ import {
  * (쿠팡 파이프라인이 알리 미설정 때문에 멈추면 안 된다)
  */
 
-/** 실제 발급받지 않은 자리표시자. 이 값으로 링크를 만들면 수수료가 안 붙는다 */
-const PLACEHOLDER_TRACKING_IDS = new Set(["", "default", "your_tracking_id", "changeme"]);
+/**
+ * 아직 값을 안 넣은 상태를 가리키는 문자열.
+ *
+ * "default" 를 여기 넣었다가 뺐다. 알리는 어필리에이트 승인 시 이름이 그대로
+ * "default" 인 Tracking ID 를 자동 발급한다(실측: 계정→트래킹ID 목록에 default
+ * 하나, 생성 시각이 승인 시각과 동일). 즉 진짜 값이라 막으면 안 된다.
+ * (막았던 근거였던 "수수료가 안 붙는다"는 추측이었고 사실이 아니었다)
+ */
+const UNSET_TRACKING_IDS = new Set(["", "your_tracking_id", "changeme", "todo"]);
 
 export function hasAffiliateEnv(): boolean {
   const tid = (optionalEnv("ALIEXPRESS_TRACKING_ID") ?? "").trim();
-  return hasAppEnv(AFFILIATE_APP) && !PLACEHOLDER_TRACKING_IDS.has(tid.toLowerCase());
+  return hasAppEnv(AFFILIATE_APP) && !UNSET_TRACKING_IDS.has(tid.toLowerCase());
 }
 
-/**
- * 왜 자리표시자를 막는가: `.env` 에 ALIEXPRESS_TRACKING_ID=default 가 들어 있으면
- * API 는 200 을 주지만 그 링크에는 수수료가 붙지 않는다. 조용히 돈이 새는 종류의
- * 실패라, 아예 미설정으로 취급해 링크를 만들지 않는 편이 낫다.
- */
+/** 값이 안 들어왔으면 null (링크를 만들지 않는다) */
 function trackingId(): string | null {
   const tid = (optionalEnv("ALIEXPRESS_TRACKING_ID") ?? "").trim();
-  if (PLACEHOLDER_TRACKING_IDS.has(tid.toLowerCase())) {
+  if (UNSET_TRACKING_IDS.has(tid.toLowerCase())) {
     console.warn(
-      "알리 TRACKING_ID 가 자리표시자입니다(어필리에이트 승인 후 실제 값으로 교체 필요) - 제휴 링크 생성을 건너뜁니다"
+      "알리 TRACKING_ID 미설정 - 제휴 링크 생성을 건너뜁니다 (portals.aliexpress.com 계정→트래킹ID 에서 확인)"
     );
     return null;
   }
@@ -267,8 +270,7 @@ export async function fetchAffiliateOrders(
 export async function affiliateStatus(): Promise<string> {
   if (!hasAppEnv(AFFILIATE_APP)) return "미설정 (어필리에이트 앱 키 없음)";
   const tid = (optionalEnv("ALIEXPRESS_TRACKING_ID") ?? "").trim();
-  if (PLACEHOLDER_TRACKING_IDS.has(tid.toLowerCase()))
-    return "미설정 (Tracking ID 가 자리표시자)";
+  if (UNSET_TRACKING_IDS.has(tid.toLowerCase())) return "미설정 (Tracking ID 없음)";
   const token = await currentToken(AFFILIATE_APP);
   if (!token) return "키는 있으나 OAuth 미완료";
   return `준비됨 (tracking_id=${tid})`;
