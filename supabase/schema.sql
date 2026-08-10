@@ -161,3 +161,49 @@ create trigger trg_app_settings_updated_at
   for each row execute function set_updated_at();
 
 alter table app_settings enable row level security;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 알리익스프레스 제휴 상품 (쿠팡과 별개)
+--
+-- products 를 재사용하지 않은 이유: 쿠팡은 "영상 1개 = 상품 1개" 로 묶여
+-- video_items 와 한 몸이지만, 알리는 영상 없이 랜딩에만 얹는 경우가 있다.
+-- 스키마도 수명주기도 달라 섞으면 양쪽 다 지저분해진다.
+-- ─────────────────────────────────────────────────────────────────────
+create table if not exists ali_items (
+  id uuid primary key default gen_random_uuid(),
+  ali_product_id text,
+  title text not null,
+  image_url text,
+  price_text text,
+  -- 원본 알리 상품 URL. 어필리에이트 승인 전에는 이 주소로 나간다(수수료 없음).
+  product_url text not null,
+  -- affiliate.link.generate 로 만든 제휴 링크. 승인 후 채워지며 있으면 이쪽이 우선.
+  affiliate_url text,
+  commission_rate text,
+  landing_visible boolean not null default false,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 알리 클릭 로그. click_logs 는 video_item_id/product_id 가 NOT NULL 이라 재사용 불가.
+create table if not exists ali_click_logs (
+  id uuid primary key default gen_random_uuid(),
+  ali_item_id uuid not null references ali_items(id) on delete cascade,
+  referrer text,
+  user_agent text,
+  slot text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_ali_items_visible on ali_items (landing_visible, sort_order);
+create index if not exists idx_ali_click_logs_item on ali_click_logs (ali_item_id);
+create index if not exists idx_ali_click_logs_created on ali_click_logs (created_at);
+
+drop trigger if exists trg_ali_items_updated_at on ali_items;
+create trigger trg_ali_items_updated_at
+  before update on ali_items
+  for each row execute function set_updated_at();
+
+alter table ali_items enable row level security;
+alter table ali_click_logs enable row level security;

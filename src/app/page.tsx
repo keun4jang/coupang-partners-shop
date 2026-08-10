@@ -1,7 +1,8 @@
 import Link from "next/link";
-import type { Product, VideoItemWithProduct } from "@/types/db";
+import type { AliItem, Product, VideoItemWithProduct } from "@/types/db";
 import { supabaseAdmin } from "@/lib/supabase";
 import { formatDisplayNumber, shortenProductName } from "@/lib/format";
+import { visibleAliItems } from "@/lib/aliItems";
 import { APP_VERSION } from "@/lib/appVersion";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +129,42 @@ function ItemCard({ item }: { item: VideoItemWithProduct }) {
   );
 }
 
+/** 알리 상품 카드 - 쿠팡 목록과 한눈에 구분되게 배지를 단다 */
+function AliCard({ item }: { item: AliItem }) {
+  return (
+    <a
+      href={`/api/click/ali?itemId=${item.id}&slot=ali`}
+      rel="nofollow sponsored"
+      className="flex gap-3 items-center bg-card rounded-2xl p-3 shadow-sm border border-accent-soft active:scale-[0.99] transition-transform"
+    >
+      {item.image_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.image_url}
+          alt=""
+          className="w-20 h-20 rounded-xl object-cover bg-white shrink-0 border border-accent-soft"
+        />
+      ) : (
+        <div className="w-20 h-20 rounded-xl bg-accent-soft shrink-0 flex items-center justify-center text-2xl">
+          📦
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <span className="inline-block bg-[#FFE8D6] text-[#8A4B1F] font-semibold rounded-full px-2 py-0.5 text-[11px]">
+          해외직구
+        </span>
+        <h3 className="font-bold text-[15px] mt-1 leading-snug line-clamp-2">
+          {item.title}
+        </h3>
+        {item.price_text && (
+          <p className="text-sub text-xs mt-0.5">{item.price_text}</p>
+        )}
+      </div>
+      <span className="shrink-0 text-primary-dark font-extrabold text-sm">보기 →</span>
+    </a>
+  );
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -137,10 +174,12 @@ export default async function Home({
 
   let result: VideoItemWithProduct | null = null;
   let items: VideoItemWithProduct[] = [];
+  let aliItems: AliItem[] = [];
   let dbReady = true;
   try {
     if (q) result = await findByNumber(q);
     items = await visibleItems();
+    aliItems = await visibleAliItems();
   } catch {
     dbReady = false;
   }
@@ -239,9 +278,28 @@ export default async function Home({
         </section>
       )}
 
+      {/* 알리익스프레스 제휴 상품 - 등록된 게 있을 때만 */}
+      {dbReady && aliItems.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-bold text-base mb-1 px-1">해외직구로 더 싸게</h2>
+          <p className="text-sub text-xs mb-2.5 px-1">
+            배송에 1~2주 걸리지만 같은 물건을 더 저렴하게 살 수 있어요.
+          </p>
+          <div className="flex flex-col gap-2">
+            {aliItems.map((item) => (
+              <AliCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* 대가성 문구 + 버전 (수정할 때마다 자동으로 올라감) */}
       <footer className="mt-12 text-center text-sub text-xs leading-relaxed">
-        쿠팡파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다.
+        {/* 제휴처가 늘면 고지도 같이 늘어야 한다. 알리 상품이 실제로 노출될 때만
+            알리를 함께 적어, 없는 제휴를 표시하지 않는다. */}
+        {aliItems.length > 0
+          ? "쿠팡파트너스 및 알리익스프레스 어필리에이트 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다."
+          : "쿠팡파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다."}
         <span className="block mt-2 text-sub/50">{APP_VERSION}</span>
       </footer>
     </main>

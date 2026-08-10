@@ -205,6 +205,12 @@ export default async function AdminDashboard() {
         >
           영상 생성 요청
         </Link>
+        <Link
+          href="/admin/ali"
+          className="bg-card border border-accent text-primary-dark font-bold rounded-xl px-5 py-3"
+        >
+          알리 상품
+        </Link>
       </section>
     </main>
   );

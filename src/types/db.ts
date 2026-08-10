@@ -112,3 +112,21 @@ export interface VideoCopy {
   /** SNS 업로드용 캡션 전문 */
   captionText: string;
 }
+
+/** 알리익스프레스 제휴 상품 (쿠팡 products 와 별개 테이블) */
+export interface AliItem {
+  id: string;
+  ali_product_id: string | null;
+  title: string;
+  image_url: string | null;
+  price_text: string | null;
+  /** 원본 알리 상품 URL (승인 전에는 이 주소로 나간다 - 수수료 없음) */
+  product_url: string;
+  /** 제휴 링크. 있으면 이쪽이 우선 */
+  affiliate_url: string | null;
+  commission_rate: string | null;
+  landing_visible: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
