@@ -67,6 +67,10 @@ import {
   sourceProductClips,
 } from "../src/lib/videoSource";
 import { maybeRefreshAliToken, loadAliexpressCredsFromSettings } from "../src/lib/aliexpress";
+import {
+  loadAffiliateCredsFromSettings,
+  maybeRefreshAffiliateToken,
+} from "../src/lib/aliexpressAffiliate";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { VIDEO } from "../remotion/config/videoConfig";
@@ -992,8 +996,10 @@ async function processPending(): Promise<number> {
 
   // 인스타 장기 토큰 자동 갱신 (7일 주기, 하루 1회 시도 - 60일 만료 방지)
   await maybeRefreshInstagramToken();
-  // 알리 access_token 자동 갱신 (12시간 주기)
+  // 알리 access_token 자동 갱신 (12시간 주기). DS 와 어필리에이트는 앱이 달라
+  // 토큰도 따로다 - 둘 다 갱신한다(미설정이면 각자 조용히 넘어간다).
   await maybeRefreshAliToken();
+  await maybeRefreshAffiliateToken();
 
   const db = supabaseAdmin();
   const { data, error } = await db
@@ -1130,6 +1136,8 @@ async function main(): Promise<void> {
   // 알리 앱 키: WORKER_ENV(구 스냅샷)에 없으면 app_settings 에서 로드
   // (없으면 알리 소싱이 조용히 스킵돼 스톡 폴백만 쓰게 됨)
   await loadAliexpressCredsFromSettings();
+  // 어필리에이트 앱 키·트래킹ID (승인 전이면 미설정 상태로 조용히 넘어감)
+  await loadAffiliateCredsFromSettings();
 
   if (once) {
     const n = await processPending();
