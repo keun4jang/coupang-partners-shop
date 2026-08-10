@@ -67,13 +67,26 @@ export default function ProductForm({
         </select>
       </Field>
 
-      <Field label="쿠팡파트너스 링크 *">
+      <Field label="제휴처">
+        <select
+          name="source"
+          defaultValue={product?.source ?? "coupang"}
+          className={inputCls}
+        >
+          <option value="coupang">쿠팡파트너스</option>
+          <option value="aliexpress">알리익스프레스 (해외직구)</option>
+        </select>
+      </Field>
+
+      {/* 쿠팡이면 파트너스 링크, 알리면 상품 URL 을 넣는다.
+          알리 제휴링크는 승인 후 자동 생성되므로 여기서는 원본 주소만 받는다. */}
+      <Field label="상품 링크 * (쿠팡=파트너스 링크 / 알리=상품 URL)">
         <input
           name="coupang_partner_url"
           required
           type="url"
           defaultValue={product?.coupang_partner_url ?? ""}
-          placeholder="https://link.coupang.com/..."
+          placeholder="https://link.coupang.com/... 또는 https://www.aliexpress.com/item/....html"
           className={inputCls}
         />
       </Field>

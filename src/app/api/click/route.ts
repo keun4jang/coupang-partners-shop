@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { withSubId } from "@/lib/coupang";
+import { productTargetUrl } from "@/lib/format";
 import type { VideoItemWithProduct } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
  * slot: 랜딩에서 어느 자리를 눌렀는지 (hero=원탭 히어로 / list=아래 목록 /
  *       search=번호 검색 결과 / direct=영상 설명란의 /n/{번호} 직행 링크).
  *       히어로가 실제로 먹히는지, 직행 링크가 경로를 줄여주는지 판단하는 근거.
+ *
+ * 상품 출처(쿠팡/알리)에 따라 목적지가 다르다 - productTargetUrl() 이 결정한다.
  *
  * subId: 쿠팡파트너스 링크에 영상 번호를 심어 "어느 영상이 실제로 돈을 벌었는지"를
  *        커미션 리포트에서 되짚을 수 있게 한다. 이게 없으면 수익이 한 덩어리로만
@@ -39,7 +42,8 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   const item = data as VideoItemWithProduct | null;
-  if (!item?.products?.coupang_partner_url) {
+  const target = item?.products ? productTargetUrl(item.products) : null;
+  if (!item || !target) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
@@ -58,10 +62,12 @@ export async function GET(request: NextRequest) {
     await db.from("click_logs").insert(row);
   }
 
-  // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚을 수 있게 한다
-  const target = withSubId(
-    item.products.coupang_partner_url,
-    `v${item.display_number}`
-  );
-  return NextResponse.redirect(target, 302);
+  // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚을 수 있게 한다.
+  // 알리는 subId 개념이 없고(tracking_id 로 귀속) 제휴 링크에 쿼리를 덧붙이면
+  // 링크가 깨질 수 있으므로 쿠팡일 때만 붙인다.
+  const finalUrl =
+    item.products.source === "aliexpress"
+      ? target
+      : withSubId(target, `v${item.display_number}`);
+  return NextResponse.redirect(finalUrl, 302);
 }

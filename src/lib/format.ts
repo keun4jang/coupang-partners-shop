@@ -177,3 +177,20 @@ export function dateFolderName(date = new Date()): string {
   const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
   return kst.toISOString().slice(0, 10);
 }
+
+/**
+ * 상품에서 실제로 내보낼 제휴 주소.
+ * 알리는 제휴링크(affiliate_url)가 있으면 그쪽, 없으면(승인 전) 원본 상품 URL.
+ * 쿠팡은 coupang_partner_url 이 곧 제휴 링크다.
+ * 어느 것도 없으면 null - 호출부는 클릭을 랜딩으로 되돌린다.
+ */
+export function productTargetUrl(p: {
+  source?: string | null;
+  coupang_partner_url?: string | null;
+  affiliate_url?: string | null;
+}): string | null {
+  if (p.source === "aliexpress") {
+    return p.affiliate_url || p.coupang_partner_url || null;
+  }
+  return p.coupang_partner_url || null;
+}

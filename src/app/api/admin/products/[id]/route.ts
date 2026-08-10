@@ -68,6 +68,7 @@ export async function POST(
       main_benefit: formValue(form, "main_benefit"),
       price_text: formValue(form, "price_text"),
       coupang_partner_url: coupangUrl,
+      source: formValue(form, "source") === "aliexpress" ? "aliexpress" : "coupang",
       image_url: formValue(form, "image_url"),
       source_memo: formValue(form, "source_memo"),
     })

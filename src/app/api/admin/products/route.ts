@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isValidHttpUrl } from "@/lib/format";
+import {
+  generateAffiliateLink,
+  loadAffiliateCredsFromSettings,
+} from "@/lib/aliexpressAffiliate";
 
 function formValue(form: FormData, key: string): string | null {
   const v = String(form.get(key) ?? "").trim();
@@ -30,8 +34,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const source = formValue(form, "source") === "aliexpress" ? "aliexpress" : "coupang";
+  // 알리 상품이고 어필리에이트가 준비돼 있으면 제휴 링크를 바로 만들어 둔다.
+  // 승인 전이면 null 로 남고, 나중에 backfillAffiliateLinks() 가 채운다.
+  let affiliateUrl: string | null = null;
+  if (source === "aliexpress") {
+    await loadAffiliateCredsFromSettings();
+    affiliateUrl = await generateAffiliateLink(coupangUrl);
+  }
   const { error } = await supabaseAdmin().from("products").insert({
     product_name: productName,
+    source,
+    affiliate_url: affiliateUrl,
     category: formValue(form, "category") ?? "생활템",
     target_user: formValue(form, "target_user"),
     pain_point: formValue(form, "pain_point"),

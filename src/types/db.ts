@@ -1,6 +1,9 @@
 // DB 행 타입 정의 (Supabase 컬럼은 snake_case)
 
 export type ProductStatus = "candidate" | "paused";
+
+/** 상품 출처 - 제휴처가 다르면 링크 만드는 법도 수익 귀속도 다르다 */
+export type ProductSource = "coupang" | "aliexpress";
 /** rendered = 렌더·드라이브 업로드 완료, SNS 발행은 예약 시간 대기 */
 export type VideoStatus =
   | "pending"
@@ -20,7 +23,15 @@ export interface Product {
   pain_point: string | null;
   main_benefit: string | null;
   price_text: string | null;
-  coupang_partner_url: string;
+  /** 상품 출처. 영상 1개 = 상품 1개이고, 그 상품이 쿠팡일 수도 알리일 수도 있다 */
+  source: ProductSource;
+  /**
+   * 쿠팡파트너스 링크 (source='coupang' 일 때). 알리 상품에는 없으므로 nullable.
+   * 실제로 내보낼 주소는 productTargetUrl() 로 구한다.
+   */
+  coupang_partner_url: string | null;
+  /** 알리 제휴 링크 (source='aliexpress'). 승인 전이면 비어 있고 원본으로 나간다 */
+  affiliate_url: string | null;
   image_url: string | null;
   source_memo: string | null;
   status: ProductStatus;
@@ -111,22 +122,4 @@ export interface VideoCopy {
   reviewLine: string;
   /** SNS 업로드용 캡션 전문 */
   captionText: string;
-}
-
-/** 알리익스프레스 제휴 상품 (쿠팡 products 와 별개 테이블) */
-export interface AliItem {
-  id: string;
-  ali_product_id: string | null;
-  title: string;
-  image_url: string | null;
-  price_text: string | null;
-  /** 원본 알리 상품 URL (승인 전에는 이 주소로 나간다 - 수수료 없음) */
-  product_url: string;
-  /** 제휴 링크. 있으면 이쪽이 우선 */
-  affiliate_url: string | null;
-  commission_rate: string | null;
-  landing_visible: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
 }

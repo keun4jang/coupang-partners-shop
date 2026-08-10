@@ -7,6 +7,11 @@ import {
 } from "./coupang";
 import { dateFolderName } from "./format";
 import { appealScore, isSpamTitle } from "./appeal";
+import {
+  hasAffiliateEnv,
+  loadAffiliateCredsFromSettings,
+  searchAffiliateProducts,
+} from "./aliexpressAffiliate";
 
 /**
  * 스카우트(시장조사) — 주부가 많이 살 것 같은 카테고리 베스트에서
@@ -29,11 +34,16 @@ export interface ScoutOptions {
 }
 
 export interface ScoutCandidate {
+  /** 제휴처. 영상 1개 = 상품 1개이고, 그 상품이 쿠팡일 수도 알리일 수도 있다 */
+  source?: "coupang" | "aliexpress";
   productId: number;
   product_name: string;
   category: string;
   price_text: string;
+  /** 쿠팡=파트너스 링크 / 알리=원본 상품 URL */
   coupang_partner_url: string;
+  /** 알리 제휴 링크 (있으면 이쪽이 우선 목적지) */
+  affiliate_url?: string | null;
   image_url: string;
   source_memo: string;
 }
@@ -44,10 +54,24 @@ export interface ScoutResult {
   skippedFiltered: number;
   /** 키워드 도배 제목이라 아예 후보로 안 받은 수 (필터 조정 근거) */
   skippedSpamTitle: number;
+  /** 이번에 새로 담은 알리 후보 수 */
+  aliCandidates: number;
   errors: string[];
 }
 
 const CPID_RE = /\[cpid:(\d+)\]/;
+
+/**
+ * 알리 후보 검색어 (영어). 알리는 국제 플랫폼이라 한국어로 검색하면 안 잡힌다.
+ * 배송이 1~2주라 "급하지 않고 신기한" 쪽이 맞아서, 생필품보다 아이디어 상품 위주.
+ */
+const ALI_KEYWORDS: Array<{ query: string; appCategory: string }> = [
+  { query: "kitchen gadget useful", appCategory: "주방템" },
+  { query: "home storage organizer", appCategory: "수납템" },
+  { query: "cleaning tool household", appCategory: "청소템" },
+  { query: "space saving gadget", appCategory: "생활템" },
+  { query: "car accessories interior", appCategory: "차량용품" },
+];
 
 /** 이미 등록된 상품들의 쿠팡 productId 집합 (source_memo 의 [cpid:...] 마커에서 추출) */
 async function loadKnownProductIds(): Promise<Set<number>> {
@@ -158,8 +182,47 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   skippedFiltered = buckets.reduce((s, b) => s + b.length, 0) - registered.length - skippedDuplicate;
   if (skippedFiltered < 0) skippedFiltered = 0;
 
+  // 알리 후보 - 어필리에이트 승인 전에는 건너뛴다.
+  // 승인 전에 담아봤자 수수료가 안 붙는 링크로 영상이 나가는데, 영상은 지울 수
+  // 없으니 그 한 편은 영영 돈이 안 되는 콘텐츠가 된다.
+  let aliCandidates = 0;
+  await loadAffiliateCredsFromSettings();
+  if (hasAffiliateEnv()) {
+    const aliTake = Math.max(1, Math.floor(maxCandidates / 3)); // 대략 1/3 을 알리로
+    for (const kw of ALI_KEYWORDS.slice(0, aliTake)) {
+      try {
+        const found = await searchAffiliateProducts(kw.query, 10);
+        const pick = found
+          .filter((p) => p.title && p.imageUrl && !isSpamTitle(p.title))
+          .sort((a, b) => appealScore(b.title) - appealScore(a.title))[0];
+        if (!pick) continue;
+        const pid = Number(pick.productId);
+        if (!Number.isFinite(pid) || known.has(pid) || pickedIds.has(pid)) continue;
+        pickedIds.add(pid);
+        registered.push({
+          source: "aliexpress",
+          productId: pid,
+          product_name: pick.title.trim(),
+          category: kw.appCategory,
+          price_text: pick.price ? `${pick.price}원` : "",
+          // 원본은 coupang_partner_url(범용 상품 URL) 자리에, 제휴 링크는 affiliate_url 에.
+          // 목적지는 productTargetUrl() 이 affiliate_url 우선으로 고른다.
+          coupang_partner_url: `https://www.aliexpress.com/item/${pick.productId}.html`,
+          affiliate_url: pick.promotionLink,
+          image_url: pick.imageUrl,
+          source_memo: `알리 스카우트 · '${kw.query}' · [cpid:${pid}] · 수수료 ${pick.commissionRate || "?"}% · ${today}`,
+        });
+        aliCandidates++;
+      } catch (e) {
+        errors.push(`알리 '${kw.query}': ${(e as Error).message.slice(0, 80)}`);
+      }
+    }
+  }
+
   if (registered.length > 0 && !opts.dryRun) {
     const rows = registered.map((c) => ({
+      source: c.source ?? "coupang",
+      affiliate_url: c.affiliate_url ?? null,
       product_name: c.product_name,
       category: c.category,
       price_text: c.price_text,
@@ -176,7 +239,14 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     console.log(`스팸성 제목 ${skippedSpamTitle}건 수집 제외`);
   }
 
-  return { registered, skippedDuplicate, skippedFiltered, skippedSpamTitle, errors };
+  return {
+    registered,
+    skippedDuplicate,
+    skippedFiltered,
+    skippedSpamTitle,
+    aliCandidates,
+    errors,
+  };
 }
 
 /** 텔레그램 요약 메시지 */

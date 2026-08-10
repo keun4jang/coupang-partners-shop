@@ -273,3 +273,45 @@ export async function affiliateStatus(): Promise<string> {
   if (!token) return "키는 있으나 OAuth 미완료";
   return `준비됨 (tracking_id=${tid})`;
 }
+
+/**
+ * 알리 상품인데 제휴 링크가 비어 있는 것들을 채운다 (어필리에이트 승인 직후 1회).
+ * 승인 전에 등록해 둔 상품들이 한 번에 수수료 링크로 바뀐다.
+ */
+export async function backfillAffiliateLinks(): Promise<{
+  updated: number;
+  failed: number;
+  reason?: string;
+}> {
+  if (!hasAffiliateEnv()) {
+    return { updated: 0, failed: 0, reason: "어필리에이트 미설정 (키/Tracking ID 확인)" };
+  }
+  const { supabaseAdmin } = await import("./supabase");
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from("products")
+    .select("id, coupang_partner_url")
+    .eq("source", "aliexpress")
+    .is("affiliate_url", null);
+  const rows = (data as { id: string; coupang_partner_url: string | null }[] | null) ?? [];
+  let updated = 0;
+  let failed = 0;
+  for (const r of rows) {
+    if (!r.coupang_partner_url) {
+      failed++;
+      continue;
+    }
+    const link = await generateAffiliateLink(r.coupang_partner_url);
+    if (!link) {
+      failed++;
+      continue;
+    }
+    const { error } = await db
+      .from("products")
+      .update({ affiliate_url: link })
+      .eq("id", r.id);
+    if (error) failed++;
+    else updated++;
+  }
+  return { updated, failed };
+}

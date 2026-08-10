@@ -730,7 +730,8 @@ export async function sourceProductClips(
   if (!hasCoupangScraperEnv()) {
     console.log("쿠팡 상세영상 소싱 건너뜀: SCRAPER_PROXY_URL 미설정");
   }
-  if (hasCoupangScraperEnv()) {
+  // 알리 상품에는 쿠팡 링크가 없다 - 이 경로는 쿠팡 상품일 때만 의미가 있다
+  if (hasCoupangScraperEnv() && product.coupang_partner_url) {
     try {
       const videoUrl = await findCoupangProductVideo(product.coupang_partner_url);
       if (videoUrl) {
