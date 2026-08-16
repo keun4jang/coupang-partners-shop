@@ -5,7 +5,12 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { COLORS, FONT_SIZES, MOTION, ctaTemplate } from "../config/videoConfig";
+import {
+  COLORS,
+  MOTION,
+  ctaNumberFontSize,
+  ctaTemplate,
+} from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /**
@@ -55,14 +60,21 @@ export const CtaScene: React.FC<{
           opacity: pop,
         }}
       >
+        {/* 숫자와 "번"을 한 덩어리로 두되 절대 줄바꿈시키지 않는다.
+            107번부터 원(안지름 352px) 밖으로 "번"이 삐져나갔다 - 두 자리까지는
+            맞았지만 세 자리가 되며 폭이 넘쳤다. 자릿수에 맞춰 크기를 줄인다. */}
         <span
           style={{
             color: COLORS.primaryDark,
             fontWeight: 900,
-            fontSize: FONT_SIZES.ctaNumber,
+            fontSize: ctaNumberFontSize(displayNumber),
+            whiteSpace: "nowrap",
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
           }}
         >
-          {displayNumber}번
+          {displayNumber}
+          <span style={{ fontSize: "0.55em", marginLeft: "0.04em" }}>번</span>
         </span>
       </div>
 

@@ -186,6 +186,22 @@ export function hookFontSize(hookLine: string): number {
 }
 
 /**
+ * CTA 마지막 화면의 큰 번호 크기.
+ *
+ * 원 지름 380px, 테두리 14px → 안지름 352px. 여기에 "107번" 을 150px 로 그리면
+ * 약 396px 가 되어 넘치고, 줄바꿈되며 "번" 이 원 밖으로 삐져나갔다
+ * (실제 발행본 107번에서 확인). 두 자리까지는 우연히 맞았을 뿐이다.
+ *
+ * 숫자는 약 0.55em, "번" 은 0.55em 으로 줄여 그리므로 전체 폭 ≈ 0.55 × 크기 × (자릿수+1).
+ * 여유를 두고 310px 안에 들어가도록 역산하고 150 을 넘지 않게 자른다.
+ */
+export function ctaNumberFontSize(displayNumber: number): number {
+  const digits = String(Math.max(1, Math.abs(displayNumber))).length;
+  const fit = 310 / (0.55 * (digits + 1));
+  return Math.round(Math.min(FONT_SIZES.ctaNumber, fit));
+}
+
+/**
  * 영상 첫 프레임(정확히 1프레임)을 썸네일처럼 쓰기 위한 정적 커버 화면 길이.
  * 재생 중엔 1/30초라 거의 안 보이고, 플랫폼이 이 프레임을 미리보기로 캡처하거나
  * 우리가 직접 썸네일 PNG로 뽑을 때(worker THUMBNAIL_FRAME) 이 화면이 나온다.
