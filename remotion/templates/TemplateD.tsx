@@ -4,6 +4,7 @@ import type { ShortsProps } from "../types";
 import {
   COVER_FRAME_COUNT,
   FONT_SIZES,
+  hookFontSize,
   resolveTiming,
   secondsToFrames as f,
 } from "../config/videoConfig";
@@ -57,7 +58,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
       <Sequence durationInFrames={f(T.empathy.to)}>
         <Subtitle
           text={props.hookLine}
-          size={FONT_SIZES.hook}
+          size={hookFontSize(props.hookLine)}
           variant="bubble"
           y={0.26}
           strong
