@@ -424,12 +424,60 @@ async function claimItem(id: string): Promise<VideoItemWithProduct | null> {
 }
 
 /**
+ * 진행 중임을 주기적으로 알리는 하트비트.
+ *
+ * claimItem 이 generating 으로 바꾼 뒤 완료 기록까지 row 를 다시 안 건드리면,
+ * 번들 생성(~1GB)·footage OCR(429 시 15초 대기)·드라이브 업로드가 겹쳐 15분
+ * (STALE_GENERATING_MS)을 넘기는 순간 병행 워커(로컬 PC + GitHub Actions)의
+ * reclaimStaleGenerating 이 이 항목을 "죽은 렌더"로 오판해 빼앗아 간다.
+ * → 같은 영상이 두 번 렌더되고 SNS 에 두 번 올라간다.
+ * 같은 값으로 no-op UPDATE 만 쳐도 updated_at 트리거가 갱신돼 점유가 유지된다.
+ */
+const HEARTBEAT_MS = 4 * 60_000;
+function startHeartbeat(id: string): () => void {
+  const timer = setInterval(() => {
+    supabaseAdmin()
+      .from("video_items")
+      .update({ video_status: "generating" })
+      .eq("id", id)
+      .eq("video_status", "generating")
+      .then(({ error }) => {
+        if (error) console.warn("하트비트 실패(무시):", error.message.slice(0, 100));
+      });
+  }, HEARTBEAT_MS);
+  return () => clearInterval(timer);
+}
+
+/**
  * 워커가 렌더 도중 죽어 'generating' 상태로 멈춘 항목을 되돌린다.
- * 다시 pending 으로 바꿔 다음 폴링에서 재시도되게 한다.
+ *
+ * 예약 발행(scheduled) 도중 죽은 항목은 렌더 결과가 이미 드라이브에 있으므로
+ * 'rendered' 로 되돌려 다음 슬롯에 발행만 재시도한다. 'pending' 으로 되돌리면
+ * 전체 재렌더 + (죽기 전에 이미 올라간 채널의) 중복 게시가 난다.
+ * 그 외(렌더 도중 죽은 것)만 pending 으로 되돌려 재렌더한다.
  */
 async function reclaimStaleGenerating(): Promise<void> {
   const db = supabaseAdmin();
   const staleBefore = new Date(Date.now() - STALE_GENERATING_MS).toISOString();
+
+  const { data: backToRendered, error: renderedError } = await db
+    .from("video_items")
+    .update({
+      video_status: "rendered",
+      error_message: "발행이 중단되어 다음 슬롯에 다시 시도합니다.",
+    })
+    .eq("video_status", "generating")
+    .lt("updated_at", staleBefore)
+    .eq("publish_mode", "scheduled")
+    .not("drive_video_file_id", "is", null)
+    .select("id, display_number");
+  if (renderedError) {
+    console.error("정체된 발행 항목 복구 실패:", renderedError.message);
+  } else if (backToRendered?.length) {
+    console.log(
+      `발행 중단 복구(rendered): ${backToRendered.map((r) => r.display_number + "번").join(", ")}`
+    );
+  }
 
   const { data, error } = await db
     .from("video_items")
@@ -472,10 +520,22 @@ async function publishToSns(
   captionText: string,
   thumbnailPath?: string
 ): Promise<SnsResult> {
+  // 채널별로 성공 즉시 URL 을 DB 에 기록한다. 완료 기록(일괄 UPDATE) 전에 워커가
+  // 죽으면 "올라갔는데 기록은 없는" 상태가 되고, 복구 재시도가 같은 영상을 그 채널에
+  // 또 올린다. 즉시 기록 + 아래 "이미 URL 있으면 건너뜀"이 짝을 이뤄 재시도를
+  // 멱등하게 만든다. (기록 실패는 무시 - 발행 자체를 막지 않는다)
+  const db = supabaseAdmin();
+  const recordChannel = async (patch: Record<string, string>) => {
+    const { error } = await db.from("video_items").update(patch).eq("id", item.id);
+    if (error) console.warn("채널 URL 즉시 기록 실패(무시):", error.message.slice(0, 100));
+  };
+
   // 유튜브 쇼츠
-  let youtubeUrl: string | null = null;
+  let youtubeUrl: string | null = item.youtube_url ?? null;
   let youtubeError: string | null = null;
-  if (hasYoutubeEnv()) {
+  if (youtubeUrl) {
+    console.log("유튜브: 이미 업로드됨 - 건너뜀:", youtubeUrl);
+  } else if (hasYoutubeEnv()) {
     try {
       console.log("유튜브 업로드 중...");
       const result = await uploadShortToYoutube({
@@ -487,6 +547,7 @@ async function publishToSns(
       });
       youtubeUrl = result.url;
       console.log("유튜브 업로드 완료:", youtubeUrl);
+      await recordChannel({ youtube_url: youtubeUrl });
       // 자동자막(ASR) 억제: 빈 표준 자막 트랙을 올려 화면에 자동자막이 안 뜨게 한다.
       // (우리 영상은 자막을 이미 구워넣으므로 자동자막은 중복·오역만 됨). 실패해도 무시.
       await suppressAutoCaptions(result.videoId);
@@ -498,10 +559,12 @@ async function publishToSns(
 
   // 인스타 릴스 (드라이브 공개 링크를 메타 서버가 직접 가져감)
   // 킬스위치: app_settings.instagram_paused = "1" 이면 발행을 건너뛴다
-  let instagramUrl: string | null = null;
+  let instagramUrl: string | null = item.instagram_url ?? null;
   let instagramError: string | null = null;
   const instagramPaused = (await getSetting("instagram_paused")) === "1";
-  if (instagramPaused) {
+  if (instagramUrl) {
+    console.log("인스타: 이미 업로드됨 - 건너뜀:", instagramUrl);
+  } else if (instagramPaused) {
     instagramError = "인스타 자동발행 일시중지 중 (계정 복구 대기)";
     console.log("인스타 발행 건너뜀:", instagramError);
   } else if (hasInstagramEnv()) {
@@ -517,6 +580,7 @@ async function publishToSns(
         });
         instagramUrl = result.url;
         console.log("인스타 업로드 완료:", instagramUrl);
+        await recordChannel({ instagram_url: instagramUrl });
       } catch (e) {
         instagramError = e instanceof Error ? e.message : String(e);
         console.error("인스타 업로드 실패:", instagramError);
@@ -525,9 +589,11 @@ async function publishToSns(
   }
 
   // 페이스북 릴스 (별도 세팅 시에만)
-  let facebookUrl: string | null = null;
+  let facebookUrl: string | null = item.facebook_url ?? null;
   let facebookError: string | null = null;
-  if (await facebookConfigured()) {
+  if (facebookUrl) {
+    console.log("페이스북: 이미 업로드됨 - 건너뜀:", facebookUrl);
+  } else if (await facebookConfigured()) {
     if (!driveVideoFileId) {
       facebookError = "드라이브 업로드가 안 돼 공개 URL을 만들 수 없음";
     } else {
@@ -540,6 +606,7 @@ async function publishToSns(
         });
         facebookUrl = result.url;
         console.log("페이스북 업로드 완료:", facebookUrl);
+        await recordChannel({ facebook_url: facebookUrl });
       } catch (e) {
         facebookError = e instanceof Error ? e.message : String(e);
         console.error("페이스북 업로드 실패:", facebookError);
@@ -556,6 +623,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
   const number = formatDisplayNumber(row.display_number);
   console.log(`\n=== ${number} ${product.product_name} 처리 시작 ===`);
 
+  const stopHeartbeat = startHeartbeat(row.id);
   try {
     // 문구가 아직 없으면 여기서 생성 (webhook 실패 대비)
     let item: VideoItem = row;
@@ -673,6 +741,7 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       .from("video_items")
       .update({
         video_status: "completed",
+        published_at: new Date().toISOString(),
         broll_origin: brollOrigin,
         broll_files: brollFiles,
         drive_video_url: driveVideoUrl,
@@ -741,6 +810,8 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       .update({ video_status: "failed", error_message: message.slice(0, 500) })
       .eq("id", row.id);
     await notify(`영상 생성 실패\n\n번호: ${number}\n오류: ${message.slice(0, 300)}`);
+  } finally {
+    stopHeartbeat();
   }
 }
 
@@ -764,6 +835,7 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
     .maybeSingle();
   if (!claimed) return false;
 
+  const stopHeartbeat = startHeartbeat(row.id);
   console.log(`\n=== ${number} 예약 발행 시작 ===`);
   try {
     if (!row.drive_video_file_id) {
@@ -808,6 +880,7 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
       .from("video_items")
       .update({
         video_status: "completed",
+        published_at: new Date().toISOString(),
         youtube_url: sns.youtubeUrl,
         youtube_error: sns.youtubeError,
         instagram_url: sns.instagramUrl,
@@ -858,6 +931,8 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
       `예약 영상 업로드 실패 (다음 슬롯에 재시도)\n\n번호: ${number}\n오류: ${message.slice(0, 300)}`
     );
     return false;
+  } finally {
+    stopHeartbeat();
   }
 }
 
@@ -962,6 +1037,9 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
 
   // 오늘(KST 자정 이후) 슬롯을 소비한 완료 영상 수 → 지난 슬롯 수만큼만 채운다.
   // 슬롯 소비 = 자동(auto) + 예약(scheduled). 텔레그램 즉시(immediate)는 세지 않는다.
+  // 판정 기준은 published_at(발행 시각)이다. updated_at 을 쓰면 완료된 옛 row 를
+  // 오늘 무슨 이유로든 갱신(수동 수정·백필 등)하는 순간 "오늘 발행"으로 오인돼
+  // 그날 슬롯이 통째로 소진된 것처럼 계산된다.
   const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
   const kstMidnightUtc = new Date(
     Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
@@ -973,7 +1051,7 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
     .select("id", { count: "exact", head: true })
     .eq("video_status", "completed")
     .neq("publish_mode", "immediate")
-    .gte("updated_at", kstMidnightUtc.toISOString());
+    .gte("published_at", kstMidnightUtc.toISOString());
   if (error) {
     console.error("오늘 완료 수 조회 실패(안전하게 대기):", error.message);
     return 0;

@@ -65,6 +65,8 @@ export interface VideoItem {
   facebook_url: string | null;
   facebook_error: string | null;
   landing_visible: boolean;
+  /** SNS 발행 완료 시각 (업로드 슬롯 계산 기준) */
+  published_at: string | null;
   /** 텔레그램 "업로드" 등 수동 요청 여부 - 수동 항목은 업로드 슬롯 게이트를 우회한다 */
   manual: boolean;
   /** 스튜디오(직접 업로드 소재) - Storage 'footage' 버킷 영상 경로 목록. 있으면 이 영상을 배경으로 렌더 */

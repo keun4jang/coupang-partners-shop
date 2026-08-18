@@ -90,6 +90,9 @@ create table if not exists click_logs (
 
 -- 기존 배포에 컬럼 추가 (재실행해도 안전)
 alter table click_logs add column if not exists slot text;
+-- 발행(SNS 업로드) 완료 시각. 업로드 슬롯 게이트가 "오늘 몇 개 발행했나"를 이걸로
+-- 센다 (updated_at 은 무관한 갱신에도 움직여서 슬롯 오인 소진이 났다).
+alter table video_items add column if not exists published_at timestamptz;
 alter table video_items add column if not exists broll_origin text;
 alter table video_items add column if not exists broll_files jsonb;
 
