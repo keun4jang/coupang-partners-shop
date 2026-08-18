@@ -217,7 +217,13 @@ function pickFile(
 const ANIMAL_WORDS = /\b(cat|dog|pet|animal|kitten|puppy|bird|fish)\b/i;
 const SCENERY_WORDS =
   /\b(mountain|mountains|forest|woods|cabin|hut|lake|river|ocean|sea|beach|waterfall|snow|winter|sunset|sunrise|sky|clouds|drone|aerial|landscape|scenery|nature|travel|island|desert|field|meadow)\b/i;
-const SYNTHETIC_WORDS = /ai.generated|\b(anime|cartoon|animation|lofi|3d|render|fireplace)\b/i;
+const SYNTHETIC_WORDS =
+  /ai.generated|\b(anime|cartoon|animation|lofi|3d|render|fireplace|abstract|kaleidoscope|fractal|geometric|symmetry|glitch|particles?|hologram|neon|visuali[sz]er)\b/i;
+/** 살림 실사용 장면이 될 수 없는 소재 (종교·명절 장식, 향 연출 등) - 항상 제외.
+ *  실측(115번 가로 소싱): "tile" 검색에 geometric 모션그래픽이,
+ *  "home" 계열 검색에 ramadan/incense 향로 클립이 배경으로 뽑혔다. */
+const OFFTOPIC_WORDS =
+  /\b(ramadan|ramadhan|mubarak|islamic|spiritual|worship|temple|church|christmas|halloween|easter|diwali|incense|meditation|yoga|zen)\b/i;
 
 function isOutdoorQuery(query: string): boolean {
   return /camping|outdoor|car\b/i.test(query);
@@ -227,6 +233,7 @@ function isOutdoorQuery(query: string): boolean {
 function isUnusableClip(text: string, query: string): boolean {
   if (ANIMAL_WORDS.test(text)) return true;
   if (SYNTHETIC_WORDS.test(text)) return true;
+  if (OFFTOPIC_WORDS.test(text)) return true;
   if (!isOutdoorQuery(query) && SCENERY_WORDS.test(text)) return true;
   return false;
 }
