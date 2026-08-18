@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Img } from "remotion";
-import { COLORS, FONT_SIZES, PALETTE, VIDEO } from "../config/videoConfig";
+import { PALETTE, VIDEO, coverHookFontSize } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
 
 /**
@@ -53,7 +53,7 @@ export const CoverFrame: React.FC<{
             textAlign: "center",
             color: "#FFFFFF",
             fontWeight: 900,
-            fontSize: FONT_SIZES.coverHook,
+            fontSize: coverHookFontSize(hookLine),
             lineHeight: 1.14,
             letterSpacing: "-0.02em",
             wordBreak: "keep-all",

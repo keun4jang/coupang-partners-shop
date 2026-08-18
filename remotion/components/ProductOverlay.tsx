@@ -15,7 +15,8 @@ import { Badge } from "./Badge";
 
 /** 상품명에서 카드 상단 배지 문구 자동 생성 (대용량/구성/카테고리 순) */
 function shelfLabel(productName: string): string {
-  const vol = productName.match(/(\d+(?:\.\d+)?)\s*(L|리터|kg|ml|g)\b/i);
+  // \b 는 한글 뒤에서 매치되지 않아(JS \w 는 영숫자만) "리터" 분기가 죽어 있었다
+  const vol = productName.match(/(\d+(?:\.\d+)?)\s*(L|리터|kg|ml|g)(?![A-Za-z])/i);
   if (vol) {
     const unit = vol[2].toLowerCase();
     const big = unit === "l" || unit === "리터" || unit === "kg";

@@ -166,23 +166,86 @@ export const FONT_SIZES = {
 } as const;
 
 /**
- * 훅 자막 크기를 문구 길이에 맞춰 최대한 크게 잡는다.
+ * keep-all 줄바꿈 기준으로 주어진 폭·높이에 들어가는 최대 폰트 크기.
  *
- * 왜 고정값이 아닌가: 실측상 인스타 릴스 평균 시청이 2.72초(스킵율 80.5%)라
- * 시청자가 보는 건 사실상 훅 한 줄뿐이다. 그래서 최대한 키워야 하는데,
- * 훅 길이가 12~24자로 편차가 커서 고정값을 키우면 긴 훅이 3줄이 되고
- * 바로 아래 공감 자막(y=0.4)과 겹친다.
+ * 자막은 wordBreak: keep-all 이라 "공백에서만" 줄이 바뀐다. 글자 수로만 크기를
+ * 역산하면(예전 hookFontSize) 긴 어절이 연달아 오는 문구에서 실제 줄 수가 계산보다
+ * 많아져 아래 요소와 겹친다. 그래서 어절 단위로 줄바꿈을 시뮬레이션한다.
  *
- * 훅은 y=0.26, 공감은 y=0.4 → 사이 간격 0.14 × 1920 = 269px.
- * lineHeight 1.2 기준 2줄까지만 허용해야 안 겹친다(2줄 = 크기 × 2.4).
- * 한글 글자폭은 대략 1em, 자막 폭은 화면의 86%(929px)이므로
- * 2줄에 들어가려면  크기 ≤ 929 ÷ (글자수 ÷ 2) = 1858 ÷ 글자수.
- * 안전 계수 0.92를 곱하고 62~96 사이로 자른다.
+ * 근사: 한글 자폭 ≈ 1em (자간 -0.015em 은 보수적으로 무시), 공백 ≈ 0.5em.
+ * textWrap: balance 는 같은 줄 수 안에서 가장 긴 줄을 "줄이는" 쪽으로만 움직이므로
+ * 탐욕 줄바꿈이 들어가면 balance 결과도 들어간다.
+ */
+function fitKoreanText(opts: {
+  text: string;
+  maxWidth: number;
+  maxHeight: number;
+  lineHeight: number;
+  maxSize: number;
+  minSize: number;
+}): number {
+  const words = (opts.text ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return opts.minSize;
+  const SPACE_EM = 0.5;
+  const linesAt = (size: number): number => {
+    const capacity = opts.maxWidth / size; // 한 줄 용량 (em)
+    let lines = 1;
+    let current = 0;
+    for (const w of words) {
+      if (w.length > capacity) return Infinity; // 어절 하나가 통째로 안 들어감
+      const appended = current === 0 ? w.length : current + SPACE_EM + w.length;
+      if (appended > capacity) {
+        lines += 1;
+        current = w.length;
+      } else {
+        current = appended;
+      }
+    }
+    return lines;
+  };
+  for (let size = opts.maxSize; size >= opts.minSize; size -= 2) {
+    const lines = linesAt(size);
+    if (lines !== Infinity && lines * opts.lineHeight * size <= opts.maxHeight) {
+      return size;
+    }
+  }
+  return opts.minSize;
+}
+
+/**
+ * 훅 자막 크기 (본편, Subtitle bubble strong).
+ *
+ * 실측상 릴스 평균 시청이 2.72초(스킵율 80.5%)라 시청자가 보는 건 사실상 훅
+ * 한 줄뿐이므로 최대한 키운다. 제약: 훅(y=0.26) 아래 공감 자막(y=0.4)까지
+ * 간격 269px 안에 들어가야 한다 (훅 Sequence 는 공감과 동시에 떠 있다).
+ * 폭은 자막 컨테이너 86% = 929px, strong lineHeight 1.2.
  */
 export function hookFontSize(hookLine: string): number {
-  const n = Math.max(1, (hookLine ?? "").trim().length);
-  const fit = (1858 / n) * 0.92;
-  return Math.round(Math.min(96, Math.max(62, fit)));
+  return fitKoreanText({
+    text: hookLine,
+    maxWidth: VIDEO.width * 0.86,
+    maxHeight: 252, // 269px 간격에서 외곽선·그림자 여유를 뺀 값
+    lineHeight: 1.2,
+    maxSize: 96,
+    minSize: 54,
+  });
+}
+
+/**
+ * 커버(썸네일) 훅 크기. 예전엔 104 고정이라 긴 어절 조합에서 4줄이 되면
+ * 코랄 밴드가 아래로 자라 제품 카드(top 0.37)가 훅 마지막 줄을 가렸다.
+ * 밴드 내부 텍스트 폭 = 1080×0.92 − 패딩 80 − 테두리 16 = 897.6px,
+ * 세로 여유 = 카드 상단 710.4 − 밴드 상단 211.2 − 상하 크롬 84 = 415.2px.
+ */
+export function coverHookFontSize(hookLine: string): number {
+  return fitKoreanText({
+    text: hookLine,
+    maxWidth: VIDEO.width * 0.92 - 96,
+    maxHeight: 400, // 415.2px 에서 외곽선(11px) 여유를 뺀 값
+    lineHeight: 1.14,
+    maxSize: FONT_SIZES.coverHook,
+    minSize: 64,
+  });
 }
 
 /**
