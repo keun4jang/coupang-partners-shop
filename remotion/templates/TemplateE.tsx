@@ -246,7 +246,9 @@ const MediaWindow: React.FC<{
       }}
     >
       {/* 제품 사진이 창의 주인공 (사장님 피드백 2026-08-18: 자료화면이 제품과
-          무관한 장면일 때가 많으니 제품을 훨씬 크게 - 스톡과 역할을 뒤집었다) */}
+          무관한 장면일 때가 많으니 제품을 훨씬 크게 - 스톡과 역할을 뒤집었다).
+          보조 창이 있으면 오른쪽에 그 폭만큼 자리를 비워 넓적한 제품 사진이
+          보조 창에 가려지지 않게 한다 (세로형 제품은 높이 기준이라 크기 그대로). */}
       <div
         style={{
           width: "100%",
@@ -255,6 +257,7 @@ const MediaWindow: React.FC<{
           alignItems: "center",
           justifyContent: "center",
           padding: 32,
+          paddingRight: files.length > 0 ? 372 : 32,
           boxSizing: "border-box",
         }}
       >
@@ -267,13 +270,15 @@ const MediaWindow: React.FC<{
           <span style={{ fontSize: 160 }}>🧺</span>
         )}
       </div>
-      {/* 스톡 클립은 우하단 작은 보조 창 - 생동감만 주고 시선은 뺏지 않게 */}
+      {/* 스톡 클립은 오른쪽 열 세로 중앙의 작은 보조 창 - 생동감만 주고
+          시선은 뺏지 않게. 제품(왼쪽 열)과 2단 매거진 구성이 된다 */}
       {files.length > 0 && (
         <div
           style={{
             position: "absolute",
             right: 20,
-            bottom: 20,
+            top: "50%",
+            transform: "translateY(-50%)",
             width: 330,
             height: 246,
             borderRadius: 20,
