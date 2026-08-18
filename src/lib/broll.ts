@@ -71,10 +71,13 @@ const SEARCH_QUERY_BY_CATEGORY: Record<string, string[]> = {
     "car seat interior",
   ],
   생활템: [
+    // "cozy home living" 같은 분위기 검색어는 Pixabay 에서 AI 생성 오두막·
+    // 벽난로 클립이 상위에 온다(실측 2026-08-16: 상위 5개 중 4개 ai generated).
+    // 구체적인 집안일 동작으로 좁혀야 실사용 장면이 나온다.
     "housework daily home",
-    "cozy home living",
+    "wiping table home",
     "morning routine home",
-    "home lifestyle domestic",
+    "tidying living room home",
   ],
   반려동물: ["dog cat home", "playing pet home", "pet care home"],
   뷰티: ["skincare routine", "beauty vanity home", "morning skincare home"],
@@ -98,6 +101,12 @@ const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
   [/턱받이|이유식|아기\s*식판/, "baby feeding highchair"],
   [/욕조|목욕/, "baby bath water"],
   [/유모차/, "stroller walk baby"],
+  // 식기류는 건조대/세탁 규칙보다 앞에 둔다. 뒤에 두면 "식기 건조대"가
+  // /건조대/ 에 걸려 빨래 배경이 깔리고, "면그릇"은 아무 규칙에도 안 걸려
+  // 카테고리 폴백으로 떨어진다(실측: 107번 도자기 면그릇에 산속 오두막 배경).
+  // 검색어는 세로 재고가 확인된 것만 쓴다(Pexels "washing dishes" 4,453건,
+  // Pixabay 는 설거지 세로가 0건이라 이 규칙은 사실상 Pexels 전용).
+  [/그릇|접시|식기|면기|국그릇|밥그릇|수저|젓가락|숟가락/, "washing dishes home"],
   [/세탁|세제|캡슐|섬유유연제/, "laundry washing machine clothes"],
   [/건조대|빨래/, "laundry drying clothes rack"],
   [/밀대|물걸레|대걸레|걸레/, "mopping floor cleaning home"],
@@ -154,6 +163,9 @@ interface PexelsVideoFile {
 interface PexelsVideo {
   id: number;
   duration: number;
+  /** 영상 페이지 URL - 슬러그에 내용 설명이 들어 있어 무관 클립 필터에 쓴다
+      (예: .../video/aerial-view-of-forest-9472839/). Pexels 는 태그를 안 준다. */
+  url?: string;
   video_files: PexelsVideoFile[];
 }
 
@@ -176,6 +188,32 @@ function pickFile(video: PexelsVideo): PexelsVideoFile | null {
       return score(a) - score(b);
     });
   return portrait[0] ?? null;
+}
+
+/**
+ * 살림템 배경으로 못 쓰는 클립 판별 - 태그(Pixabay)나 URL 슬러그(Pexels)로 거른다.
+ *
+ * 실측(107번): "cozy home living" 폴백 검색이 mountains/cabin/forest 태그의
+ * 산속 오두막 클립을 돌려줘 도자기 그릇 영상 배경에 깔렸다. 동물 태그만 막고
+ * 풍경·AI 생성물은 안 막고 있었다.
+ *
+ * 캠핑/차량 검색어는 야외 장면이 정답이므로 풍경 필터를 건너뛴다.
+ */
+const ANIMAL_WORDS = /\b(cat|dog|pet|animal|kitten|puppy|bird|fish)\b/i;
+const SCENERY_WORDS =
+  /\b(mountain|mountains|forest|woods|cabin|hut|lake|river|ocean|sea|beach|waterfall|snow|winter|sunset|sunrise|sky|clouds|drone|aerial|landscape|scenery|nature|travel|island|desert|field|meadow)\b/i;
+const SYNTHETIC_WORDS = /ai.generated|\b(anime|cartoon|animation|lofi|3d|render|fireplace)\b/i;
+
+function isOutdoorQuery(query: string): boolean {
+  return /camping|outdoor|car\b/i.test(query);
+}
+
+/** true 면 배경 후보에서 제외 */
+function isUnusableClip(text: string, query: string): boolean {
+  if (ANIMAL_WORDS.test(text)) return true;
+  if (SYNTHETIC_WORDS.test(text)) return true;
+  if (!isOutdoorQuery(query) && SCENERY_WORDS.test(text)) return true;
+  return false;
 }
 
 /**
@@ -254,14 +292,12 @@ async function fetchFromPixabay(
   // 예전엔 세로가 없으면 가로 파일을 받아 왔는데, 배경은 objectFit:cover 라
   // 16:9 를 9:16 에 맞추면 좌우가 70% 잘리고 1.9배 확대돼 정작 보여줄 피사체가
   // 화면 밖으로 나갔다. 세로가 없으면 그 후보는 건너뛰고 다음 시드·검색어로 간다.
-  // 동물 태그 제외: 살림템 배경에 고양이·강아지 영상이 섞이면 맥락이 어긋난다.
-  // (세로 필터로 이미 대부분 걸러지지만 저비용 안전장치로 남긴다)
-  const ANIMAL_TAGS = /\b(cat|dog|pet|animal|kitten|puppy)\b/i;
+  // 무관 클립 제외: 동물·풍경·AI 생성물 태그 (isUnusableClip 주석 참고)
   const candidates = (data.hits ?? []).filter(
     (v) =>
       v.duration >= MIN_DURATION_SEC &&
       v.duration <= MAX_DURATION_SEC &&
-      !ANIMAL_TAGS.test(v.tags ?? "") &&
+      !isUnusableClip(v.tags ?? "", query) &&
       Object.values(v.videos).some((f) => f.url && f.height > f.width)
   );
   if (candidates.length === 0) return null;
@@ -308,6 +344,7 @@ async function fetchFromPexels(
     (v) =>
       v.duration >= MIN_DURATION_SEC &&
       v.duration <= MAX_DURATION_SEC &&
+      !isUnusableClip(v.url ?? "", query) &&
       pickFile(v)
   );
   if (candidates.length === 0) {
