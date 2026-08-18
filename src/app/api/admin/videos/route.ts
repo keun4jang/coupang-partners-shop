@@ -22,12 +22,23 @@ export async function POST(request: NextRequest) {
 
   const retryId = String(form.get("retryVideoItemId") ?? "").trim();
   if (retryId) {
-    const { error } = await db
+    // 재시도는 끝난 항목(failed/completed)에서만. generating(진행 중)을 되돌리면
+    // 워커 점유와 겹쳐 이중 렌더가 나고, rendered(발행 대기)는 슬롯이 알아서 발행한다.
+    const { data, error } = await db
       .from("video_items")
       .update({ video_status: "pending", error_message: null })
-      .eq("id", retryId);
+      .eq("id", retryId)
+      .in("video_status", ["failed", "completed"])
+      .select("id")
+      .maybeSingle();
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: "진행 중이거나 발행 대기 중인 항목은 재시도할 수 없어요." },
+        { status: 409 }
+      );
     }
     return NextResponse.redirect(new URL("/admin/videos", request.url), 303);
   }

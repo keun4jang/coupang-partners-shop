@@ -39,10 +39,17 @@ export interface NarrationLine {
 
 const SINO_DIGITS = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"];
 
-/** 숫자 → 한자어 읽기 (금액/번호용). 9999까지 지원 */
+/** 숫자 → 한자어 읽기 (금액/번호용). 만 단위 재귀로 99,999,999까지 지원
+ *  (예전엔 9999까지만이라 10000 이상에서 SINO_DIGITS[10]=undefined 가
+ *   문자열에 섞여 "undefined번"으로 읽혔다) */
 export function sinoKorean(n: number): string {
   if (!Number.isFinite(n) || n < 0) return String(n);
   if (n === 0) return "영";
+  if (n >= 10000) {
+    const man = Math.floor(n / 10000);
+    const below = n % 10000;
+    return (man === 1 ? "" : sinoKorean(man)) + "만" + (below > 0 ? " " + sinoKorean(below) : "");
+  }
   let out = "";
   let rest = n;
   const units: Array<[number, string]> = [

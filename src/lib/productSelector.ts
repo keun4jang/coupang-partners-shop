@@ -3,6 +3,27 @@ import { supabaseAdmin } from "./supabase";
 import { appealScore, spamTitleReason } from "./appeal";
 
 /**
+ * video_items 의 product_id 전량 조회.
+ * PostgREST 는 limit 미지정 시 1000행에서 조용히 자른다. 영상이 1000개를 넘으면
+ * "아직 영상 없는 상품" 판정이 그 뒤 행을 못 보고 깨지므로 페이지로 다 읽는다.
+ */
+async function allVideoProductIds(): Promise<string[]> {
+  const db = supabaseAdmin();
+  const out: string[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from("video_items")
+      .select("product_id")
+      .range(from, from + 999);
+    if (error) throw new Error(`영상 수 조회 실패: ${error.message}`);
+    const rows = (data ?? []) as { product_id: string }[];
+    out.push(...rows.map((r) => r.product_id));
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
+/**
  * 숏폼에 우선 배정할 카테고리.
  * 클릭 실적(노출일당 클릭) 기준 - 생활템·수납템이 가장 잘 나오고
  * 육아생활템이 가장 낮아 아래 DEPRIORITIZED_CATEGORIES 로 뺐다.
@@ -101,14 +122,10 @@ export async function selectProductForVideo(): Promise<Product | null> {
   if (error) throw new Error(`상품 조회 실패: ${error.message}`);
   if (!products || products.length === 0) return null;
 
-  const { data: videoCounts, error: vcError } = await db
-    .from("video_items")
-    .select("product_id");
-  if (vcError) throw new Error(`영상 수 조회 실패: ${vcError.message}`);
-
+  const videoProductIds = await allVideoProductIds();
   const countByProduct = new Map<string, number>();
-  for (const row of videoCounts ?? []) {
-    countByProduct.set(row.product_id, (countByProduct.get(row.product_id) ?? 0) + 1);
+  for (const pid of videoProductIds) {
+    countByProduct.set(pid, (countByProduct.get(pid) ?? 0) + 1);
   }
 
   const sorted = dropSpamTitles(products as Product[]).sort((a, b) => {
@@ -141,11 +158,7 @@ export async function selectProductsForVideos(count: number): Promise<Product[]>
   if (error) throw new Error(`상품 조회 실패: ${error.message}`);
   if (!products || products.length === 0) return [];
 
-  const { data: videoRows, error: vcError } = await db
-    .from("video_items")
-    .select("product_id");
-  if (vcError) throw new Error(`영상 수 조회 실패: ${vcError.message}`);
-  const usedProductIds = new Set((videoRows ?? []).map((r) => r.product_id));
+  const usedProductIds = new Set(await allVideoProductIds());
 
   // 아직 영상이 없고 이미지가 있는 후보만 (스팸성 제목은 여기서 제외)
   const fresh = dropSpamTitles(

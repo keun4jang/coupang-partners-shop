@@ -18,8 +18,12 @@ export default async function DirectNumber({
   params: Promise<{ number: string }>;
 }) {
   const { number } = await params;
-  const n = parseInt(String(number).replace(/[^0-9]/g, ""), 10);
-  if (!Number.isFinite(n) || n <= 0) redirect("/");
+  // 숫자만 이어붙이면 "1.5" → 15, "-3" → 3 처럼 엉뚱한 번호가 된다.
+  // 순수 정수 표기만 받고 그 외엔 홈으로 보낸다 (상한은 현실적인 번호 범위).
+  const raw = String(number).trim();
+  if (!/^\d{1,5}$/.test(raw)) redirect("/");
+  const n = parseInt(raw, 10);
+  if (n <= 0) redirect("/");
   // s=direct: 이 방문이 영상 직행 링크에서 왔음을 클릭 로그에 남긴다
   redirect(`/?q=${n}&s=direct`);
 }

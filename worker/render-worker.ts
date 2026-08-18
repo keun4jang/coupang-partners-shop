@@ -60,8 +60,8 @@ import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls } from "../src/lib/broll";
-import { SEGMENT_SECONDS as FOOTAGE_SEGMENT_SECONDS } from "../src/lib/videoSource";
 import {
+  brollFileDurations,
   deleteFootageFiles,
   segmentsFromFootage,
   sourceProductClips,
@@ -270,7 +270,10 @@ async function renderVideo(
       inputProps.brollFiles = files;
       // 잘라낸 조각은 SEGMENT_SECONDS 고정 길이라 컷보다 짧을 수 있다.
       // 길이를 넘겨야 Background 가 Loop 로 이어 붙여 정지화면을 막는다.
-      inputProps.brollDurations = files.map(() => FOOTAGE_SEGMENT_SECONDS);
+      // 선언값(4.5s 고정)이 아니라 실측 길이를 넘긴다. 짧은 소재는 조각이 4.5초보다
+      // 짧게 나오는데, 선언값이 더 길면 Background 의 Loop 판정이 빗나가
+      // 실제 끝난 뒤부터 정지화면이 됐다.
+      inputProps.brollDurations = brollFileDurations(files);
       cachedBundle = null;
       brollOrigin = "직접 업로드 소재";
       console.log(`직접 소재 사용: ${files.join(", ")}`);
@@ -287,7 +290,7 @@ async function renderVideo(
     );
     if (sourced.files.length > 0) {
       inputProps.brollFiles = sourced.files;
-      inputProps.brollDurations = sourced.files.map(() => FOOTAGE_SEGMENT_SECONDS);
+      inputProps.brollDurations = brollFileDurations(sourced.files);
       cachedBundle = null;
       brollOrigin = sourced.origin;
       console.log(`상품 영상 사용 (${sourced.origin}): ${sourced.files.join(", ")}`);
@@ -993,11 +996,13 @@ const DEFAULT_UPLOAD_SCHEDULE = "07:30-10:00,12:00-14:00,20:00-22:30";
 
 /** 업로드 슬롯 스케줄: 환경변수 → app_settings → 기본값 순 (빈 문자열 = 게이트 없음) */
 async function uploadSchedule(): Promise<string> {
-  return (
+  const raw =
     optionalEnv("UPLOAD_SCHEDULE") ??
     (await getSetting("UPLOAD_SCHEDULE")) ??
-    DEFAULT_UPLOAD_SCHEDULE
-  );
+    DEFAULT_UPLOAD_SCHEDULE;
+  // "off"/"none"/"0" 이면 게이트 없음(즉시 전부 처리). 빈 문자열로는 끌 수 없다 -
+  // optionalEnv 가 빈 값을 미설정으로 취급해 기본 스케줄로 떨어지기 때문.
+  return /^(off|none|0)$/i.test(raw.trim()) ? "" : raw;
 }
 
 /** 기준 시각 이후의 첫 업로드 슬롯 (게이트 없으면 null) */

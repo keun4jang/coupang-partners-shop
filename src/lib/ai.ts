@@ -279,8 +279,10 @@ export const DISCLOSURE_LINE =
  */
 export function fallbackCopy(product: Product, displayNumber: number): VideoCopy {
   const category = product.category || "생활템";
-  const pain = product.pain_point?.trim();
-  const benefit = product.main_benefit?.trim();
+  // 관리자 폼으로 들어온 값이라 개행이 섞여 있을 수 있다. 이 값이 훅/장점 줄이
+  // 되므로 개행을 정리하지 않으면 script_text 7줄 규칙이 깨진다(줄 밀림).
+  const pain = singleLine(product.pain_point?.trim() ?? "") || undefined;
+  const benefit = singleLine(product.main_benefit?.trim() ?? "") || undefined;
   const v = CATEGORY_VARIANTS[category] ?? CATEGORY_VARIANTS["생활템"];
   const seed = displayNumber + nameHash(product.product_name);
 
@@ -806,6 +808,17 @@ export async function generateVideoCopy(
       const preset = pick(v.hooks, displayNumber + nameHash(product.product_name));
       console.warn(`훅 재생성 실패 - 프리셋 훅으로 대체: "${preset}"`);
       copy = { ...copy, hookText: preset };
+    }
+
+    // 운영정책 검사를 최종본에 한 번 더 - 위 재생성(약한 훅/부정 표현)이 copy 를
+    // 교체할 수 있는데, 교체본은 맨 위의 정책 검사를 거치지 않았다. 재생성이
+    // 새 위반 표현을 들여오면 그대로 발행되는 구멍이라 마지막에 반드시 다시 본다.
+    const finalViolations = findPolicyViolations(copy);
+    if (finalViolations.length > 0) {
+      console.warn(
+        `재생성본에서 운영정책 위반 감지(${finalViolations.join(", ")}) - 프리셋 문구로 폴백`
+      );
+      return fallbackCopy(product, displayNumber);
     }
     return copy;
   } catch (error) {

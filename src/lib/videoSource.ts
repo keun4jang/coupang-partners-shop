@@ -32,6 +32,17 @@ const MIN_WIDTH = 500;
 /** 세그먼트 하나 길이(초) - 장면(2~4초)을 여유 있게 덮는다 */
 /** 소재를 잘라낼 조각 길이(초). 워커가 Loop 판단에 쓰도록 내보낸다 */
 export const SEGMENT_SECONDS = 4.5;
+
+/**
+ * 잘라낸 세그먼트의 "실제" 길이(초). 선언값(SEGMENT_SECONDS)은 상한일 뿐이고
+ * 짧은 소재는 min(4.5, 길이×0.9)라 더 짧게 나온다. 선언값을 그대로 넘기면
+ * Background 의 Loop 판정이 빗나가 배경이 실제 끝난 뒤 정지화면으로 멈춘다.
+ */
+export function brollFileDurations(files: string[]): number[] {
+  return files.map(
+    (f) => probeVideo(path.join(BROLL_DIR, f))?.duration ?? SEGMENT_SECONDS
+  );
+}
 /** 가장자리 크롭 비율 - 모서리 워터마크/자막 제거용 (86%만 남김) */
 const EDGE_KEEP = 0.86;
 /** 다운로드 용량 상한 */
@@ -131,14 +142,19 @@ export function segmentLocalVideo(
   const segLen = Math.min(SEGMENT_SECONDS, Math.max(2, info.duration * 0.9));
   const tailTrim = Math.max(info.duration * 0.05, opts?.tailTrimSeconds ?? 0);
   const usableFrom = info.duration * 0.05;
-  const usableTo = info.duration - tailTrim - segLen;
+  // 소재가 짧아 (아웃트로 트림 + 세그먼트 길이)가 전체를 넘으면 usableTo 가
+  // usableFrom 아래로 내려간다. 예전엔 이때 모든 컷 시작점이 usableFrom 으로
+  // 고정돼 6컷이 전부 같은 장면이 됐다. 그땐 트림을 포기하고(아웃트로가 일부
+  // 섞이는 쪽이 6컷 동일 장면보다 낫다) 영상 끝까지를 분산 구간으로 쓴다.
+  let usableTo = info.duration - tailTrim - segLen;
+  if (usableTo <= usableFrom) usableTo = info.duration - segLen;
   const n = Math.max(1, count);
   const files: string[] = [];
   for (let i = 0; i < n; i++) {
     const start =
       usableTo > usableFrom
         ? usableFrom + ((usableTo - usableFrom) * i) / Math.max(1, n - 1)
-        : usableFrom;
+        : Math.max(0, Math.min(usableFrom, info.duration - segLen));
     const name = `${outPrefix}-${i}.mp4`;
     try {
       runFf("ffmpeg", [
@@ -221,7 +237,6 @@ export async function segmentsFromFootage(
 ): Promise<string[]> {
   const db = supabaseAdmin();
   const usable = storagePaths.slice(0, totalCount);
-  const per = Math.ceil(totalCount / usable.length);
 
   const files: string[] = [];
   try {
@@ -238,7 +253,13 @@ export async function segmentsFromFootage(
         }
         fs.writeFileSync(tmp, Buffer.from(await data.arrayBuffer()));
         const info = probeVideo(tmp);
-        const want = Math.min(per, totalCount - files.length);
+        // 남은 컷을 남은 파일 수로 나눠 배분한다. 예전 ceil 선점 방식은 5개 파일에
+        // 6컷이면 앞 3개가 2컷씩 다 가져가 뒤 2개 파일이 아예 안 쓰였고,
+        // 이 방식은 앞 파일이 실패해도 그 몫을 뒤 파일이 자연히 흡수한다.
+        const want = Math.min(
+          Math.ceil((totalCount - files.length) / (usable.length - fi)),
+          totalCount - files.length
+        );
         const got = segmentLocalVideo(tmp, want, `ftg${displayNumber}-${fi}`, {
           minSeconds: FOOTAGE_MIN_SECONDS,
           tailTrimSeconds: info ? douyinTailTrim(info.duration) : 0,

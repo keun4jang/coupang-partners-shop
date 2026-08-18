@@ -77,6 +77,11 @@ export async function publishReelToInstagram(params: {
   const igUserId = requireEnv("INSTAGRAM_BUSINESS_ACCOUNT_ID");
   const accessToken = await currentAccessToken();
 
+  // 캡션 상한 2,200자 - 넘기면 발행 자체가 실패한다. AI 캡션이 어쩌다 길어져도
+  // 발행이 죽는 것보단 뒤가 잘리는 게 낫다 (여유 50자를 남기고 절단).
+  const caption =
+    params.caption.length > 2150 ? params.caption.slice(0, 2150) : params.caption;
+
   // 1) 미디어 컨테이너 생성
   const created = await graphFetch(`${igUserId}/media`, {
     method: "POST",
@@ -84,7 +89,7 @@ export async function publishReelToInstagram(params: {
     body: JSON.stringify({
       media_type: "REELS",
       video_url: params.videoUrl,
-      caption: params.caption,
+      caption,
       access_token: accessToken,
     }),
   });
