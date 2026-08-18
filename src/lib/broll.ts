@@ -180,16 +180,29 @@ export interface StockBroll {
   pexelsId: number;
 }
 
-function pickFile(video: PexelsVideo): PexelsVideoFile | null {
-  // 세로(9:16에 가까운) + HD(720~1080 너비) 파일 우선
-  const portrait = video.video_files
-    .filter((f) => f.height > f.width && f.link)
-    .sort((a, b) => {
-      // 1080x1920 에 가장 가까운 해상도 우선
-      const score = (f: PexelsVideoFile) => Math.abs(f.width - 1080);
-      return score(a) - score(b);
-    });
-  return portrait[0] ?? null;
+/**
+ * 클립 방향. 포맷 D 는 전면 세로 배경이라 portrait,
+ * 포맷 E 는 카드 안 16:9 가로 창이라 landscape 를 쓴다
+ * (가로 창에 세로 클립을 cover 크롭하면 원본의 가운데 1/3 띠만 보인다).
+ */
+export type StockOrientation = "portrait" | "landscape";
+
+function pickFile(
+  video: PexelsVideo,
+  orientation: StockOrientation
+): PexelsVideoFile | null {
+  // 요청 방향 + HD 근처 해상도 파일 우선 (세로 1080폭 / 가로 1280폭 목표)
+  const targetWidth = orientation === "portrait" ? 1080 : 1280;
+  const match = video.video_files
+    .filter(
+      (f) =>
+        f.link &&
+        (orientation === "portrait" ? f.height > f.width : f.width > f.height)
+    )
+    .sort(
+      (a, b) => Math.abs(a.width - targetWidth) - Math.abs(b.width - targetWidth)
+    );
+  return match[0] ?? null;
 }
 
 /**
@@ -271,7 +284,8 @@ async function downloadClip(
 async function fetchFromPixabay(
   query: string,
   seed: number,
-  apiKey: string
+  apiKey: string,
+  orientation: StockOrientation
 ): Promise<StockBroll | null> {
   const page = 1 + (Math.abs(seed) % PAGE_SPREAD);
   const url =
@@ -290,29 +304,34 @@ async function fetchFromPixabay(
       videos: Record<string, { url: string; width: number; height: number }>;
     }>;
   };
-  // 세로(9:16) 렌디션이 있는 것만 후보로 둔다.
-  // 예전엔 세로가 없으면 가로 파일을 받아 왔는데, 배경은 objectFit:cover 라
-  // 16:9 를 9:16 에 맞추면 좌우가 70% 잘리고 1.9배 확대돼 정작 보여줄 피사체가
-  // 화면 밖으로 나갔다. 세로가 없으면 그 후보는 건너뛰고 다음 시드·검색어로 간다.
+  // 요청 방향의 렌디션이 있는 것만 후보로 둔다.
+  // 예전엔 방향이 안 맞아도 받아 왔는데, cover 크롭은 반대 방향을 맞추면
+  // 원본의 30% 안팎만 보여 정작 보여줄 피사체가 화면 밖으로 나갔다.
+  // 방향이 없으면 그 후보는 건너뛰고 다음 시드·검색어로 간다.
   // 무관 클립 제외: 동물·풍경·AI 생성물 태그 (isUnusableClip 주석 참고)
+  const fits = (f: { url: string; width: number; height: number }) =>
+    Boolean(f.url) &&
+    (orientation === "portrait" ? f.height > f.width : f.width > f.height);
   const candidates = (data.hits ?? []).filter(
     (v) =>
       v.duration >= MIN_DURATION_SEC &&
       v.duration <= MAX_DURATION_SEC &&
       !isUnusableClip(v.tags ?? "", query) &&
-      Object.values(v.videos).some((f) => f.url && f.height > f.width)
+      Object.values(v.videos).some(fits)
   );
   if (candidates.length === 0) return null;
   const video = candidates[Math.abs(seed) % candidates.length];
-  const portrait = Object.values(video.videos).filter(
-    (f) => f.url && f.height > f.width
-  );
-  // 1080 폭에 가장 가까운 세로 렌디션
-  const pick = portrait.sort(
-    (a, b) => Math.abs(a.width - 1080) - Math.abs(b.width - 1080)
-  )[0];
+  const targetWidth = orientation === "portrait" ? 1080 : 1280;
+  // 목표 폭에 가장 가까운 렌디션
+  const pick = Object.values(video.videos)
+    .filter(fits)
+    .sort(
+      (a, b) => Math.abs(a.width - targetWidth) - Math.abs(b.width - targetWidth)
+    )[0];
   if (!pick) return null;
-  const filename = await downloadClip(pick.url, `pixabay-${video.id}.mp4`);
+  // 가로 파일은 이름을 구분한다 - 같은 id 의 세로 캐시 파일을 재사용하면 안 되므로
+  const suffix = orientation === "landscape" ? "-land" : "";
+  const filename = await downloadClip(pick.url, `pixabay-${video.id}${suffix}.mp4`);
   if (!filename) return null;
   return { file: filename, durationSec: video.duration, pexelsId: video.id };
 }
@@ -329,13 +348,14 @@ const PER_PAGE = 30;
 async function fetchFromPexels(
   query: string,
   seed: number,
-  apiKey: string
+  apiKey: string,
+  orientation: StockOrientation
 ): Promise<StockBroll | null> {
   // 시드로 페이지를 회전 → 항상 상위 50개만 쓰지 않고 수백 개 풀에서 고름 (반복 방지)
   const page = 1 + (Math.abs(seed) % PAGE_SPREAD);
   const url =
     `${PEXELS_SEARCH}?query=${encodeURIComponent(query)}` +
-    `&orientation=portrait&size=medium&per_page=${PER_PAGE}&page=${page}`;
+    `&orientation=${orientation}&size=medium&per_page=${PER_PAGE}&page=${page}`;
   const res = await fetch(url, { headers: { Authorization: apiKey } });
   if (!res.ok) {
     console.warn(`Pexels 검색 실패 (${res.status})`);
@@ -347,15 +367,17 @@ async function fetchFromPexels(
       v.duration >= MIN_DURATION_SEC &&
       v.duration <= MAX_DURATION_SEC &&
       !isUnusableClip(v.url ?? "", query) &&
-      pickFile(v)
+      pickFile(v, orientation)
   );
   if (candidates.length === 0) {
     return null;
   }
 
   const video = candidates[Math.abs(seed) % candidates.length];
-  const file = pickFile(video)!;
-  const filename = await downloadClip(file.link, `pexels-${video.id}.mp4`);
+  const file = pickFile(video, orientation)!;
+  // 가로 파일은 이름을 구분한다 - 같은 id 의 세로 캐시 파일을 재사용하면 안 되므로
+  const suffix = orientation === "landscape" ? "-land" : "";
+  const filename = await downloadClip(file.link, `pexels-${video.id}${suffix}.mp4`);
   if (!filename) {
     console.warn("Pexels 다운로드 실패/용량 초과");
     return null;
@@ -382,17 +404,23 @@ type Provider = {
 };
 
 /** 키가 설정된 스톡 제공자만 활성화 (Pexels · Pixabay). 키는 env → Supabase 순. */
-async function activeProviders(): Promise<Provider[]> {
+async function activeProviders(orientation: StockOrientation): Promise<Provider[]> {
   const list: Provider[] = [];
   const [pexels, pixabay] = await Promise.all([
     resolveKey("PEXELS_API_KEY"),
     resolveKey("PIXABAY_API_KEY"),
   ]);
   if (pexels) {
-    list.push({ name: "Pexels", fetch: (q, s) => fetchFromPexels(q, s, pexels) });
+    list.push({
+      name: "Pexels",
+      fetch: (q, s) => fetchFromPexels(q, s, pexels, orientation),
+    });
   }
   if (pixabay) {
-    list.push({ name: "Pixabay", fetch: (q, s) => fetchFromPixabay(q, s, pixabay) });
+    list.push({
+      name: "Pixabay",
+      fetch: (q, s) => fetchFromPixabay(q, s, pixabay, orientation),
+    });
   }
   return list;
 }
@@ -401,14 +429,15 @@ export async function fetchStockBrolls(
   category: string,
   displayNumber: number,
   count: number,
-  productName = ""
+  productName = "",
+  orientation: StockOrientation = "portrait"
 ): Promise<StockBroll[]> {
   // 검색어 풀: 상품명 특화 검색어(있으면) + 카테고리 변형들. 모두 생활감 보정.
   const pq = productQuery(productName);
   const rawQueries = [...(pq ? [pq] : []), ...categoryQueries(category)];
   const queries = [...new Set(rawQueries.map(domesticize))];
 
-  const providers = await activeProviders();
+  const providers = await activeProviders(orientation);
   if (providers.length === 0) {
     console.warn("스톡 API 키 없음 - 블러 상품사진 배경으로 폴백");
     return [];

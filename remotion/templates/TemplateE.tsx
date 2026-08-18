@@ -245,49 +245,11 @@ const MediaWindow: React.FC<{
         background: E.card,
       }}
     >
-      {/* 제품 사진이 창의 주인공 (사장님 피드백 2026-08-18: 자료화면이 제품과
-          무관한 장면일 때가 많으니 제품을 훨씬 크게 - 스톡과 역할을 뒤집었다).
-          보조 창이 있으면 오른쪽에 그 폭만큼 자리를 비워 넓적한 제품 사진이
-          보조 창에 가려지지 않게 한다 (세로형 제품은 높이 기준이라 크기 그대로). */}
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 32,
-          paddingRight: files.length > 0 ? 372 : 32,
-          boxSizing: "border-box",
-        }}
-      >
-        {props.productImageUrl ? (
-          <Img
-            src={props.productImageUrl}
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
-          />
-        ) : (
-          <span style={{ fontSize: 160 }}>🧺</span>
-        )}
-      </div>
-      {/* 스톡 클립은 오른쪽 열 세로 중앙의 작은 보조 창 - 생동감만 주고
-          시선은 뺏지 않게. 제품(왼쪽 열)과 2단 매거진 구성이 된다 */}
-      {files.length > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            right: 20,
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 330,
-            height: 246,
-            borderRadius: 20,
-            overflow: "hidden",
-            border: `1px solid ${E.line}`,
-            boxShadow: "0 8px 24px rgba(36,33,30,0.18)",
-            background: E.card,
-          }}
-        >
+      {/* 실사용 클립이 카드 전체(≈16:9 가로)에 깔리고, 제품 사진 카드가 그 위에
+          얹힌다 (사장님 피드백 2026-08-18: 영상 소스는 16:9 가로로, 제품은 그 위에).
+          워커가 E 용으로는 가로 클립을 받아오므로 크롭 손실이 거의 없다. */}
+      {files.length > 0 ? (
+        <>
           {cutSeconds.map((startSec, i) => {
             const endSec = i + 1 < cutSeconds.length ? cutSeconds[i + 1] : toSecond;
             if (endSec <= startSec) return null;
@@ -317,6 +279,57 @@ const MediaWindow: React.FC<{
               </Sequence>
             );
           })}
+          {/* 제품 사진 오버레이 카드 - 왼쪽에 크게, 영상 위에 떠 있다 */}
+          <div
+            style={{
+              position: "absolute",
+              left: 28,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 410,
+              height: 410,
+              borderRadius: E.radius,
+              background: E.card,
+              border: `1px solid ${E.line}`,
+              boxShadow: "0 14px 40px rgba(36,33,30,0.28)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+              boxSizing: "border-box",
+            }}
+          >
+            {props.productImageUrl ? (
+              <Img
+                src={props.productImageUrl}
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+            ) : (
+              <span style={{ fontSize: 120 }}>🧺</span>
+            )}
+          </div>
+        </>
+      ) : (
+        // 스톡이 없으면 제품 사진을 카드 전체에 크게
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 32,
+            boxSizing: "border-box",
+          }}
+        >
+          {props.productImageUrl ? (
+            <Img
+              src={props.productImageUrl}
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            />
+          ) : (
+            <span style={{ fontSize: 160 }}>🧺</span>
+          )}
         </div>
       )}
     </div>
@@ -541,9 +554,9 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
             </div>
 
             {/* 사진 창 (본문) → CTA 카드 (마지막).
-                높이 520: 제품을 최대한 크게 (행 4개 최악 높이까지 더해도
-                콘텐츠 안전대 1220px 안: 54+26+520+26+554 = 1180) */}
-            <div style={{ width: "100%", height: 520, position: "relative" }}>
+                높이 526 = 936÷16×9, 정확한 16:9 (행 4개 최악 높이까지 더해도
+                콘텐츠 안전대 1220px 안: 54+26+526+26+554 = 1186) */}
+            <div style={{ width: "100%", height: 526, position: "relative" }}>
               <Sequence durationInFrames={f(ctaFrom - bodyFrom)} layout="none">
                 <MediaWindow
                   props={props}

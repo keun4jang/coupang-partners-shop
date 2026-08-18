@@ -309,7 +309,10 @@ async function renderVideo(
         product.category,
         item.display_number,
         BROLL_CUT_COUNT,
-        product.product_name
+        product.product_name,
+        // E 는 카드 안 16:9 가로 창이라 가로 클립을 받는다 (세로를 cover 크롭하면
+        // 원본의 가운데 1/3 띠만 보여 피사체가 잘림). D 는 전면 세로 배경.
+        effectiveTemplate === "E" ? "landscape" : "portrait"
       );
       if (brolls.length > 0) {
         inputProps.brollFiles = brolls.map((b) => b.file);
