@@ -224,6 +224,16 @@ const SYNTHETIC_WORDS =
  *  "home" 계열 검색에 ramadan/incense 향로 클립이 배경으로 뽑혔다. */
 const OFFTOPIC_WORDS =
   /\b(ramadan|ramadhan|mubarak|islamic|spiritual|worship|temple|church|christmas|halloween|easter|diwali|incense|meditation|yoga|zen)\b/i;
+/** 음식·조리 장면 - 요리 의도가 없는 검색어에서만 제외.
+ *  실측(115번): 청소템 검색어 "wiping kitchen counter home" 이 Pixabay 태그
+ *  kitchen 에 걸려 치킨 튀기는 클립을 욕실 세정제 배경으로 가져왔다.
+ *  주방템의 "kitchen cooking home" 류 검색어는 음식 장면이 정답이므로 허용. */
+const FOOD_WORDS =
+  /\b(food|cooking|cooked?|frying|fried|baking|baked|recipe|meal|schnitzel|grill|barbecue|bbq|chef|dough|breakfast|dinner|lunch|delicious)\b/i;
+
+function isFoodQuery(query: string): boolean {
+  return /cooking|food|recipe|baking/i.test(query);
+}
 
 function isOutdoorQuery(query: string): boolean {
   return /camping|outdoor|car\b/i.test(query);
@@ -234,6 +244,7 @@ function isUnusableClip(text: string, query: string): boolean {
   if (ANIMAL_WORDS.test(text)) return true;
   if (SYNTHETIC_WORDS.test(text)) return true;
   if (OFFTOPIC_WORDS.test(text)) return true;
+  if (!isFoodQuery(query) && FOOD_WORDS.test(text)) return true;
   if (!isOutdoorQuery(query) && SCENERY_WORDS.test(text)) return true;
   return false;
 }
