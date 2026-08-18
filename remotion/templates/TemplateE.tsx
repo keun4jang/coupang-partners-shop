@@ -245,87 +245,73 @@ const MediaWindow: React.FC<{
         background: E.card,
       }}
     >
-      {files.length > 0 ? (
-        cutSeconds.map((startSec, i) => {
-          const endSec = i + 1 < cutSeconds.length ? cutSeconds[i + 1] : toSecond;
-          if (endSec <= startSec) return null;
-          const file = files[i % files.length];
-          const clipFrames = durations[i % files.length]
-            ? Math.max(1, Math.round(durations[i % files.length] * VIDEO.fps))
-            : null;
-          const seqFrames = f(endSec - startSec);
-          const video = (
-            <OffthreadVideo
-              src={staticFile(`assets/broll/${file}`)}
-              muted
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          );
-          return (
-            <Sequence
-              key={i}
-              from={f(startSec - fromSecond)}
-              durationInFrames={seqFrames}
-            >
-              {clipFrames && clipFrames < seqFrames ? (
-                <Loop durationInFrames={clipFrames}>{video}</Loop>
-              ) : (
-                video
-              )}
-            </Sequence>
-          );
-        })
-      ) : (
-        // 스톡이 없으면 제품 사진을 창에 (블러·중첩 오버레이 없이 그대로)
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            boxSizing: "border-box",
-          }}
-        >
-          {props.productImageUrl ? (
-            <Img
-              src={props.productImageUrl}
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          ) : (
-            <span style={{ fontSize: 120 }}>🧺</span>
-          )}
-        </div>
-      )}
-      {/* 제품 미니 카드 - 스톡이 재생되는 동안에도 제품이 화면에서 사라지지 않게 */}
+      {/* 제품 사진이 창의 주인공 (사장님 피드백 2026-08-18: 자료화면이 제품과
+          무관한 장면일 때가 많으니 제품을 훨씬 크게 - 스톡과 역할을 뒤집었다) */}
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 32,
+          boxSizing: "border-box",
+        }}
+      >
+        {props.productImageUrl ? (
+          <Img
+            src={props.productImageUrl}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
+        ) : (
+          <span style={{ fontSize: 160 }}>🧺</span>
+        )}
+      </div>
+      {/* 스톡 클립은 우하단 작은 보조 창 - 생동감만 주고 시선은 뺏지 않게 */}
       {files.length > 0 && (
         <div
           style={{
             position: "absolute",
             right: 20,
             bottom: 20,
-            width: 168,
-            height: 168,
+            width: 330,
+            height: 246,
             borderRadius: 20,
-            background: E.card,
+            overflow: "hidden",
             border: `1px solid ${E.line}`,
             boxShadow: "0 8px 24px rgba(36,33,30,0.18)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 12,
-            boxSizing: "border-box",
+            background: E.card,
           }}
         >
-          {props.productImageUrl ? (
-            <Img
-              src={props.productImageUrl}
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          ) : (
-            <span style={{ fontSize: 64 }}>🧺</span>
-          )}
+          {cutSeconds.map((startSec, i) => {
+            const endSec = i + 1 < cutSeconds.length ? cutSeconds[i + 1] : toSecond;
+            if (endSec <= startSec) return null;
+            const file = files[i % files.length];
+            const clipFrames = durations[i % files.length]
+              ? Math.max(1, Math.round(durations[i % files.length] * VIDEO.fps))
+              : null;
+            const seqFrames = f(endSec - startSec);
+            const video = (
+              <OffthreadVideo
+                src={staticFile(`assets/broll/${file}`)}
+                muted
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            );
+            return (
+              <Sequence
+                key={i}
+                from={f(startSec - fromSecond)}
+                durationInFrames={seqFrames}
+              >
+                {clipFrames && clipFrames < seqFrames ? (
+                  <Loop durationInFrames={clipFrames}>{video}</Loop>
+                ) : (
+                  video
+                )}
+              </Sequence>
+            );
+          })}
         </div>
       )}
     </div>
@@ -549,8 +535,10 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
               </div>
             </div>
 
-            {/* 사진 창 (본문) → CTA 카드 (마지막) */}
-            <div style={{ width: "100%", height: 470, position: "relative" }}>
+            {/* 사진 창 (본문) → CTA 카드 (마지막).
+                높이 520: 제품을 최대한 크게 (행 4개 최악 높이까지 더해도
+                콘텐츠 안전대 1220px 안: 54+26+520+26+554 = 1180) */}
+            <div style={{ width: "100%", height: 520, position: "relative" }}>
               <Sequence durationInFrames={f(ctaFrom - bodyFrom)} layout="none">
                 <MediaWindow
                   props={props}
