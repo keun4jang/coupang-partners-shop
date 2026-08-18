@@ -182,8 +182,18 @@ export function formatPayoutMessage(p: PayoutStatus): string {
  */
 export async function shouldAlertPayoutReached(p: PayoutStatus): Promise<boolean> {
   if (!p.ok || !p.reachedThreshold) return false;
-  const key = `payout_alerted_${p.currentMonth}`;
-  if ((await getSetting(key)) === "1") return false;
-  await setSetting(key, "1");
-  return true;
+  return (await getSetting(alertKey(p))) !== "1";
+}
+
+function alertKey(p: PayoutStatus): string {
+  return `payout_alerted_${p.currentMonth}`;
+}
+
+/**
+ * 알림 "발송 성공 후"에 호출해 이번달 1회성 플래그를 기록한다.
+ * (예전엔 판정 시점에 플래그를 먼저 찍어서, 텔레그램 전송이 실패하면
+ *  그 달의 출금 달성 알림이 영구히 유실됐다)
+ */
+export async function markPayoutAlerted(p: PayoutStatus): Promise<void> {
+  await setSetting(alertKey(p), "1");
 }

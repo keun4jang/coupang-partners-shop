@@ -4,6 +4,7 @@ import { getEarnings, formatEarningsMessage } from "@/lib/earnings";
 import {
   getPayoutStatus,
   formatPayoutMessage,
+  markPayoutAlerted,
   shouldAlertPayoutReached,
 } from "@/lib/payout";
 import { sendTelegramMessage } from "@/lib/telegram";
@@ -57,6 +58,8 @@ export async function GET(request: NextRequest) {
           "쿠팡파트너스 > 설정에서 한 번 확인해 주세요.",
         ].join("\n")
       );
+      // 전송이 성공했을 때만 1회성 플래그 기록 (실패 시 다음 실행에서 재시도)
+      await markPayoutAlerted(payout);
     }
 
     return NextResponse.json({ ok: true, ...data, earnings, payout, alerted });
