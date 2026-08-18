@@ -14,8 +14,9 @@ import { BGM, BROLL_VEIL, COLORS, VIDEO } from "../config/videoConfig";
 import { FontFaceStyle } from "./FontFaceStyle";
 import { useVideoConfig } from "remotion";
 
-/** 밝은 배경음악 - 나레이션을 가리지 않게 아주 작게, 끝에서 페이드아웃 */
-const BgmAudio: React.FC = () => {
+/** 밝은 배경음악 - 나레이션을 가리지 않게 아주 작게, 끝에서 페이드아웃.
+ *  (TemplateE 는 Background 없이 종이 배경을 직접 그리므로 이걸 따로 가져다 쓴다) */
+export const BgmAudio: React.FC = () => {
   const { durationInFrames } = useVideoConfig();
   const fadeFrames = Math.round(BGM.fadeOutSeconds * VIDEO.fps);
   return (

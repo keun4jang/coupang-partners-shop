@@ -248,18 +248,27 @@ async function renderVideo(
 }> {
   const inputProps = buildProps(item, product);
 
-  // 렌더할 실제 템플릿. FORCE_TEMPLATE 로 배치 렌더 시 강제 지정 가능
-  // (DB 제약이 아직 'D' 를 안 받을 때 D 포맷을 뽑기 위한 안전장치).
-  const effectiveTemplate = optionalEnv("FORCE_TEMPLATE") ?? item.template_type;
+  // 렌더할 실제 템플릿. 우선순위: app_settings.design_template → FORCE_TEMPLATE 환경변수
+  // → DB template_type. app_settings 가 최우선인 이유: FORCE_TEMPLATE=D 는 GitHub
+  // Actions 시크릿(WORKER_ENV)에 박혀 있어 코드/시크릿 수정 없이는 못 바꾸는데,
+  // 디자인 전환(D↔E)·롤백은 DB 값 하나로 즉시 되어야 하기 때문.
+  const designSetting = (await getSetting("design_template"))?.trim().toUpperCase();
+  const effectiveTemplate =
+    (designSetting && /^[A-E]$/.test(designSetting) ? designSetting : null) ??
+    optionalEnv("FORCE_TEMPLATE") ??
+    item.template_type;
 
-  // 포맷 D 배경 우선순위:
-  // ⓪ 직접 업로드 소재(스튜디오) → ① 상품 영상 자동 소싱 → ② 스톡 → ③ 블러 상품사진
+  // 포맷 D/E 배경 우선순위:
+  // ⓪ 직접 업로드 소재(스튜디오) → ① 상품 영상 자동 소싱 → ② 스톡 → ③ 폴백
+  //    (D 는 블러 상품사진 전면 배경, E 는 사진 창에 제품 사진)
   //
-  // 세 경로 모두 컷 수(TemplateD cutSeconds = 6)와 같은 개수를 만들어야 한다.
-  // 모자라면 Background 가 앞 클립을 재사용해 "되감긴 것처럼" 보인다.
-  const BROLL_CUT_COUNT = 6;
+  // 컷 수: D 는 전면 배경 6컷, E 는 "사진 창" 안에서만 최대 3컷이라 3개면 충분
+  // (컨설팅 반영 - 스톡 컷이 많을수록 광고 냄새가 나므로 E 는 줄였다).
+  // 모자라면 Background/MediaWindow 가 앞 클립을 재사용해 "되감긴 것처럼" 보인다.
+  const usesBroll = effectiveTemplate === "D" || effectiveTemplate === "E";
+  const BROLL_CUT_COUNT = effectiveTemplate === "E" ? 3 : 6;
   let brollOrigin = "배경 없음(블러 사진)";
-  if (effectiveTemplate === "D" && item.footage_paths?.length) {
+  if (usesBroll && item.footage_paths?.length) {
     console.log(`직접 업로드 소재 처리 중 (${item.footage_paths.length}개)...`);
     const files = await segmentsFromFootage(
       item.footage_paths,
@@ -281,7 +290,7 @@ async function renderVideo(
       console.warn("직접 소재 처리 실패 - 자동 소싱/스톡으로 폴백");
     }
   }
-  if (effectiveTemplate === "D" && !inputProps.brollFiles) {
+  if (usesBroll && !inputProps.brollFiles) {
     console.log("상품 영상 자동 소싱 중...");
     const sourced = await sourceProductClips(
       product,

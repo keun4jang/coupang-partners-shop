@@ -78,6 +78,11 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
 
 > 🎬 **포맷 D 고정**: `FORCE_TEMPLATE=D` 를 넣으면 DB template_type 과 무관하게
 > 모든 영상을 포맷 D(실사용 스톡영상 배경)로 렌더한다. 빼면 저장된 A/B/C 로 렌더됨.
+>
+> 🎨 **디자인 전환(최우선 스위치)**: `app_settings` 의 `design_template` 키가 있으면
+> `FORCE_TEMPLATE` 환경변수보다 우선한다 (`E` = 살림 검증 노트 포맷, `D` = 기존 포맷).
+> WORKER_ENV 시크릿을 고치지 않고도 DB 값 하나로 전 워커의 디자인을 즉시 전환/롤백할
+> 수 있다. 키를 지우면 다시 `FORCE_TEMPLATE` → DB template_type 순서로 돌아간다.
 
 > 📺 **유튜브 쇼츠 자동 업로드**: 유튜브 채널이 있는 구글 계정으로 OAuth 클라이언트를
 > 별도로 만든다(드라이브 계정과 다를 수 있음). `SCOPE=youtube node scripts/google-oauth.mjs url`

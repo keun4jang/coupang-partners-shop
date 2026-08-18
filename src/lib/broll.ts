@@ -112,7 +112,9 @@ const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
   [/밀대|물걸레|대걸레|걸레/, "mopping floor cleaning home"],
   [/테이프\s*클리너|롤러|먼지떨이|먼지/, "lint roller cleaning sofa"],
   [/청소솔|브러쉬|브러시|수세미/, "scrubbing cleaning brush"],
-  [/락스|폼스프레이|욕실|변기|타일/, "bathroom cleaning spray tiles"],
+  // "배스룸 폼 클리너"(115번)가 어느 규칙에도 안 걸려 버섯 손질·폰 보는 영상이
+  // 깔렸다. 외래어 표기(배스룸)와 "폼/욕실 클리너" 조합도 잡는다.
+  [/락스|폼\s*스프레이|폼\s*클리너|배스룸|욕실|변기|타일/, "bathroom cleaning spray tiles"],
   [/청소기/, "vacuum cleaning floor home"],
   [/선반|거치대|정리함|수납|리빙\s*박스|리빙박스|옷정리|정리|박스/, "organizing storage boxes home"],
   [/전자레인지|밥솥|에어프라이어/, "kitchen counter appliance home"],

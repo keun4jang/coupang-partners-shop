@@ -1,8 +1,15 @@
 import React from "react";
 import { staticFile } from "remotion";
-import { FONT_NAME } from "../fonts";
+import { EDITORIAL_FONT_NAME, FONT_NAME } from "../fonts";
 
-const WEIGHTS = ["400", "700", "900"] as const;
+const NOTO_WEIGHTS = ["400", "700", "900"] as const;
+
+/** Pretendard 는 파일명이 두께 이름이라 (숫자, 파일명) 쌍으로 매핑한다 */
+const PRETENDARD_WEIGHTS: ReadonlyArray<readonly [string, string]> = [
+  ["400", "Regular"],
+  ["600", "SemiBold"],
+  ["800", "ExtraBold"],
+];
 
 /**
  * @font-face CSS 선언 (delayRender 없이 순수 CSS 로 로드).
@@ -11,8 +18,9 @@ const WEIGHTS = ["400", "700", "900"] as const;
  */
 export const FontFaceStyle: React.FC = () => (
   <style>
-    {WEIGHTS.map(
-      (weight) => `
+    {[
+      ...NOTO_WEIGHTS.map(
+        (weight) => `
       @font-face {
         font-family: '${FONT_NAME}';
         src: url('${staticFile(`fonts/NotoSansKR-${weight}.woff2`)}') format('woff2');
@@ -20,6 +28,17 @@ export const FontFaceStyle: React.FC = () => (
         font-display: block;
       }
     `
-    ).join("\n")}
+      ),
+      ...PRETENDARD_WEIGHTS.map(
+        ([weight, file]) => `
+      @font-face {
+        font-family: '${EDITORIAL_FONT_NAME}';
+        src: url('${staticFile(`fonts/Pretendard-${file}.woff2`)}') format('woff2');
+        font-weight: ${weight};
+        font-display: block;
+      }
+    `
+      ),
+    ].join("\n")}
   </style>
 );

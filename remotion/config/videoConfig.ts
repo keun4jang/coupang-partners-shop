@@ -265,6 +265,78 @@ export function ctaNumberFontSize(displayNumber: number): number {
 }
 
 /**
+ * 포맷 E(살림 검증 노트) 디자인 토큰 - 2026-08 디자인 컨설팅 반영.
+ *
+ * 방향: "광고"가 아니라 "정리된 검증 노트"로 보이게.
+ *  - 종이색 단색 배경 위에 텍스트를 얹어 외곽선(노래방 자막) 없이 읽히게 한다
+ *  - 두께는 400/600/800 세 단계로 위계를 만든다 (전부 900 금지)
+ *  - 제품은 0초부터 보인다 (기존 D 는 4.6초에 등장 - 평균 시청 2.72초와 어긋남)
+ *  - 스톡 영상은 전면 배경이 아니라 둥근 "사진 창" 안에만, 컷 3개 이하
+ */
+export const EDITORIAL = {
+  /** 종이(배경) */
+  paper: "#F7F3EA",
+  /** 본문 잉크 */
+  ink: "#24211E",
+  /** 보조 텍스트 */
+  sub: "#6E675E",
+  /** 포인트(토마토) - CTA 전용으로 아껴 쓴다 */
+  accent: "#E95F45",
+  /** 딥그린 - 라벨 칩 */
+  green: "#55725B",
+  /** 형광펜 옐로 - TIP 라벨 */
+  highlight: "#FFD766",
+  /** 카드 흰색 */
+  card: "#FFFFFF",
+  /** 헤어라인(카드 테두리) */
+  line: "#E5DCCB",
+  /** 카드 모서리 */
+  radius: 24,
+  /** 좌우 안전 여백(px) */
+  safeX: 72,
+  /** 콘텐츠 상단 시작(px) - 플랫폼 UI 데드존 아래 */
+  safeTop: 260,
+  /** 콘텐츠 하단 한계(px) - 캡션·버튼 데드존 위 */
+  safeBottom: 1480,
+} as const;
+
+/** 포맷 E 모션 - 팝인을 절제 (오버슈트 거의 없음, 컨설팅 권고 damping 20) */
+export const MOTION_E = {
+  springDamping: 20,
+} as const;
+
+/**
+ * 포맷 E 훅 크기 (왼쪽 정렬, 종이 배경 위 잉크색).
+ * 폭 = 1080 − safeX×2 = 936. 컨설팅 권고 72~92px 를 기본으로 하되
+ * 짧은 훅은 96 까지 키우고, 어절이 길면 fitKoreanText 로 자동 축소한다.
+ */
+export function eHookFontSize(hookLine: string): number {
+  return fitKoreanText({
+    text: hookLine,
+    maxWidth: VIDEO.width - EDITORIAL.safeX * 2,
+    maxHeight: 430,
+    lineHeight: 1.12,
+    maxSize: 96,
+    minSize: 56,
+  });
+}
+
+/**
+ * 포맷 E 노트 행 본문 크기.
+ * 폭 = 936 − 라벨 칩 132 − 간격 20 = 784, 최대 2줄 안에 들어가게.
+ */
+export function eRowTextSize(text: string): number {
+  return fitKoreanText({
+    text,
+    maxWidth: VIDEO.width - EDITORIAL.safeX * 2 - 152,
+    maxHeight: 122,
+    lineHeight: 1.32,
+    maxSize: 44,
+    minSize: 32,
+  });
+}
+
+/**
  * 영상 첫 프레임(정확히 1프레임)을 썸네일처럼 쓰기 위한 정적 커버 화면 길이.
  * 재생 중엔 1/30초라 거의 안 보이고, 플랫폼이 이 프레임을 미리보기로 캡처하거나
  * 우리가 직접 썸네일 PNG로 뽑을 때(worker THUMBNAIL_FRAME) 이 화면이 나온다.
