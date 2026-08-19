@@ -72,7 +72,7 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
    `FORCE_TEMPLATE=D`(모든 렌더를 포맷 D 로 고정),
    `YOUTUBE_OAUTH_CLIENT_ID`/`YOUTUBE_OAUTH_CLIENT_SECRET`/`YOUTUBE_OAUTH_REFRESH_TOKEN`(유튜브 쇼츠 자동 업로드),
    `INSTAGRAM_BUSINESS_ACCOUNT_ID`/`INSTAGRAM_ACCESS_TOKEN`(인스타 릴스 자동 게시),
-   `UPLOAD_SCHEDULE=08:40,13:00,19:00`(하루 3개를 아침/점심/저녁 슬롯에 ±30분 랜덤 지터로 분산 업로드 - KST),
+   `UPLOAD_SCHEDULE`(업로드 슬롯 - 지금은 app_settings 값이 우선이라 보통 DB에서 관리),
    (선택)`AI_API_KEY`)
 4. Actions 탭에서 `render-worker` → **Run workflow** 로 수동 테스트 가능
 
@@ -157,13 +157,14 @@ npm run worker:once   # 대기중인 것만 처리하고 종료
 
 | 경로 | 스케줄(UTC) | KST | 하는 일 |
 |---|---|---|---|
-| `/api/cron/scout` | `0 23 * * *` | 아침 08:00 | ① 쿠팡에서 주부 인기 상품 후보 자동 등록 → ② 카테고리가 겹치지 않는 상품으로 **하루 3개 영상 자동 큐잉**(pending) + 텔레그램 알림 |
+| `/api/cron/scout` | `0 23 * * *` | 아침 08:00 | ① 쿠팡에서 주부 인기 상품 후보 자동 등록 → ② 카테고리가 겹치지 않는 상품으로 **하루치 영상 자동 큐잉**(pending, 개수 = `app_settings.daily_video_target`) + 텔레그램 알림 |
 | `/api/cron/report` | `0 11 * * *` | 저녁 20:00 | click_logs 집계 → 오늘/이번주 클릭·인기 번호 리포트 |
 
-> 🔁 **완전 자동 흐름**: 매일 아침 scout 이 상품을 찾아 **영상 3개를 pending 으로** 만든다
+> 🔁 **완전 자동 흐름**: 매일 아침 scout 이 상품을 찾아 **하루치 영상을 pending 으로** 만든다
 > → 15분마다 도는 렌더 워커(GitHub Actions)가 포맷 D 로 렌더 → 드라이브 업로드.
 > 사람은 드라이브에서 완성 영상을 받아 Reels/TikTok/Shorts 에 올리기만 하면 된다.
-> 멱등 처리: 하루에 3개를 넘겨 만들지 않는다(수동으로 몇 개 만든 날은 3개까지만 채움).
+> 멱등 처리: 하루 목표치를 넘겨 만들지 않는다(수동으로 몇 개 만든 날은 목표치까지만 채움).
+> `daily_video_target` 은 **`UPLOAD_SCHEDULE` 슬롯 개수와 같게** 유지한다.
 
 ### 켜려면 — Vercel 환경변수 3개 필요 (한 번만)
 
@@ -178,7 +179,8 @@ Vercel 프로젝트 → **Settings → Environment Variables** 에서 아래 3�
 
 - `CRON_SECRET` 은 Vercel Cron 이 `Authorization: Bearer` 헤더로 자동 전송 → 라우트가 검증.
 - 없으면 라우트가 401 로 거부(공개 남용 방지).
-- 수동 실행/테스트: `https://<도메인>/api/cron/scout?key=<CRON_SECRET>`
+- 수동 실행/테스트: `curl -H "Authorization: Bearer <CRON_SECRET>" https://<도메인>/api/cron/scout`
+  (`?key=` 쿼리 인증은 보안상 제거됐다 - 헤더만 받는다)
 
 ### 로컬에서 수동 실행 (선택)
 
