@@ -108,3 +108,54 @@ export function spamTitleReason(productName: string): string | null {
 export function isSpamTitle(productName: string): boolean {
   return spamTitleReason(productName) !== null;
 }
+
+/**
+ * 상품명 → 우리 카테고리 추정.
+ *
+ * 키워드 검색은 검색어에 카테고리가 붙어 오지만, 골드박스·카테고리 베스트셀러는
+ * 상품 목록만 오므로 이름으로 판정해야 한다. 카테고리는 배경 스톡 검색어를
+ * 좌우하므로(broll.ts) 확실할 때만 지정하고 애매하면 생활템으로 둔다.
+ */
+const CATEGORY_RULES: Array<[RegExp, string]> = [
+  // 차량은 맨 앞 - "차량용 청소기"가 청소템으로 새면 집안 배경이 깔린다
+  [/차량|자동차|트렁크|대시보드|와이퍼|차박/, "차량용품"],
+  [/캠핑|텐트|화로대|랜턴|코펠|아이스박스|타프/, "캠핑"],
+  [/주방|냄비|프라이팬|도마|식기|그릇|수저|젓가락|밀폐용기|조리|채칼|다지기|커피|텀블러|보온병/, "주방템"],
+  [/청소|걸레|빗자루|먼지|물때|곰팡이|배수구|세탁조|욕실|브러쉬|브러시/, "청소템"],
+  [/수납|정리함|정리대|선반|칸막이|행거|옷장|서랍|후크|걸이/, "수납템"],
+  [/자취|원룸|1인용|미니\s*밥솥/, "자취템"],
+];
+
+export function inferCategory(productName: string): string {
+  const name = productName ?? "";
+  for (const [re, category] of CATEGORY_RULES) {
+    if (re.test(name)) return category;
+  }
+  return "생활템";
+}
+
+/**
+ * 살림템 채널에 쓸 수 없는 상품인지 (골드박스·베스트셀러용).
+ *
+ * 키워드 검색은 우리가 검색어를 고르니 엉뚱한 게 잘 안 섞이지만, 골드박스와
+ * 카테고리 베스트셀러는 쿠팡이 주는 대로 오므로 패션·식품·의약품처럼
+ * "살림템 영상으로 만들 수 없는" 품목이 섞인다. 이름으로 먼저 걷어낸다.
+ */
+const OFF_BRAND_RULES: Array<[RegExp, string]> = [
+  [/티셔츠|셔츠|바지|청바지|원피스|자켓|재킷|코트|패딩|니트|양말|속옷|브라|팬티|신발|운동화|구두|슬리퍼|가방|백팩|지갑|모자|목걸이|귀걸이|반지/, "패션"],
+  [/즉석밥|라면|과자|음료|커피믹스|생수|우유|계란|고기|삼겹살|한우|과일|사과|귀리|쌀\b|김치|반찬|즉석|간편식|단백질\s*보충|비타민|유산균|영양제|홍삼/, "식품/건강식품"],
+  [/기저귀|분유|물티슈|생리대|화장지|휴지|물휴지/, "소모품"],
+  [/립스틱|파운데이션|쿠션|아이섀도|마스카라|스킨|로션|에센스|앰플|선크림|샴푸|린스|바디워시/, "화장품"],
+  [/사료|간식\s*캔|고양이|강아지|반려/, "반려동물"],
+  [/도서|소설|문제집|교재|만화책/, "도서"],
+  [/상품권|기프트카드|쿠폰|이용권|여행\s*상품/, "상품권/서비스"],
+];
+
+/** 못 쓰는 품목이면 사유, 쓸 수 있으면 null */
+export function offBrandReason(productName: string): string | null {
+  const name = productName ?? "";
+  for (const [re, label] of OFF_BRAND_RULES) {
+    if (re.test(name)) return label;
+  }
+  return null;
+}

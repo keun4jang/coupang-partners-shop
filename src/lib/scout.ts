@@ -4,9 +4,11 @@ import {
   SCOUT_KEYWORDS,
   searchProducts,
   priceText,
+  fetchBestCategory,
+  fetchGoldbox,
 } from "./coupang";
 import { dateFolderName } from "./format";
-import { appealScore, isSpamTitle } from "./appeal";
+import { appealScore, inferCategory, isSpamTitle, offBrandReason } from "./appeal";
 import {
   hasAffiliateEnv,
   loadAffiliateCredsFromSettings,
@@ -98,10 +100,32 @@ function passesFilter(
   return true;
 }
 
+/**
+ * 카테고리 베스트셀러를 볼 쿠팡 대분류.
+ *
+ * id 와 실제 카테고리가 어긋나도 안전하다 - 담기 전에 상품명으로 살림템 여부를
+ * 다시 판정하므로(offBrandReason) 패션·식품 카테고리가 섞여도 걸러진다.
+ * label 은 로그·source_memo 용 표기일 뿐이다.
+ */
+const BEST_CATEGORY_IDS: Array<{ id: number; label: string }> = [
+  { id: 1008, label: "주방용품" },
+  { id: 1009, label: "생활용품" },
+  { id: 1010, label: "홈인테리어" },
+  { id: 1011, label: "가전디지털" },
+  { id: 1012, label: "스포츠레저" },
+  { id: 1013, label: "자동차용품" },
+  { id: 1016, label: "문구오피스" },
+];
+
+/** 목록형 소스(골드박스·베스트) 하나당 후보로 담을 최대 개수 */
+const LISTING_TAKE = 8;
+
 export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
-  // 한 번에 담을 신규 후보 수. 발행이 하루 3~5개인데 8이면 재고가 못 따라간다
-  // (실측 2026-08-19: 미사용 재고 43개, 신규 유입 1~2개/일 → 순감소 1.5개/일).
-  const maxCandidates = opts.maxCandidates ?? 15;
+  // 한 번에 담을 신규 후보 수. 인스타를 하루 여러 편으로 올리려면 재고가 그만큼
+  // 쌓여야 한다 (실측 2026-08-19: 미사용 재고 43개, 8/16 이후 신규 유입 0개).
+  // 소스가 키워드 85개 + 골드박스 + 베스트 7종으로 늘어 후보 풀이 넓어졌으므로
+  // 등록 상한도 함께 올린다. 품질은 appealScore 정렬이 지켜준다.
+  const maxCandidates = opts.maxCandidates ?? 30;
   const perKeywordFetch = opts.perKeywordFetch ?? 10;
   // 키워드당 담는 개수. 상위 2개는 매일 같은 상품이라 대부분 중복으로 걸러진다.
   // 3개까지 담아 라운드로빈이 한 바퀴 더 돌 수 있게 한다(중복 벽 뚫기).
@@ -170,6 +194,66 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     } catch (e) {
       errors.push(`${kw.keyword}: ${(e as Error).message}`);
       buckets.push([]);
+    }
+  }
+
+  // ── 추가 소스: 골드박스 · 카테고리 베스트셀러 ─────────────────────────
+  //
+  // 키워드 검색만으로는 재고가 안 는다. 검색 API 는 키워드당 최대 10개에
+  // 페이지 넘기기가 없어서 매일 같은 상위 10개를 돌려주고, 그게 전부 이미
+  // 등록된 상품이라 신규가 0인 날이 이어졌다(실측: 8/16 이후 3일간 0개).
+  //
+  // 그래서 그동안 쓰지 않던 두 소스를 붙인다:
+  //  · 골드박스: 쿠팡이 매일 바꾸는 특가 목록 → 날마다 새 상품이 들어온다
+  //  · 카테고리 베스트셀러: 카테고리별 상위 목록 → 검색으로는 안 닿던 풀
+  //
+  // 두 소스는 "우리가 검색어를 고르는" 게 아니라 쿠팡이 주는 대로 오므로
+  // 패션·식품 같은 살림템 아닌 품목이 섞인다. offBrandReason 으로 걷어내고,
+  // 카테고리는 상품명으로 판정한다(카테고리가 배경 스톡 검색어를 좌우한다).
+  let skippedOffBrand = 0;
+  const fromListing = (products: CoupangProduct[], memo: string): ScoutCandidate[] => {
+    const out: ScoutCandidate[] = [];
+    for (const p of products) {
+      if (!passesFilter(p, minPrice, maxPrice)) continue;
+      if (isSpamTitle(p.productName)) {
+        skippedSpamTitle++;
+        continue;
+      }
+      if (offBrandReason(p.productName)) {
+        skippedOffBrand++;
+        continue;
+      }
+      out.push({
+        productId: p.productId,
+        product_name: p.productName.trim(),
+        category: inferCategory(p.productName),
+        price_text: priceText(p.productPrice),
+        coupang_partner_url: p.productUrl,
+        image_url: p.productImage ?? "",
+        source_memo: `스카우트 · ${memo} · [cpid:${p.productId}] · ${today}`,
+      });
+    }
+    // 혹하는 순으로 세워 두면 라운드로빈이 좋은 것부터 집어간다
+    return out.sort((a, b) => appealScore(b.product_name) - appealScore(a.product_name));
+  };
+
+  try {
+    await new Promise((r) => setTimeout(r, CALL_GAP_MS));
+    const goldbox = await fetchGoldbox();
+    const bucket = fromListing(goldbox, "골드박스");
+    if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
+  } catch (e) {
+    errors.push(`골드박스: ${(e as Error).message}`);
+  }
+
+  for (const cat of BEST_CATEGORY_IDS) {
+    try {
+      await new Promise((r) => setTimeout(r, CALL_GAP_MS));
+      const best = await fetchBestCategory(cat.id, 50);
+      const bucket = fromListing(best, `베스트 ${cat.label}`);
+      if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
+    } catch (e) {
+      errors.push(`베스트 ${cat.label}: ${(e as Error).message}`);
     }
   }
 
@@ -255,6 +339,11 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 
   if (skippedSpamTitle > 0) {
     console.log(`스팸성 제목 ${skippedSpamTitle}건 수집 제외`);
+  }
+  if (skippedOffBrand > 0) {
+    // 골드박스·베스트셀러에 섞여 온 패션·식품류. 많이 찍히는 게 정상이다
+    // (그만큼 목록형 소스가 넓다는 뜻). 이 수가 0 이면 필터가 안 도는 것이니 의심.
+    console.log(`살림템 아님 ${skippedOffBrand}건 수집 제외 (골드박스·베스트)`);
   }
 
   return {
