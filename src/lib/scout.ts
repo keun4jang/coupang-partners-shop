@@ -28,6 +28,8 @@ export interface ScoutOptions {
   perKeywordFetch?: number;
   /** 키워드당 한 번에 뽑을 최대 후보 수(다양성 확보) */
   perKeywordTake?: number;
+  /** 이번 실행에서 검색할 키워드 수 (기본: 날짜 회전으로 KEYWORDS_PER_RUN 개) */
+  keywordsPerRun?: number;
   /** 가격 필터 (원) */
   minPrice?: number;
   maxPrice?: number;
@@ -101,6 +103,30 @@ function passesFilter(
 }
 
 /**
+ * 한 번 실행에서 검색할 키워드 개수.
+ * Vercel 함수 60초 제한 안에 끝나야 한다 (동시 3개 × 왕복 ~0.4초 기준
+ * 70개면 약 10초, 목록형 소스와 DB 저장까지 더해도 여유가 있다).
+ */
+const KEYWORDS_PER_RUN = 70;
+
+/**
+ * 날짜로 회전시켜 오늘 몫의 키워드를 잘라낸다.
+ * 매일 시작점이 take 만큼 밀리므로 며칠이면 전체를 한 바퀴 돈다.
+ * 같은 날 여러 번 돌면 같은 묶음이 나오는데, 그건 의도한 것이다
+ * (하루 안에서는 중복 조회를 늘리지 않는다).
+ */
+function rotateForToday<T>(items: T[], take: number): T[] {
+  if (items.length <= take) return items.slice();
+  const day = Math.floor((Date.now() + 9 * 3600_000) / 86400_000);
+  const slices = Math.ceil(items.length / take);
+  const start = (day % slices) * take;
+  const out = items.slice(start, start + take);
+  // 마지막 조각이 짧으면 앞에서 채워 매번 같은 개수를 본다
+  if (out.length < take) out.push(...items.slice(0, take - out.length));
+  return out;
+}
+
+/**
  * 카테고리 베스트셀러를 볼 쿠팡 대분류.
  *
  * id 와 실제 카테고리가 어긋나도 안전하다 - 담기 전에 상품명으로 살림템 여부를
@@ -147,23 +173,46 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 
   // 키워드별로 후보 목록을 만들어 둔다(우선순위 순).
   const buckets: ScoutCandidate[][] = [];
-  // 키워드가 85개라 연속 호출이 쿠팡 API 호출 제한에 걸릴 수 있다.
-  // 걸리면 그 키워드는 통째로 조용히 비어버리므로(아래 catch), 간격을 두고
-  // 실패 시 한 번 더 시도한다. 스카우트는 하루 몇 번뿐이라 지연은 문제되지 않는다.
-  const CALL_GAP_MS = 350;
+
+  // 왜 전부 안 돌리나: 이 라우트는 Vercel 함수라 60초 제한이 있는데
+  // 키워드 하나에 API 왕복이 붙어 195개를 순서대로 돌면 그것만으로 넘긴다.
+  // 그래서 날짜로 회전시켜 하루에 KEYWORDS_PER_RUN 개씩만 검색한다.
+  // 며칠이면 전체를 한 바퀴 돌고, 총 키워드 수는 마음껏 늘려도 된다.
+  // (검색 API 는 키워드당 10개 고정이라 "키워드 수 = 신규 재고량" 이다)
+  const rotated = rotateForToday(SCOUT_KEYWORDS, opts.keywordsPerRun ?? KEYWORDS_PER_RUN);
+  console.log(
+    `키워드 ${rotated.length}/${SCOUT_KEYWORDS.length}개 검색 (날짜별 회전)`
+  );
+
   const searchWithRetry = async (keyword: string) => {
     try {
       return await searchProducts(keyword, perKeywordFetch);
     } catch {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 1200));
       return await searchProducts(keyword, perKeywordFetch);
     }
   };
 
-  for (const kw of SCOUT_KEYWORDS) {
+  // 순차 호출이면 60초를 넘기므로 소수 동시 실행으로 돈다.
+  // 동시 수를 크게 잡으면 쿠팡 호출 제한이 걱정되니 3 정도로 묶는다.
+  const CONCURRENCY = 3;
+  const keywordResults: Array<{ kw: (typeof SCOUT_KEYWORDS)[number]; products: CoupangProduct[] }> = [];
+  for (let i = 0; i < rotated.length; i += CONCURRENCY) {
+    const chunk = rotated.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (kw) => {
+        try {
+          const products = await searchWithRetry(kw.keyword);
+          keywordResults.push({ kw, products });
+        } catch (e) {
+          errors.push(`${kw.keyword}: ${(e as Error).message}`);
+        }
+      })
+    );
+  }
+
+  for (const { kw, products } of keywordResults) {
     try {
-      await new Promise((r) => setTimeout(r, CALL_GAP_MS));
-      const products = await searchWithRetry(kw.keyword);
       // 검색 결과를 "혹하는 정도" 순으로 세워 두고 앞에서부터 담는다.
       // (쿠팡 기본 정렬은 판매량 위주라, 잘 팔려도 영상으로 보여줄 게 없는
       //  소모품이 앞에 오는 경우가 많다)
@@ -238,7 +287,6 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   };
 
   try {
-    await new Promise((r) => setTimeout(r, CALL_GAP_MS));
     const goldbox = await fetchGoldbox();
     const bucket = fromListing(goldbox, "골드박스");
     if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
@@ -248,7 +296,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 
   for (const cat of BEST_CATEGORY_IDS) {
     try {
-      await new Promise((r) => setTimeout(r, CALL_GAP_MS));
+      await new Promise((r) => setTimeout(r, 120));
       const best = await fetchBestCategory(cat.id, 50);
       const bucket = fromListing(best, `베스트 ${cat.label}`);
       if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
