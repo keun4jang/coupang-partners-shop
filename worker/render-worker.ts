@@ -527,6 +527,42 @@ interface SnsResult {
  * 즉시 발행(processItem)과 예약 발행(publishRendered)이 공유한다.
  * 각 채널 실패는 결과에 담아 돌려주고 영상 자체를 실패 처리하지 않는다.
  */
+/**
+ * 유튜브 하루 업로드 상한. app_settings.youtube_daily_cap 으로 조정 가능
+ * ("off"/"0" 이면 상한 없음). 기본 4편 - API 무료 할당량 10,000 units 기준
+ * (편당 약 2,150 units, 5편이면 초과).
+ */
+async function youtubeDailyCap(): Promise<number | null> {
+  const raw = (optionalEnv("YOUTUBE_DAILY_CAP") ?? (await getSetting("youtube_daily_cap")) ?? "4")
+    .trim()
+    .toLowerCase();
+  if (raw === "off" || raw === "none" || raw === "0") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 4;
+}
+
+/** 오늘(KST) 유튜브에 올라간 편 수 */
+async function youtubeUploadedTodayCount(now = new Date()): Promise<number> {
+  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
+  const kstMidnightUtc = new Date(
+    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
+      KST_OFFSET_MS
+  );
+  const db = supabaseAdmin();
+  const { count, error } = await db
+    .from("video_items")
+    .select("id", { count: "exact", head: true })
+    .not("youtube_url", "is", null)
+    .gte("published_at", kstMidnightUtc.toISOString());
+  if (error) {
+    // 조회 실패 시 상한을 모른 채 올리면 할당량 초과로 실패할 수 있으므로
+    // 보수적으로 "상한 도달"로 보고 유튜브만 건너뛴다 (인스타는 정상 발행).
+    console.warn("유튜브 일일 업로드 수 조회 실패 - 이번엔 유튜브를 건너뜁니다:", error.message.slice(0, 100));
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return count ?? 0;
+}
+
 async function publishToSns(
   item: VideoItem,
   product: Product,
@@ -546,10 +582,24 @@ async function publishToSns(
   };
 
   // 유튜브 쇼츠
+  //
+  // 하루 상한이 있는 이유: 유튜브 Data API 무료 할당량은 하루 10,000 units 인데
+  // 영상 1편에 약 2,150 units 가 든다 (videos.insert 1600 + thumbnails.set 50 +
+  // captions.list 50 + captions.insert 400 + 설명 수정 51). 5편이면 10,755 로
+  // 초과해서 마지막 편이 통째로 실패한다. 그래서 4편에서 끊는다.
+  //
+  // 인스타는 하루 50건까지 허용이라 이 상한과 무관하게 계속 올라간다. 즉 5번째
+  // 영상부터는 "인스타 전용"으로 나간다. 클릭 실적도 인스타에서만 나오므로
+  // (쇼츠는 설명란 링크가 눌리지 않는다) 이 조합이 손해가 아니다.
   let youtubeUrl: string | null = item.youtube_url ?? null;
   let youtubeError: string | null = null;
+  const ytCap = await youtubeDailyCap();
+  const ytToday = youtubeUrl ? 0 : await youtubeUploadedTodayCount();
   if (youtubeUrl) {
     console.log("유튜브: 이미 업로드됨 - 건너뜀:", youtubeUrl);
+  } else if (ytCap !== null && ytToday >= ytCap) {
+    youtubeError = `유튜브 일일 상한(${ytCap}편) 도달 - 이 영상은 인스타 전용으로 발행`;
+    console.log(youtubeError);
   } else if (hasYoutubeEnv()) {
     try {
       console.log("유튜브 업로드 중...");

@@ -1,0 +1,69 @@
+# 상품 스카우트 (하루 2회).
+#
+# Vercel Cron(Hobby)은 크론당 하루 1회만 돌릴 수 있어서, 재고를 더 빨리 쌓으려면
+# 여기서 돌린다. Vercel 쪽 /api/cron/scout(하루 1회)는 그대로 두고 이걸 추가로
+# 돌리는 구조 - 같은 상품은 중복으로 걸러지므로 겹쳐도 문제되지 않는다.
+#
+# 필요한 것: WORKER_ENV 시크릿 (렌더 워커와 동일, COUPANG_ACCESS_KEY/SECRET_KEY 포함)
+#
+# 수동 실행: Actions 탭 → scout → Run workflow
+
+name: scout
+
+on:
+  workflow_dispatch:
+  schedule:
+    # KST 07:20 / 15:20 (UTC 22:20 / 06:20)
+    - cron: "20 22 * * *"
+    - cron: "20 6 * * *"
+
+concurrency:
+  group: scout
+  cancel-in-progress: false
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 워커 환경변수 확인
+        id: check
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then
+            echo "WORKER_ENV 시크릿이 없어 스카우트를 건너뜁니다."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 20
+
+      - name: node_modules 캐시
+        if: steps.check.outputs.ready == 'true'
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true' && steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: 스카우트 실행
+        if: steps.check.outputs.ready == 'true'
+        run: npm run scout

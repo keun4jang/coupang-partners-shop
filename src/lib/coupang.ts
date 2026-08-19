@@ -235,6 +235,69 @@ export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
   { keyword: "센서 자동 조명", appCategory: "생활템" },
   { keyword: "욕실 물때 제거템", appCategory: "청소템" },
   { keyword: "창문 청소 도구", appCategory: "청소템" },
+
+  // ── 2026-08-19 확장 ──────────────────────────────────────────────
+  // 왜 키워드를 늘렸나: 쿠팡 검색 API 는 키워드당 최대 10개만 주고 페이지 넘기기가
+  // 없다(coupang.ts searchProducts 주석 참고). 즉 "검색을 더 깊게" 파는 방법이
+  // 없어서, 같은 키워드는 매일 같은 상위 10개를 돌려주고 그게 전부 이미 등록된
+  // 상품이라 하루 1~2개밖에 신규가 안 쌓였다(실측: 43개 재고에 순감소 1.5개/일).
+  // 재고를 늘리는 유일한 수단이 키워드 수라서 기존 38개에 아래를 더한다.
+  // 원칙: 기존 키워드와 검색 결과가 최대한 안 겹치게 구체적인 물건 이름으로.
+  { keyword: "주방 물기 제거 트레이", appCategory: "주방템" },
+  { keyword: "싱크대 배수구 거름망", appCategory: "주방템" },
+  { keyword: "실리콘 냄비 받침", appCategory: "주방템" },
+  { keyword: "밀폐용기 세트", appCategory: "주방템" },
+  { keyword: "다지기 채칼", appCategory: "주방템" },
+  { keyword: "전자레인지 조리용기", appCategory: "주방템" },
+  { keyword: "커피 드립 도구", appCategory: "주방템" },
+  { keyword: "도마 살균", appCategory: "주방템" },
+
+  { keyword: "물걸레 청소포", appCategory: "청소템" },
+  { keyword: "먼지 제거 롤러", appCategory: "청소템" },
+  { keyword: "배수구 뚫는 도구", appCategory: "청소템" },
+  { keyword: "샤워기 필터", appCategory: "청소템" },
+  { keyword: "곰팡이 제거제", appCategory: "청소템" },
+  { keyword: "틈새 청소 브러쉬", appCategory: "청소템" },
+  { keyword: "세탁조 클리너", appCategory: "청소템" },
+  { keyword: "유리창 물기 제거기", appCategory: "청소템" },
+
+  { keyword: "옷장 정리함", appCategory: "수납템" },
+  { keyword: "신발 정리대", appCategory: "수납템" },
+  { keyword: "냉장고 정리 용기", appCategory: "수납템" },
+  { keyword: "싱크대 하부장 선반", appCategory: "수납템" },
+  { keyword: "케이블 정리함", appCategory: "수납템" },
+  { keyword: "화장품 정리대", appCategory: "수납템" },
+  { keyword: "벽걸이 수납 선반", appCategory: "수납템" },
+  { keyword: "서랍 칸막이", appCategory: "수납템" },
+
+  { keyword: "빨래 건조대 접이식", appCategory: "생활템" },
+  { keyword: "제습기 소형", appCategory: "생활템" },
+  { keyword: "무선 충전 거치대", appCategory: "생활템" },
+  { keyword: "휴대용 스팀다리미", appCategory: "생활템" },
+  { keyword: "발 매트 규조토", appCategory: "생활템" },
+  { keyword: "옷 보풀 제거기", appCategory: "생활템" },
+  { keyword: "전동 코털 정리기", appCategory: "생활템" },
+  { keyword: "휴대용 미니 가습기", appCategory: "생활템" },
+  { keyword: "led 무드등", appCategory: "생활템" },
+  { keyword: "타이머 콘센트", appCategory: "생활템" },
+  { keyword: "문틈 방풍", appCategory: "생활템" },
+  { keyword: "전기 요금 절약 가전", appCategory: "생활템" },
+
+  { keyword: "차량용 방향제", appCategory: "차량용품" },
+  { keyword: "차량용 핸드폰 거치대", appCategory: "차량용품" },
+  { keyword: "차량용 트렁크 정리함", appCategory: "차량용품" },
+  { keyword: "김서림 방지 코팅", appCategory: "차량용품" },
+  { keyword: "차량 실내 청소 도구", appCategory: "차량용품" },
+
+  { keyword: "캠핑 랜턴 충전식", appCategory: "캠핑" },
+  { keyword: "휴대용 폴딩 테이블", appCategory: "캠핑" },
+  { keyword: "캠핑 화로대", appCategory: "캠핑" },
+  { keyword: "보냉 아이스박스", appCategory: "캠핑" },
+
+  { keyword: "자취 소형 밥솥", appCategory: "자취템" },
+  { keyword: "1인용 미니 냄비", appCategory: "자취템" },
+  { keyword: "원룸 수납 아이디어", appCategory: "자취템" },
+  { keyword: "자취방 인테리어 소품", appCategory: "자취템" },
 ];
 
 /** 가격을 "21,990원" 형태로 */

@@ -99,9 +99,13 @@ function passesFilter(
 }
 
 export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
-  const maxCandidates = opts.maxCandidates ?? 8;
+  // 한 번에 담을 신규 후보 수. 발행이 하루 3~5개인데 8이면 재고가 못 따라간다
+  // (실측 2026-08-19: 미사용 재고 43개, 신규 유입 1~2개/일 → 순감소 1.5개/일).
+  const maxCandidates = opts.maxCandidates ?? 15;
   const perKeywordFetch = opts.perKeywordFetch ?? 10;
-  const perKeywordTake = opts.perKeywordTake ?? 2;
+  // 키워드당 담는 개수. 상위 2개는 매일 같은 상품이라 대부분 중복으로 걸러진다.
+  // 3개까지 담아 라운드로빈이 한 바퀴 더 돌 수 있게 한다(중복 벽 뚫기).
+  const perKeywordTake = opts.perKeywordTake ?? 3;
   // 가격 상한을 크게 연다: 목표는 "그 제품 판매"가 아니라 "클릭".
   // 클릭 시 심기는 쿠팡 쿠키로 24시간 내 다른 구매까지 수수료가 붙으므로,
   // 비싼 제품은 오히려 "가격 궁금해서 눌러보는" 클릭 미끼로 좋다.
@@ -119,9 +123,23 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 
   // 키워드별로 후보 목록을 만들어 둔다(우선순위 순).
   const buckets: ScoutCandidate[][] = [];
+  // 키워드가 85개라 연속 호출이 쿠팡 API 호출 제한에 걸릴 수 있다.
+  // 걸리면 그 키워드는 통째로 조용히 비어버리므로(아래 catch), 간격을 두고
+  // 실패 시 한 번 더 시도한다. 스카우트는 하루 몇 번뿐이라 지연은 문제되지 않는다.
+  const CALL_GAP_MS = 350;
+  const searchWithRetry = async (keyword: string) => {
+    try {
+      return await searchProducts(keyword, perKeywordFetch);
+    } catch {
+      await new Promise((r) => setTimeout(r, 1500));
+      return await searchProducts(keyword, perKeywordFetch);
+    }
+  };
+
   for (const kw of SCOUT_KEYWORDS) {
     try {
-      const products = await searchProducts(kw.keyword, perKeywordFetch);
+      await new Promise((r) => setTimeout(r, CALL_GAP_MS));
+      const products = await searchWithRetry(kw.keyword);
       // 검색 결과를 "혹하는 정도" 순으로 세워 두고 앞에서부터 담는다.
       // (쿠팡 기본 정렬은 판매량 위주라, 잘 팔려도 영상으로 보여줄 게 없는
       //  소모품이 앞에 오는 경우가 많다)
