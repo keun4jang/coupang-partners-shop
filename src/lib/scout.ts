@@ -271,5 +271,32 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 export function formatScoutMessage(result: ScoutResult): string {
   // 후보 수집 결과는 알림에 넣지 않는다(사장님 요청 - 전부 자동으로 골라 만들어짐).
   // 오류가 있을 때만 알려서 조치할 수 있게 한다.
-  return result.errors.length ? `⚠️ 스카우트 일부 오류:\n${result.errors.join("\n")}` : "";
+  if (!result.errors.length) return "";
+  // 키워드가 85개라 공통 원인(키 미설정 등)이면 오류도 85줄이 된다.
+  // 텔레그램 상한은 4096자라 그대로 보내면 400 으로 통째로 전송 실패한다
+  // (실측 2026-08-19: "message is too long" 으로 알림이 아예 안 갔다).
+  // 같은 문구는 묶고, 남는 건 건수로만 알린다.
+  const byMessage = new Map<string, string[]>();
+  for (const line of result.errors) {
+    const idx = line.indexOf(": ");
+    const keyword = idx > 0 ? line.slice(0, idx) : "?";
+    const message = idx > 0 ? line.slice(idx + 2) : line;
+    const list = byMessage.get(message) ?? [];
+    list.push(keyword);
+    byMessage.set(message, list);
+  }
+  const parts: string[] = [];
+  for (const [message, keywords] of [...byMessage.entries()].sort(
+    (a, b) => b[1].length - a[1].length
+  )) {
+    const shown = keywords.slice(0, 3).join(", ");
+    const more = keywords.length > 3 ? ` 외 ${keywords.length - 3}개` : "";
+    parts.push(`· (${keywords.length}건) ${shown}${more}\n  ${message.slice(0, 200)}`);
+  }
+  const body = parts.slice(0, 6).join("\n");
+  const omitted = parts.length > 6 ? `\n… 그 외 ${parts.length - 6}종 오류 생략` : "";
+  return `⚠️ 스카우트 일부 오류 (총 ${result.errors.length}건):\n${body}${omitted}`.slice(
+    0,
+    3800
+  );
 }

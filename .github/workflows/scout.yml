@@ -64,6 +64,42 @@ jobs:
         if: steps.check.outputs.ready == 'true' && steps.cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: 스카우트 실행
+      # 어떤 자격증명이 러너에 실려 있는지 (값이 아니라 "있다/없다"만) 확인한다.
+      # 렌더 워커용 WORKER_ENV 에는 쿠팡 키가 없을 수 있어서(스카우트는 원래
+      # Vercel 에서만 돌았다) 어느 경로로 스카우트할지 여기서 갈린다.
+      - name: 자격증명 확인
         if: steps.check.outputs.ready == 'true'
+        id: creds
+        run: |
+          have() { grep -q "^$1=." .env.local && echo yes || echo no; }
+          echo "COUPANG_ACCESS_KEY=$(have COUPANG_ACCESS_KEY)"
+          echo "COUPANG_SECRET_KEY=$(have COUPANG_SECRET_KEY)"
+          echo "CRON_SECRET=$(have CRON_SECRET)"
+          echo "NEXT_PUBLIC_SITE_URL=$(have NEXT_PUBLIC_SITE_URL)"
+          echo "coupang=$(have COUPANG_ACCESS_KEY)" >> "$GITHUB_OUTPUT"
+          echo "cron=$(have CRON_SECRET)" >> "$GITHUB_OUTPUT"
+
+      # 경로 A: 러너에 쿠팡 키가 있으면 여기서 직접 수집한다.
+      - name: 스카우트 실행 (직접)
+        if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang == 'yes'
         run: npm run scout
+
+      # 경로 B: 쿠팡 키가 없으면 배포된 사이트의 스카우트 엔드포인트를 호출한다
+      # (쿠팡 키는 Vercel 환경변수에만 있다). CRON_SECRET 으로 인증한다.
+      - name: 스카우트 실행 (배포 엔드포인트 호출)
+        if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang != 'yes' && steps.creds.outputs.cron == 'yes'
+        run: |
+          SITE=$(grep '^NEXT_PUBLIC_SITE_URL=' .env.local | cut -d= -f2- | tr -d '\r' | sed 's:/*$::')
+          SECRET=$(grep '^CRON_SECRET=' .env.local | cut -d= -f2- | tr -d '\r')
+          [ -n "$SITE" ] || { echo "NEXT_PUBLIC_SITE_URL 이 없어 호출할 주소를 모릅니다"; exit 1; }
+          code=$(curl -sS -o /tmp/scout.out -w '%{http_code}' \
+            -H "Authorization: Bearer $SECRET" "$SITE/api/cron/scout")
+          echo "HTTP $code"; cat /tmp/scout.out; echo
+          [ "$code" = "200" ]
+
+      - name: 자격증명 없음 안내
+        if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang != 'yes' && steps.creds.outputs.cron != 'yes'
+        run: |
+          echo "쿠팡 키도 CRON_SECRET 도 없어 스카우트를 돌릴 수 없습니다."
+          echo "WORKER_ENV 시크릿에 COUPANG_ACCESS_KEY/COUPANG_SECRET_KEY 또는 CRON_SECRET 을 추가해 주세요."
+          exit 1
