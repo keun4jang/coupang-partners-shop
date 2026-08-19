@@ -97,9 +97,11 @@ jobs:
           echo "HTTP $code"; cat /tmp/scout.out; echo
           [ "$code" = "200" ]
 
+      # 자격증명이 없으면 조용히 건너뛴다(실패로 두면 하루 2번씩 실패 알림만 쌓인다).
+      # 이 경우에도 Vercel 크론의 하루 1회 스카우트는 정상 동작한다.
       - name: 자격증명 없음 안내
         if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang != 'yes' && steps.creds.outputs.cron != 'yes'
         run: |
-          echo "쿠팡 키도 CRON_SECRET 도 없어 스카우트를 돌릴 수 없습니다."
-          echo "WORKER_ENV 시크릿에 COUPANG_ACCESS_KEY/COUPANG_SECRET_KEY 또는 CRON_SECRET 을 추가해 주세요."
-          exit 1
+          echo "::notice::러너에 쿠팡 키도 CRON_SECRET 도 없어 이번 스카우트는 건너뜁니다."
+          echo "하루 2회 수집을 켜려면 WORKER_ENV 시크릿에 CRON_SECRET 한 줄을 추가하세요"
+          echo "(Vercel 환경변수의 CRON_SECRET 과 같은 값). Vercel 크론의 하루 1회 수집은 계속 동작합니다."

@@ -79,6 +79,19 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
 > 🎬 **포맷 D 고정**: `FORCE_TEMPLATE=D` 를 넣으면 DB template_type 과 무관하게
 > 모든 영상을 포맷 D(실사용 스톡영상 배경)로 렌더한다. 빼면 저장된 A/B/C 로 렌더됨.
 >
+> 🔎 **상품 스카우트(재고 채우기)**: Vercel 크론이 하루 1회(`0 23 * * *` UTC = 08:00 KST)
+> `/api/cron/scout` 를 돌린다. `.github/workflows/scout.yml` 은 여기에 하루 2회
+> (KST 07:20/15:20)를 더하는 보강용인데, **WORKER_ENV 에 `CRON_SECRET` 한 줄을
+> 추가해야** 동작한다(Vercel 환경변수의 CRON_SECRET 과 같은 값). 없으면 조용히
+> 건너뛰고 Vercel 쪽 하루 1회만 돈다. 쿠팡 키(`COUPANG_ACCESS_KEY`/`COUPANG_SECRET_KEY`)를
+> WORKER_ENV 에 직접 넣으면 러너가 엔드포인트 없이 바로 수집한다.
+
+> 📅 **업로드 슬롯 / 채널별 상한**: `app_settings.UPLOAD_SCHEDULE` 의 슬롯 개수가
+> 곧 하루 발행 편수다(범위로 적으면 그 안에서 매일 다른 시각에 나간다).
+> 유튜브는 `app_settings.youtube_daily_cap`(기본 4)에서 끊기고 그 이상은 인스타
+> 전용으로 나간다 - 유튜브 API 무료 할당량이 하루 10,000 units 인데 편당 약
+> 2,150 units 라 5편째부터 실패하기 때문. 인스타는 하루 50건까지 허용.
+
 > 🎨 **디자인 전환(최우선 스위치)**: `app_settings` 의 `design_template` 키가 있으면
 > `FORCE_TEMPLATE` 환경변수보다 우선한다 (`E` = 살림 검증 노트 포맷, `D` = 기존 포맷).
 > WORKER_ENV 시크릿을 고치지 않고도 DB 값 하나로 전 워커의 디자인을 즉시 전환/롤백할
