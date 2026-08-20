@@ -12,10 +12,12 @@ import {
 } from "remotion";
 import type { ShortsProps } from "../types";
 import {
+  COVER_BAND,
   COVER_FRAME_COUNT,
   EDITORIAL as E,
   MOTION_E,
   VIDEO,
+  coverHookFontSizeE,
   eHookFontSize,
   eRowTextSize,
   resolveTiming,
@@ -115,22 +117,19 @@ const ProductCard: React.FC<{
 );
 
 /**
- * 포스터 화면 (커버 프레임 + 훅/공감 장면 공용).
- * animated=false 면 등장 완료 상태로 정적으로 그린다 (1프레임 커버·썸네일용).
+ * 본편 첫 장면: 문제 훅 + 공감 + 제품 사진.
+ * (썸네일은 별도 CoverPoster 를 쓴다 - 그리드에서 읽히려면 훅이 훨씬 커야 해서 분리했다)
  */
 const Poster: React.FC<{
   props: ShortsProps;
-  animated: boolean;
-  showEmpathy: boolean;
   empathyDelayFrames: number;
-}> = ({ props, animated, showEmpathy, empathyDelayFrames }) => {
+}> = ({ props, empathyDelayFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const hookSize = eHookFontSize(props.hookLine);
   const words = props.hookLine.trim().split(/\s+/).filter(Boolean);
 
   const wordStyle = (i: number): React.CSSProperties => {
-    if (!animated) return {};
     const s = spring({
       frame: frame - 4 - i * 3,
       fps,
@@ -143,16 +142,16 @@ const Poster: React.FC<{
     };
   };
 
-  const cardIn = animated
-    ? spring({ frame: frame - 8, fps, config: { damping: MOTION_E.springDamping } })
-    : 1;
-  const empathyIn = animated
-    ? spring({
-        frame: frame - empathyDelayFrames,
-        fps,
-        config: { damping: MOTION_E.springDamping },
-      })
-    : 1;
+  const cardIn = spring({
+    frame: frame - 8,
+    fps,
+    config: { damping: MOTION_E.springDamping },
+  });
+  const empathyIn = spring({
+    frame: frame - empathyDelayFrames,
+    fps,
+    config: { damping: MOTION_E.springDamping },
+  });
 
   return (
     <AbsoluteFill style={{ fontFamily: editorialFontFamily }}>
@@ -188,9 +187,7 @@ const Poster: React.FC<{
             </React.Fragment>
           ))}
         </div>
-        {/* 공감 문장 - 나레이션 시작에 맞춰 훅 아래로 (보조 위계: 600/회색).
-            커버(showEmpathy=false)에서도 자리는 차지시켜 커버→본편 사이에
-            제품 카드가 1프레임 만에 툭 내려앉는 레이아웃 점프를 막는다. */}
+        {/* 공감 문장 - 나레이션 시작에 맞춰 훅 아래로 (보조 위계: 600/회색) */}
         <div
           style={{
             color: E.sub,
@@ -200,7 +197,7 @@ const Poster: React.FC<{
             letterSpacing: "-0.01em",
             wordBreak: "keep-all",
             textAlign: "left",
-            opacity: showEmpathy ? empathyIn : 0,
+            opacity: empathyIn,
             transform: `translateY(${(1 - empathyIn) * 24}px)`,
           }}
         >
@@ -453,6 +450,52 @@ const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
   );
 };
 
+/**
+ * 커버(썸네일) 전용 화면.
+ *
+ * 본편 첫 장면(Poster)을 그대로 쓰다가 사장님 지적으로 분리했다 - 피드 그리드에서
+ * 훅이 안 읽혔다(실측: 200px 폭으로 줄이면 글자당 3px 남짓, 위아래 빈 공간만 컸다).
+ * 커버는 재생 중 1프레임만 보이므로 본편과 달라도 되고, 오직 "손톱만 한 크기에서
+ * 읽히는가"만 보면 된다. 그래서 훅을 최대 150px 까지 키우고 요소를 화면 가운데
+ * 띠(COVER_BAND)에 모은다 - 인스타 그리드가 9:16 을 가운데 정사각으로 자르기 때문.
+ */
+const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
+  <AbsoluteFill style={{ backgroundColor: E.paper, fontFamily: editorialFontFamily }}>
+    <div
+      style={{
+        position: "absolute",
+        top: COVER_BAND.top,
+        left: E.safeX,
+        width: CONTENT_W,
+        height: COVER_BAND.height,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        gap: 28,
+      }}
+    >
+      <NumberChip displayNumber={props.displayNumber} />
+      <div
+        style={{
+          color: E.ink,
+          fontSize: coverHookFontSizeE(props.hookLine),
+          fontWeight: 800,
+          lineHeight: 1.1,
+          letterSpacing: "-0.03em",
+          wordBreak: "keep-all",
+          textAlign: "left",
+        }}
+      >
+        {props.hookLine}
+      </div>
+      <ProductCard
+        imageUrl={props.productImageUrl}
+        style={{ width: "100%", height: COVER_BAND.cardHeight, flexShrink: 0 }}
+      />
+    </div>
+  </AbsoluteFill>
+);
+
 export const TemplateE: React.FC<ShortsProps> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const T = resolveTiming(props.timing);
@@ -506,12 +549,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
 
       {/* ── 포스터 장면: 문제 훅 + 공감 + 제품 (0초부터) ── */}
       <Sequence durationInFrames={f(T.empathy.to)}>
-        <Poster
-          props={props}
-          animated
-          showEmpathy
-          empathyDelayFrames={f(T.empathy.from)}
-        />
+        <Poster props={props} empathyDelayFrames={f(T.empathy.from)} />
       </Sequence>
       <Sequence durationInFrames={f(T.hook.to)}>
         <Narration src={props.narration?.[0]} />
@@ -606,11 +644,9 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[6]} />
       </Sequence>
 
-      {/* 첫 프레임 커버 (썸네일) - 포스터를 등장 완료 상태로 정적으로 */}
+      {/* 첫 프레임 커버 (썸네일) - 그리드에서 읽히도록 훅을 크게 키운 전용 화면 */}
       <Sequence durationInFrames={COVER_FRAME_COUNT}>
-        <AbsoluteFill style={{ backgroundColor: E.paper }}>
-          <Poster props={props} animated={false} showEmpathy={false} empathyDelayFrames={0} />
-        </AbsoluteFill>
+        <CoverPoster props={props} />
       </Sequence>
     </AbsoluteFill>
   );

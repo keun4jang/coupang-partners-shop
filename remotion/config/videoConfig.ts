@@ -322,6 +322,42 @@ export function eHookFontSize(hookLine: string): number {
 }
 
 /**
+ * 포맷 E 커버(썸네일) 훅 크기.
+ *
+ * 본편 훅(eHookFontSize, 최대 96)을 그대로 쓰면 피드 그리드에서 안 읽힌다
+ * (실측 2026-08-20: 200px 폭으로 줄이면 훅이 글자당 3px 남짓). 커버는 재생 중
+ * 1프레임만 보이고 실제 역할은 "손톱만 한 썸네일에서 뭘 말하는지 읽히는 것"이라
+ * 본편과 분리해 훨씬 크게 잡는다.
+ *
+ * 폭 936(= 1080 − 좌우 72), 높이 620 안에서 최대 150까지.
+ */
+export function coverHookFontSizeE(hookLine: string): number {
+  return fitKoreanText({
+    text: hookLine,
+    maxWidth: VIDEO.width - EDITORIAL.safeX * 2,
+    maxHeight: 620,
+    lineHeight: 1.1,
+    maxSize: 150,
+    minSize: 84,
+  });
+}
+
+/**
+ * 커버 콘텐츠 배치 (그리드 크롭 대비).
+ *
+ * 인스타 프로필 그리드는 9:16 을 가운데 정사각으로 잘라 보여준다
+ * (1080×1920 → 세로 420~1500 만 남는다). 커버 요소를 화면 한가운데 띠에
+ * 모아 두어야 그리드에서 훅이 잘리지 않는다. 본편 안전대(260~1480)보다
+ * 아래로 내려 잡는 이유가 이것이다.
+ */
+export const COVER_BAND = {
+  top: 400,
+  height: 1120,
+  /** 제품 카드 높이 */
+  cardHeight: 380,
+} as const;
+
+/**
  * 포맷 E 노트 행 본문 크기.
  * 폭 = 936 − 라벨 칩 132 − 간격 20 = 784, 최대 2줄 안에 들어가게.
  */
