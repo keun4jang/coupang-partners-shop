@@ -214,7 +214,8 @@ function pickFile(
  *
  * 캠핑/차량 검색어는 야외 장면이 정답이므로 풍경 필터를 건너뛴다.
  */
-const ANIMAL_WORDS = /\b(cat|dog|pet|animal|kitten|puppy|bird|fish)\b/i;
+const ANIMAL_WORDS =
+  /\b(cat|dog|pet|animal|kitten|puppy|bird|fish|snail|mollusk|insect|bug|spider|butterfly|bee|ant|worm|turtle|hamster|rabbit|wildlife)\b/i;
 const SCENERY_WORDS =
   /\b(mountain|mountains|forest|woods|cabin|hut|lake|river|ocean|sea|beach|waterfall|snow|winter|sunset|sunrise|sky|clouds|drone|aerial|landscape|scenery|nature|travel|island|desert|field|meadow)\b/i;
 const SYNTHETIC_WORDS =
@@ -229,7 +230,34 @@ const OFFTOPIC_WORDS =
  *  kitchen 에 걸려 치킨 튀기는 클립을 욕실 세정제 배경으로 가져왔다.
  *  주방템의 "kitchen cooking home" 류 검색어는 음식 장면이 정답이므로 허용. */
 const FOOD_WORDS =
-  /\b(food|cooking|cooked?|frying|fried|baking|baked|recipe|meal|schnitzel|grill|barbecue|bbq|chef|dough|breakfast|dinner|lunch|delicious)\b/i;
+  /\b(food|cooking|cooked?|frying|fried|baking|baked|recipe|meal|schnitzel|grill|barbecue|bbq|chef|dough|breakfast|dinner|lunch|delicious|tea|coffee|beverage|juice|wine|beer|cocktail|cafe)\b/i;
+
+/**
+ * 집안일 신호. 아래 사무실·인물 필터의 예외로 쓴다 -
+ * 사람이 나와도 "청소하는 사람"이면 그게 바로 우리가 원하는 실사용 장면이다.
+ */
+const CHORE_WORDS =
+  /\b(clean|cleaning|cleaner|cleanup|wash|washing|wipe|wiping|mop|mopping|vacuum|laundry|housework|chore|chores|tidy|tidying|organiz\w*|declutter|dish|dishes|sink|bathroom|shower|toilet|towel|fold|folding|iron|ironing|scrub|scrubbing|sweep|sweeping|dust|dusting|disinfect\w*|sanitize|hygiene|household|storage|shelf|shelves|closet|kitchen)\b/i;
+
+/**
+ * 사무실·업무 장면. 살림템 영상에 노트북 치는 사람이 깔리면 완전히 겉돈다
+ * (실측 2026-08-20: 욕실 세정제 배경에 keyboard/laptop/office/desk 클립,
+ *  home/work/business/money/finance 클립이 그대로 통과했다).
+ * 책상·사무용품 검색어일 때는 사무실 장면이 정답이므로 예외를 둔다.
+ */
+const OFFICE_WORDS =
+  /\b(office|workspace|workplace|desk|laptop|computer|keyboard|monitor|meeting|business|businessman|businesswoman|corporate|coworking|startup|conference|presentation|typing|employee|colleague|manager|interview|briefcase|whiteboard|seminar|lecture|classroom|student|study|finance|money|cash|banking|invest\w*|work)\b/i;
+
+/**
+ * 제품과 무관한 "그냥 사람" 연출 컷 (인물 사진·감성 라이프스타일).
+ * 집안일 신호가 같이 있으면 통과시킨다 (청소하는 사람은 살려야 한다).
+ */
+const IDLE_PERSON_WORDS =
+  /\b(portrait|model|posing|selfie|social media|scrolling|relaxing|resting|sleeping|fashion|beauty|makeup|cosmetic|yoga|fitness|workout|gym|dancing|party|smoking|drinking)\b/i;
+
+function isOfficeQuery(query: string): boolean {
+  return /desk|office|workspace|laptop|computer|study/i.test(query);
+}
 
 function isFoodQuery(query: string): boolean {
   return /cooking|food|recipe|baking/i.test(query);
@@ -239,13 +267,18 @@ function isOutdoorQuery(query: string): boolean {
   return /camping|outdoor|car\b/i.test(query);
 }
 
-/** true 면 배경 후보에서 제외 */
-function isUnusableClip(text: string, query: string): boolean {
+/** true 면 배경 후보에서 제외 (테스트에서 직접 호출하려고 export 한다) */
+export function isUnusableClip(text: string, query: string): boolean {
   if (ANIMAL_WORDS.test(text)) return true;
   if (SYNTHETIC_WORDS.test(text)) return true;
   if (OFFTOPIC_WORDS.test(text)) return true;
   if (!isFoodQuery(query) && FOOD_WORDS.test(text)) return true;
   if (!isOutdoorQuery(query) && SCENERY_WORDS.test(text)) return true;
+  // 사무실·인물 컷은 "집안일 신호가 없을 때만" 막는다.
+  // 이 예외가 없으면 청소하는 사람·설거지하는 손처럼 정작 필요한 컷까지 날아간다.
+  const chore = CHORE_WORDS.test(text);
+  if (!chore && !isOfficeQuery(query) && OFFICE_WORDS.test(text)) return true;
+  if (!chore && IDLE_PERSON_WORDS.test(text)) return true;
   return false;
 }
 
