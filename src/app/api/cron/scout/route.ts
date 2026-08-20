@@ -39,7 +39,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   try {
-    const result = await runScout();
+    // 수집에 쓸 시간 상한. maxDuration 60초 중 수집은 38초까지만 쓰고,
+    // 나머지는 영상 큐잉·알림 몫으로 남긴다. 예산이 없으면 수집이 시간을 다 먹어
+    // 큐잉이 통째로 잘린다(실측 8/20: 6편 목표에 3편만 큐잉되고 끝났다).
+    const startedAt = Date.now();
+    const result = await runScout({ deadlineAt: startedAt + 38_000 });
 
     // 하루치 영상 큐잉 (멱등: 오늘 목표치를 이미 채웠으면 아무것도 안 함).
     // 실패해도 스카우트는 성공 처리.

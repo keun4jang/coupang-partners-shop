@@ -8,6 +8,7 @@ import {
   fetchGoldbox,
 } from "./coupang";
 import { dateFolderName } from "./format";
+import { setSetting } from "./settings";
 import { appealScore, inferCategory, isSpamTitle, offBrandReason } from "./appeal";
 import {
   hasAffiliateEnv,
@@ -30,6 +31,13 @@ export interface ScoutOptions {
   perKeywordTake?: number;
   /** 이번 실행에서 검색할 키워드 수 (기본: 날짜 회전으로 KEYWORDS_PER_RUN 개) */
   keywordsPerRun?: number;
+  /**
+   * 수집을 끊을 시각(Date.now() 기준 ms). 넘으면 남은 검색을 포기하고
+   * 지금까지 모은 것으로 마무리한다. Vercel 함수 60초 제한 때문에 필요하다 -
+   * 수집이 시간을 다 먹으면 호출부의 영상 큐잉이 통째로 날아간다(실측 8/20:
+   * 6편 목표에 3편만 큐잉됨).
+   */
+  deadlineAt?: number;
   /** 가격 필터 (원) */
   minPrice?: number;
   maxPrice?: number;
@@ -58,6 +66,8 @@ export interface ScoutResult {
   skippedFiltered: number;
   /** 키워드 도배 제목이라 아예 후보로 안 받은 수 (필터 조정 근거) */
   skippedSpamTitle: number;
+  /** 소스별 집계 (진단용) - 받아온 수 / 후보로 담은 수 / 최종 등록 수 */
+  sourceStats: Record<string, { fetched: number; kept: number; registered: number }>;
   /** 이번에 새로 담은 알리 후보 수 */
   aliCandidates: number;
   errors: string[];
@@ -166,8 +176,19 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   const minPrice = opts.minPrice ?? 5_000;
   const maxPrice = opts.maxPrice ?? 1_500_000;
 
+  // 남은 시간이 없으면 수집을 멈춘다(호출부의 후속 작업 시간을 남겨 둔다)
+  const deadlineAt = opts.deadlineAt ?? Number.POSITIVE_INFINITY;
+  const outOfTime = () => Date.now() >= deadlineAt;
+
   const errors: string[] = [];
   let skippedSpamTitle = 0;
+  // 소스별 집계. Vercel 함수 로그를 볼 수 없어서(호스팅 특성) 어느 소스가
+  // 몇 건을 물어왔는지 DB 에 남긴다 - 이게 없으면 "0건"의 원인을 못 좁힌다.
+  const sourceStats: Record<string, { fetched: number; kept: number; registered: number }> = {};
+  const bump = (src: string, field: "fetched" | "kept" | "registered", n = 1) => {
+    sourceStats[src] = sourceStats[src] ?? { fetched: 0, kept: 0, registered: 0 };
+    sourceStats[src][field] += n;
+  };
   const known = await loadKnownProductIds();
   const today = dateFolderName();
 
@@ -197,8 +218,14 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 동시 수를 크게 잡으면 쿠팡 호출 제한이 걱정되니 3 정도로 묶는다.
   const CONCURRENCY = 3;
   const keywordResults: Array<{ kw: (typeof SCOUT_KEYWORDS)[number]; products: CoupangProduct[] }> = [];
+  let searchedCount = 0;
   for (let i = 0; i < rotated.length; i += CONCURRENCY) {
+    if (outOfTime()) {
+      console.log(`시간 예산 초과 - 키워드 ${searchedCount}/${rotated.length}개에서 중단`);
+      break;
+    }
     const chunk = rotated.slice(i, i + CONCURRENCY);
+    searchedCount += chunk.length;
     await Promise.all(
       chunk.map(async (kw) => {
         try {
@@ -219,6 +246,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       const ranked = [...products].sort(
         (a, b) => appealScore(b.productName ?? "") - appealScore(a.productName ?? "")
       );
+      bump("키워드검색", "fetched", products.length);
       const bucket: ScoutCandidate[] = [];
       for (const p of ranked) {
         if (!passesFilter(p, minPrice, maxPrice)) continue;
@@ -239,6 +267,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
         });
         if (bucket.length >= perKeywordTake) break;
       }
+      bump("키워드검색", "kept", bucket.length);
       buckets.push(bucket);
     } catch (e) {
       errors.push(`${kw.keyword}: ${(e as Error).message}`);
@@ -261,6 +290,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 카테고리는 상품명으로 판정한다(카테고리가 배경 스톡 검색어를 좌우한다).
   let skippedOffBrand = 0;
   const fromListing = (products: CoupangProduct[], memo: string): ScoutCandidate[] => {
+    bump(memo, "fetched", products.length);
     const out: ScoutCandidate[] = [];
     for (const p of products) {
       if (!passesFilter(p, minPrice, maxPrice)) continue;
@@ -282,11 +312,13 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
         source_memo: `스카우트 · ${memo} · [cpid:${p.productId}] · ${today}`,
       });
     }
+    bump(memo, "kept", out.length);
     // 혹하는 순으로 세워 두면 라운드로빈이 좋은 것부터 집어간다
     return out.sort((a, b) => appealScore(b.product_name) - appealScore(a.product_name));
   };
 
   try {
+    if (outOfTime()) throw new Error("시간 예산 초과로 건너뜀");
     const goldbox = await fetchGoldbox();
     const bucket = fromListing(goldbox, "골드박스");
     if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
@@ -296,6 +328,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
 
   for (const cat of BEST_CATEGORY_IDS) {
     try {
+      if (outOfTime()) throw new Error("시간 예산 초과로 건너뜀");
       await new Promise((r) => setTimeout(r, 120));
       const best = await fetchBestCategory(cat.id, 50);
       const bucket = fromListing(best, `베스트 ${cat.label}`);
@@ -394,11 +427,47 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     console.log(`살림템 아님 ${skippedOffBrand}건 수집 제외 (골드박스·베스트)`);
   }
 
+  // 등록된 것들을 소스별로 되짚어 집계 (source_memo 에 소스 이름이 들어 있다)
+  for (const c of registered) {
+    const memo = c.source_memo ?? "";
+    const src = memo.includes("골드박스")
+      ? "골드박스"
+      : memo.includes("베스트")
+        ? memo.slice(memo.indexOf("베스트"), memo.indexOf(" · [cpid"))
+        : memo.includes("알리")
+          ? "알리"
+          : "키워드검색";
+    bump(src, "registered");
+  }
+
+  // 진단 기록: 이번 실행이 어디서 몇 건을 물어왔는지 DB 에 남긴다.
+  // (Vercel 함수 로그를 볼 수 없어서 이게 유일한 사후 확인 수단이다)
+  try {
+    await setSetting(
+      "last_scout_result",
+      JSON.stringify({
+        at: new Date().toISOString(),
+        registered: registered.length,
+        keywordsSearched: searchedCount,
+        keywordsPlanned: rotated.length,
+        skippedDuplicate,
+        skippedSpamTitle,
+        skippedOffBrand,
+        sourceStats,
+        errors: errors.slice(0, 8),
+        errorCount: errors.length,
+      }).slice(0, 4000)
+    );
+  } catch {
+    // 진단 기록 실패가 스카우트를 막지는 않는다
+  }
+
   return {
     registered,
     skippedDuplicate,
     skippedFiltered,
     skippedSpamTitle,
+    sourceStats,
     aliCandidates,
     errors,
   };
