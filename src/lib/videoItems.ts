@@ -78,10 +78,19 @@ export async function createVideoItem(
 export async function queueDailyVideos(target = 3): Promise<VideoItem[]> {
   const db = supabaseAdmin();
 
-  // 오늘(UTC) 이미 만든 "자동" 영상 수 → 남은 만큼만 채운다(중복 생성 방지)
-  // 수동(텔레그램 업로드) 항목은 세지 않는다 - 수동으로 올려도 자동 3개는 그대로 나가야 함
-  const startOfDay = new Date();
-  startOfDay.setUTCHours(0, 0, 0, 0);
+  // 오늘(KST) 이미 만든 "자동" 영상 수 → 남은 만큼만 채운다(중복 생성 방지)
+  // 수동(텔레그램 업로드) 항목은 세지 않는다 - 수동으로 올려도 자동 편수는 그대로 나가야 함
+  //
+  // KST 기준인 이유: 운영일이 KST 이고 크론이 23:00 UTC(=08:00 KST)에 돈다.
+  // UTC 자정 기준으로 세면 이 크론이 UTC 로는 "전날 밤"이라, 하루 2회 이상 돌리는
+  // 순간(Actions 스카우트 07:20/15:20 KST = 22:20/06:20 UTC) 서로 다른 UTC 날짜로
+  // 잡혀 목표치를 두 번 채운다 - 하루 12편이 큐잉된다.
+  const KST_OFFSET_MS = 9 * 3600_000;
+  const kstNow = new Date(Date.now() + KST_OFFSET_MS);
+  const startOfDay = new Date(
+    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
+      KST_OFFSET_MS
+  );
   const { count: createdToday, error: countError } = await db
     .from("video_items")
     .select("id", { count: "exact", head: true })

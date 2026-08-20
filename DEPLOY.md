@@ -72,7 +72,7 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
    `FORCE_TEMPLATE=D`(모든 렌더를 포맷 D 로 고정),
    `YOUTUBE_OAUTH_CLIENT_ID`/`YOUTUBE_OAUTH_CLIENT_SECRET`/`YOUTUBE_OAUTH_REFRESH_TOKEN`(유튜브 쇼츠 자동 업로드),
    `INSTAGRAM_BUSINESS_ACCOUNT_ID`/`INSTAGRAM_ACCESS_TOKEN`(인스타 릴스 자동 게시),
-   `UPLOAD_SCHEDULE`(업로드 슬롯 - 지금은 app_settings 값이 우선이라 보통 DB에서 관리),
+   `UPLOAD_SCHEDULE`(업로드 슬롯 - **넣으면 DB값을 덮어쓴다**. DB로 관리하려면 넣지 말 것),
    (선택)`AI_API_KEY`)
 4. Actions 탭에서 `render-worker` → **Run workflow** 로 수동 테스트 가능
 
@@ -85,6 +85,11 @@ public 저장소라 사용량 **무료**. `.github/workflows/render.yml` 이 아
 > 추가해야** 동작한다(Vercel 환경변수의 CRON_SECRET 과 같은 값). 없으면 조용히
 > 건너뛰고 Vercel 쪽 하루 1회만 돈다. 쿠팡 키(`COUPANG_ACCESS_KEY`/`COUPANG_SECRET_KEY`)를
 > WORKER_ENV 에 직접 넣으면 러너가 엔드포인트 없이 바로 수집한다.
+
+> ⚠️ **우선순위 주의**: `UPLOAD_SCHEDULE` 은 **환경변수(WORKER_ENV)가 DB보다 우선**이다
+> (`design_template` 과 반대). WORKER_ENV 에 `UPLOAD_SCHEDULE` 이 들어 있으면
+> app_settings 값을 아무리 바꿔도 발행 편수가 안 바뀐다. DB로 관리하려면
+> WORKER_ENV 에서 그 줄을 지워야 한다.
 
 > 📅 **업로드 슬롯 / 채널별 상한**: `app_settings.UPLOAD_SCHEDULE` 의 슬롯 개수가
 > 곧 하루 발행 편수다(범위로 적으면 그 안에서 매일 다른 시각에 나간다).

@@ -233,11 +233,18 @@ const FOOD_WORDS =
   /\b(food|cooking|cooked?|frying|fried|baking|baked|recipe|meal|schnitzel|grill|barbecue|bbq|chef|dough|breakfast|dinner|lunch|delicious|tea|coffee|beverage|juice|wine|beer|cocktail|cafe)\b/i;
 
 /**
- * 집안일 신호. 아래 사무실·인물 필터의 예외로 쓴다 -
+ * 집안일 "동작" 신호. 아래 사무실·인물 필터의 예외로 쓴다 -
  * 사람이 나와도 "청소하는 사람"이면 그게 바로 우리가 원하는 실사용 장면이다.
+ *
+ * 명사(storage·shelf·kitchen·bathroom·hygiene 등)는 일부러 뺐다. 무관 클립의
+ * 태그에 흔히 섞여서 예외가 통째로 열리기 때문이다 - 실측 2026-08-20:
+ * 'cloud, technology, computer, business, storage'(데이터센터 모션그래픽)가
+ * storage 한 단어로, 'man, student, library, shelves, study'(도서관)가 shelves 로,
+ * 묘지 클립이 hygiene 으로 사무실·인물 필터를 우회해 통과했다.
+ * 그래서 -ing 형 동작 단어만 남긴다.
  */
 const CHORE_WORDS =
-  /\b(clean|cleaning|cleaner|cleanup|wash|washing|wipe|wiping|mop|mopping|vacuum|laundry|housework|chore|chores|tidy|tidying|organiz\w*|declutter|dish|dishes|sink|bathroom|shower|toilet|towel|fold|folding|iron|ironing|scrub|scrubbing|sweep|sweeping|dust|dusting|disinfect\w*|sanitize|hygiene|household|storage|shelf|shelves|closet|kitchen)\b/i;
+  /\b(cleaning|cleaner|cleanup|cleans|washing|washes|wiping|wipes|mopping|vacuuming|scrubbing|sweeping|dusting|dishwashing|laundry|housework|housekeeping|chores|tidying|organizing|decluttering|folding|ironing|disinfecting|sanitizing)\b/i
 
 /**
  * 사무실·업무 장면. 살림템 영상에 노트북 치는 사람이 깔리면 완전히 겉돈다

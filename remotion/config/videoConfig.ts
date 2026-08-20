@@ -338,8 +338,8 @@ export function coverHookFontSizeE(hookLine: string): number {
   return fitKoreanText({
     text: hookLine,
     maxWidth: VIDEO.width - EDITORIAL.safeX * 2,
-    // 밴드 1200 = 번호 96 + 간격 28 + 훅 540 + 간격 28 + 카드 480 (여유 28)
-    maxHeight: 540,
+    // 밴드 1060 = 번호 96 + 간격 28 + 훅 470 + 간격 28 + 카드 420 (여유 18)
+    maxHeight: 470,
     lineHeight: 1.1,
     maxSize: 150,
     minSize: 84,
@@ -359,10 +359,12 @@ export const COVER_BAND = {
    * 밴드 위치. 훅은 정사각 크롭(420~1500) 안에 들어가고, 카드는 그보다 아래로
    * 조금 넘어가도 된다 - 잘려도 제품이라 훅만큼 치명적이지 않다.
    */
-  top: 380,
-  height: 1200,
-  /** 제품 카드 최소 높이 (남는 높이를 전부 카드가 가져간다) */
-  cardMinHeight: 480,
+  // 인스타 그리드 정사각 크롭은 세로 420~1500 만 남긴다. 380 에서 시작하면
+  // 번호(96px) 윗부분이 잘렸다 - 크롭선 아래로 내린다.
+  top: 440,
+  height: 1060,
+  /** 제품 카드 최소 높이 (훅이 짧으면 남는 높이를 전부 카드가 가져간다) */
+  cardMinHeight: 420,
 } as const;
 
 /**

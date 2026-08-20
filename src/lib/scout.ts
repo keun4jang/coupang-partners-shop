@@ -89,14 +89,23 @@ const ALI_KEYWORDS: Array<{ query: string; appCategory: string }> = [
 
 /** 이미 등록된 상품들의 쿠팡 productId 집합 (source_memo 의 [cpid:...] 마커에서 추출) */
 async function loadKnownProductIds(): Promise<Set<number>> {
-  const { data, error } = await supabaseAdmin()
-    .from("products")
-    .select("source_memo, coupang_partner_url");
-  if (error) throw new Error(`기존 상품 조회 실패: ${error.message}`);
+  // PostgREST 는 limit 미지정 시 1000행에서 조용히 자른다. 상품이 1000개를 넘으면
+  // 그 뒤 행이 "모르는 상품"이 돼 이미 등록한 상품을 매일 다시 담게 된다
+  // (중복 insert 는 unique 제약에 걸려 후보 저장 전체가 실패한다). 페이지로 다 읽는다.
+  const db = supabaseAdmin();
   const ids = new Set<number>();
-  for (const row of data ?? []) {
-    const m = (row.source_memo as string | null)?.match(CPID_RE);
-    if (m) ids.add(Number(m[1]));
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from("products")
+      .select("source_memo")
+      .range(from, from + 999);
+    if (error) throw new Error(`기존 상품 조회 실패: ${error.message}`);
+    const rows = data ?? [];
+    for (const row of rows) {
+      const m = (row.source_memo as string | null)?.match(CPID_RE);
+      if (m) ids.add(Number(m[1]));
+    }
+    if (rows.length < 1000) break;
   }
   return ids;
 }
@@ -313,15 +322,26 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       });
     }
     bump(memo, "kept", out.length);
+    // 이미 등록된 상품을 먼저 걷어낸다.
+    //
+    // 왜 여기서 거르나: 아래 호출부가 상위 LISTING_TAKE 개만 잘라 쓰는데, 베스트셀러는
+    // 순위가 며칠씩 그대로라 "상위 8개"가 매일 같은 상품이다. 중복 제거를 라운드로빈
+    // 단계에만 맡기면 그 8개가 전부 known 이라 첫날 이후 구조적으로 0건이 된다
+    // (실측 2026-08-20: 골드박스·베스트 7종 합계 신규 0건).
+    const fresh = out.filter((c) => !known.has(c.productId));
     // 혹하는 순으로 세워 두면 라운드로빈이 좋은 것부터 집어간다
-    return out.sort((a, b) => appealScore(b.product_name) - appealScore(a.product_name));
+    return fresh.sort((a, b) => appealScore(b.product_name) - appealScore(a.product_name));
   };
 
+  // 목록형 버킷은 배열 앞쪽에 넣는다. 라운드로빈이 buckets 를 앞에서부터 훑기 때문에,
+  // 뒤에 두면 키워드 버킷 70개가 먼저 자리를 채운다. 골드박스는 매일 바뀌는 소스라
+  // 신규 확보 확률이 가장 높으므로 우선권을 준다.
+  const listingBuckets: ScoutCandidate[][] = [];
   try {
     if (outOfTime()) throw new Error("시간 예산 초과로 건너뜀");
     const goldbox = await fetchGoldbox();
     const bucket = fromListing(goldbox, "골드박스");
-    if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
+    if (bucket.length) listingBuckets.push(bucket.slice(0, LISTING_TAKE));
   } catch (e) {
     errors.push(`골드박스: ${(e as Error).message}`);
   }
@@ -332,11 +352,13 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       await new Promise((r) => setTimeout(r, 120));
       const best = await fetchBestCategory(cat.id, 50);
       const bucket = fromListing(best, `베스트 ${cat.label}`);
-      if (bucket.length) buckets.push(bucket.slice(0, LISTING_TAKE));
+      if (bucket.length) listingBuckets.push(bucket.slice(0, LISTING_TAKE));
     } catch (e) {
       errors.push(`베스트 ${cat.label}: ${(e as Error).message}`);
     }
   }
+
+  buckets.unshift(...listingBuckets);
 
   // 라운드로빈으로 카테고리를 번갈아 뽑아 다양성 확보 + 중복 제거.
   const registered: ScoutCandidate[] = [];

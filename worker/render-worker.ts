@@ -542,7 +542,7 @@ async function youtubeDailyCap(): Promise<number | null> {
 }
 
 /** 오늘(KST) 유튜브에 올라간 편 수 */
-async function youtubeUploadedTodayCount(now = new Date()): Promise<number> {
+async function youtubeUploadedTodayCount(now = new Date()): Promise<number | null> {
   const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
   const kstMidnightUtc = new Date(
     Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
@@ -555,10 +555,19 @@ async function youtubeUploadedTodayCount(now = new Date()): Promise<number> {
     .not("youtube_url", "is", null)
     .gte("published_at", kstMidnightUtc.toISOString());
   if (error) {
-    // 조회 실패 시 상한을 모른 채 올리면 할당량 초과로 실패할 수 있으므로
-    // 보수적으로 "상한 도달"로 보고 유튜브만 건너뛴다 (인스타는 정상 발행).
-    console.warn("유튜브 일일 업로드 수 조회 실패 - 이번엔 유튜브를 건너뜁니다:", error.message.slice(0, 100));
-    return Number.MAX_SAFE_INTEGER;
+    // 조회 실패를 "상한 도달"로 취급하면 안 된다.
+    //
+    // 예전엔 여기서 MAX_SAFE_INTEGER 를 돌려줬는데, 그러면 그날 유튜브가 0편이어도
+    // 상한 도달로 판정돼 업로드를 건너뛰고 completed 로 확정된다. 워커는 completed 를
+    // 다시 보지 않으므로 그 영상은 유튜브에 영영 안 올라가고, DB 에는 "상한 도달"이라는
+    // 거짓 사유만 남아 운영자도 구분할 수 없다. 이 조회는 Supabase 일시 오류
+    // (러너 부팅 직후 JWT 시계 오차 등, settings.ts 주석 참고)로 충분히 실패한다.
+    //
+    // 할당량을 한 편 초과하는 손해보다 "영구 누락 + 거짓 기록"이 크므로,
+    // 모르면 상한을 적용하지 않는다(null). 초과하면 유튜브 업로드가 실패할 뿐이고
+    // youtube_url 이 비어 있어 다음 재시도에서 다시 올릴 수 있다.
+    console.warn("유튜브 일일 업로드 수 조회 실패 - 상한 미적용으로 진행:", error.message.slice(0, 100));
+    return null;
   }
   return count ?? 0;
 }
@@ -597,7 +606,7 @@ async function publishToSns(
   const ytToday = youtubeUrl ? 0 : await youtubeUploadedTodayCount();
   if (youtubeUrl) {
     console.log("유튜브: 이미 업로드됨 - 건너뜀:", youtubeUrl);
-  } else if (ytCap !== null && ytToday >= ytCap) {
+  } else if (ytCap !== null && ytToday !== null && ytToday >= ytCap) {
     youtubeError = `유튜브 일일 상한(${ytCap}편) 도달 - 이 영상은 인스타 전용으로 발행`;
     console.log(youtubeError);
   } else if (hasYoutubeEnv()) {

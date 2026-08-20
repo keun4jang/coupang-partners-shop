@@ -43,10 +43,14 @@ export async function GET(request: NextRequest) {
     // 나머지는 영상 큐잉·알림 몫으로 남긴다. 예산이 없으면 수집이 시간을 다 먹어
     // 큐잉이 통째로 잘린다(실측 8/20: 6편 목표에 3편만 큐잉되고 끝났다).
     const startedAt = Date.now();
-    const result = await runScout({ deadlineAt: startedAt + 38_000 });
 
-    // 하루치 영상 큐잉 (멱등: 오늘 목표치를 이미 채웠으면 아무것도 안 함).
-    // 실패해도 스카우트는 성공 처리.
+    // 순서 주의: 영상 큐잉을 먼저 한다.
+    //
+    // 예전엔 runScout 이 앞에 있었는데, runScout 은 loadKnownProductIds 조회 실패나
+    // 후보 insert 실패를 그대로 던진다. 그러면 아래 큐잉이 호출조차 안 돼 그날
+    // pending 이 0개가 되고 업로드 슬롯이 통째로 빈다 - 부가 작업(수집) 때문에
+    // 본류(발행)가 멈추는 구조였다. 재고는 이미 쌓여 있으므로 오늘 수집 결과가
+    // 없어도 큐잉은 문제없이 돌아간다.
     let queuedNumbers: number[] = [];
     let queueError: string | null = null;
     try {
@@ -54,6 +58,24 @@ export async function GET(request: NextRequest) {
       queuedNumbers = queued.map((v) => v.display_number);
     } catch (e) {
       queueError = e instanceof Error ? e.message : String(e);
+    }
+
+    // 수집은 실패해도 이 요청을 실패로 만들지 않는다 (다음 날 다시 돈다)
+    let result: Awaited<ReturnType<typeof runScout>>;
+    try {
+      result = await runScout({ deadlineAt: startedAt + 38_000 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("스카우트 실패(큐잉은 완료됨):", msg);
+      result = {
+        registered: [],
+        skippedDuplicate: 0,
+        skippedFiltered: 0,
+        skippedSpamTitle: 0,
+        sourceStats: {},
+        aliCandidates: 0,
+        errors: [`스카우트 전체 실패: ${msg}`],
+      };
     }
 
     const scoutMsg = (

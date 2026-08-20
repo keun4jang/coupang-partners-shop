@@ -27,6 +27,22 @@ const CASES: Array<{ id: string; tags: string; query: string; block: boolean; wh
   { id: "218379", block: true, why: "만화경 모션그래픽", query: "bathroom cleaning spray tiles home",
     tags: "geometric, golden, texture, expanding, moving, motion, symmetry, hexagon, tile, background" },
 
+  // ── 감사(2026-08-20)에서 드러난 CHORE 예외 오통과 ──
+  { id: "감사1", block: true, why: "데이터센터 모션그래픽이 storage 한 단어로 사무실 필터를 우회했다",
+    query: "organizing storage boxes home",
+    tags: "cloud, background, technology, weather, beautiful wallpaper, internet, computer, business, storage, data" },
+  { id: "감사2", block: true, why: "도서관 인물 컷이 shelves 로 우회",
+    query: "tidy shelves home", tags: "man, student, library, books, shelves, study, read" },
+  { id: "감사3", block: true, why: "묘지 클립이 hygiene 으로 우회",
+    query: "tidying living room home",
+    tags: "cemetery, graveyard, remains, after cremation, hygiene, peaceful resting place" },
+  { id: "감사4", block: true, why: "코로나 마스크 인물 컷이 bathroom/hygiene 으로 우회",
+    query: "bathroom cleaning spray tiles home",
+    tags: "portrait, woman, mask, covid-19, quarantine, hygiene, bathroom" },
+  { id: "감사5", block: true, why: "사무실 회의 컷이 kitchen 한 단어로 우회",
+    query: "wiping kitchen counter home",
+    tags: "businessman, laptop, office, meeting, kitchen" },
+
   // ── 반드시 살려야 하는 것 (사람이 나와도 집안일이면 통과) ──
   { id: "138391", block: false, why: "빗자루로 쓰는 장면", query: "housework daily home",
     tags: "sweeping, sweep, cleaning, broom, home, sawdust, dust, dji, camera" },
