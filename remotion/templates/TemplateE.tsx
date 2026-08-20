@@ -80,8 +80,9 @@ const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
       width: "fit-content",
     }}
   >
-    <span style={{ opacity: 0.85 }}>{label}</span>
-    <span style={{ fontWeight: 800 }}>{displayNumber}번</span>
+    <span style={{ opacity: 0.85, fontSize: 30 }}>{label}</span>
+    {/* 번호는 시청자가 기억해서 랜딩에서 찾아야 하는 값이라 라벨보다 크게 */}
+    <span style={{ fontWeight: 800, fontSize: 42 }}>{displayNumber}번</span>
   </div>
 );
 
@@ -473,7 +474,22 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
         gap: 28,
       }}
     >
-      <NumberChip displayNumber={props.displayNumber} />
+      {/* 번호는 칩 대신 큰 글씨로 (사장님 지적 2026-08-20: 초록 칩 안 글씨가
+          그리드에서 안 읽힌다 → "그냥 번호만 크게"). 칩은 배경이 글자 자리를
+          잡아먹어 30px 이 한계였는데, 맨글씨로 빼면 96px 까지 키울 수 있다.
+          색은 포인트색(토마토) - 종이색 위에서 대비가 가장 세고 시선이 걸린다. */}
+      <div
+        style={{
+          color: E.accent,
+          fontSize: 96,
+          fontWeight: 800,
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {props.displayNumber}
+        <span style={{ fontSize: "0.62em", marginLeft: "0.04em" }}>번</span>
+      </div>
       <div
         style={{
           color: E.ink,

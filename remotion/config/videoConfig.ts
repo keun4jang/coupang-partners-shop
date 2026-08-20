@@ -338,7 +338,8 @@ export function coverHookFontSizeE(hookLine: string): number {
   return fitKoreanText({
     text: hookLine,
     maxWidth: VIDEO.width - EDITORIAL.safeX * 2,
-    maxHeight: 560,
+    // 밴드 1200 = 번호 96 + 간격 28 + 훅 540 + 간격 28 + 카드 480 (여유 28)
+    maxHeight: 540,
     lineHeight: 1.1,
     maxSize: 150,
     minSize: 84,
