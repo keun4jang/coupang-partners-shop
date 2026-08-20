@@ -329,13 +329,16 @@ export function eHookFontSize(hookLine: string): number {
  * 1프레임만 보이고 실제 역할은 "손톱만 한 썸네일에서 뭘 말하는지 읽히는 것"이라
  * 본편과 분리해 훨씬 크게 잡는다.
  *
- * 폭 936(= 1080 − 좌우 72), 높이 620 안에서 최대 150까지.
+ * 폭 936(= 1080 − 좌우 72), 높이 560 안에서 최대 150까지.
+ * 높이를 560 으로 묶는 이유: 남는 높이가 그대로 제품 카드 몫이 된다.
+ * 훅이 세로로 다 먹으면 카드가 납작해져 세로로 긴 제품이 작게 들어간다
+ * (사장님 지침: 제품 사진은 크게).
  */
 export function coverHookFontSizeE(hookLine: string): number {
   return fitKoreanText({
     text: hookLine,
     maxWidth: VIDEO.width - EDITORIAL.safeX * 2,
-    maxHeight: 620,
+    maxHeight: 560,
     lineHeight: 1.1,
     maxSize: 150,
     minSize: 84,
@@ -351,10 +354,14 @@ export function coverHookFontSizeE(hookLine: string): number {
  * 아래로 내려 잡는 이유가 이것이다.
  */
 export const COVER_BAND = {
-  top: 400,
-  height: 1120,
-  /** 제품 카드 높이 */
-  cardHeight: 380,
+  /**
+   * 밴드 위치. 훅은 정사각 크롭(420~1500) 안에 들어가고, 카드는 그보다 아래로
+   * 조금 넘어가도 된다 - 잘려도 제품이라 훅만큼 치명적이지 않다.
+   */
+  top: 380,
+  height: 1200,
+  /** 제품 카드 최소 높이 (남는 높이를 전부 카드가 가져간다) */
+  cardMinHeight: 480,
 } as const;
 
 /**

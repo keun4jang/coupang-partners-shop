@@ -470,7 +470,6 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
         height: COVER_BAND.height,
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
         gap: 28,
       }}
     >
@@ -488,9 +487,10 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
       >
         {props.hookLine}
       </div>
+      {/* 남는 높이를 전부 제품 카드가 가져간다 - 세로로 긴 제품도 크게 보이게 */}
       <ProductCard
         imageUrl={props.productImageUrl}
-        style={{ width: "100%", height: COVER_BAND.cardHeight, flexShrink: 0 }}
+        style={{ width: "100%", flex: 1, minHeight: COVER_BAND.cardMinHeight }}
       />
     </div>
   </AbsoluteFill>
