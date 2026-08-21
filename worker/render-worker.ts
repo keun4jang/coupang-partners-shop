@@ -1065,12 +1065,30 @@ function todaysUploadSlots(schedule: string, now: Date): Date[] {
 /** 슬롯 스케줄 미설정 시 기본값 (KST) - 예약 발행이 항상 동작하도록 */
 const DEFAULT_UPLOAD_SCHEDULE = "07:30-10:00,12:00-14:00,20:00-22:30";
 
-/** 업로드 슬롯 스케줄: 환경변수 → app_settings → 기본값 순 (빈 문자열 = 게이트 없음) */
+let loggedScheduleSource = false;
+
+/**
+ * 업로드 슬롯 스케줄: app_settings → 환경변수 → 기본값 순 (빈 문자열 = 게이트 없음).
+ *
+ * DB 를 환경변수보다 앞에 둔 이유: 슬롯 수 = 하루 발행 편수라 운영 중 가장 자주
+ * 바꾸는 값인데, 환경변수(WORKER_ENV 시크릿)가 이기면 DB 를 고쳐도 아무 일이
+ * 안 일어난다. 실측 2026-08-21: app_settings 에 6슬롯을 넣었는데 워커는 계속
+ * 3슬롯로 돌아 6편을 큐잉해도 3편만 나가고 대기만 쌓였다.
+ * design_template 도 같은 이유로 DB 우선이다 - 우선순위를 통일한다.
+ *
+ * 어느 값을 썼는지 실행마다 한 번 로그로 남긴다. 이게 없으면 "DB 를 바꿨는데
+ * 왜 안 바뀌지" 를 로그만 보고는 알 수 없다.
+ */
 async function uploadSchedule(): Promise<string> {
-  const raw =
-    optionalEnv("UPLOAD_SCHEDULE") ??
-    (await getSetting("UPLOAD_SCHEDULE")) ??
-    DEFAULT_UPLOAD_SCHEDULE;
+  const fromDb = (await getSetting("UPLOAD_SCHEDULE"))?.trim();
+  const fromEnv = optionalEnv("UPLOAD_SCHEDULE")?.trim();
+  const raw = fromDb || fromEnv || DEFAULT_UPLOAD_SCHEDULE;
+  if (!loggedScheduleSource) {
+    loggedScheduleSource = true;
+    const source = fromDb ? "app_settings" : fromEnv ? "환경변수" : "기본값";
+    const slots = raw.split(",").filter((x) => x.trim()).length;
+    console.log(`업로드 슬롯 출처=${source} · ${slots}개 · ${raw}`);
+  }
   // "off"/"none"/"0" 이면 게이트 없음(즉시 전부 처리). 빈 문자열로는 끌 수 없다 -
   // optionalEnv 가 빈 값을 미설정으로 취급해 기본 스케줄로 떨어지기 때문.
   return /^(off|none|0)$/i.test(raw.trim()) ? "" : raw;
