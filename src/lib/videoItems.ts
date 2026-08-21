@@ -128,11 +128,16 @@ export async function fillVideoCopy(
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("video_items")
+    // landing_visible 은 여기서 켜지 않는다.
+    //
+    // 이 함수는 렌더 "전"에 불린다. 여기서 켜면 아직 아무 채널에도 안 올라간
+    // 번호가 랜딩에 노출되고, 렌더가 실패하면(failed) 영상 없는 번호가 그대로
+    // 남는다. 시청자가 영상에서 번호를 보고 랜딩에 오는 흐름이라 순서가 뒤집히면
+    // "없는 번호"를 보게 된다. 발행 완료 시점(render-worker 의 completed 갱신)에서만 켠다.
     .update({
       hook_text: copy.hookText,
       script_text: composeScriptText(copy, item.display_number),
       caption_text: copy.captionText,
-      landing_visible: true,
     })
     .eq("id", item.id)
     .select("*")

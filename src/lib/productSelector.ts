@@ -14,6 +14,14 @@ async function allVideoProductIds(): Promise<string[]> {
     const { data, error } = await db
       .from("video_items")
       .select("product_id")
+      // 실패한 영상은 "이 상품은 썼다"로 치지 않는다.
+      //
+      // 렌더가 실패하면 그 항목은 failed 로 남는데, 워커는 pending/rendered 만
+      // 집어가므로 자동 재시도가 없다. 그런데 여기서 상품까지 사용됨으로 세면
+      // 영상은 한 편도 안 나갔는데 상품 하나가 영구히 재고에서 빠진다
+      // (재고가 30개대인 지금은 실패 1건 = 하루 발행의 1/6 손실).
+      // 제외하면 다음 큐잉에서 같은 상품으로 다시 시도된다.
+      .neq("video_status", "failed")
       .range(from, from + 999);
     if (error) throw new Error(`영상 수 조회 실패: ${error.message}`);
     const rows = (data ?? []) as { product_id: string }[];
@@ -128,12 +136,15 @@ export async function selectProductForVideo(): Promise<Product | null> {
     countByProduct.set(pid, (countByProduct.get(pid) ?? 0) + 1);
   }
 
+  // 정렬 1차 키는 "만든 영상 수"다. score 를 먼저 보면 점수 높은 같은 상품이
+  // 계속 뽑혀, 미사용 재고를 수십 개 두고도 이미 영상이 있는 상품만 반복된다.
+  // 안 만든 상품을 먼저 소진하고, 그 안에서 혹하는 순으로 고른다.
   const sorted = dropSpamTitles(products as Product[]).sort((a, b) => {
-    const scoreDiff = score(b) - score(a);
-    if (scoreDiff !== 0) return scoreDiff;
     const countDiff =
       (countByProduct.get(a.id) ?? 0) - (countByProduct.get(b.id) ?? 0);
     if (countDiff !== 0) return countDiff;
+    const scoreDiff = score(b) - score(a);
+    if (scoreDiff !== 0) return scoreDiff;
     return a.created_at.localeCompare(b.created_at);
   });
 

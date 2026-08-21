@@ -51,7 +51,7 @@ jobs:
           set -e
           echo "커밋 $GIT_SHA 의 Vercel 배포 대기 중..."
           URL=""
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             RESP=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
               "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=10&teamId=$VERCEL_TEAM_ID")
             URL=$(GIT_SHA="$GIT_SHA" node -e "
@@ -74,13 +74,17 @@ jobs:
               echo "배포 준비됨: $URL"
               break
             fi
-            echo "[$i/30] 아직 준비 안 됨 - 10초 후 재시도"
+            echo "[$i/90] 아직 준비 안 됨 - 10초 후 재시도"
             sleep 10
           done
 
           if [ -z "$URL" ]; then
-            echo "::warning::5분 내에 배포가 준비되지 않아 도메인 재연결을 건너뜁니다. 다음 푸시에서 재시도됩니다."
-            exit 0
+            # 여기서 exit 0 하면 잡이 green 이라 아래 실패 알림이 안 울린다.
+            # 이 워크플로가 옛 배포 장애를 막는 유일한 안전장치인데, 조용히
+            # 넘어가면 사이트·크론이 옛 코드에 멈춘 걸 아무도 모른다(실제로
+            # 2026-08-21 까지 크론이 옛 배포로 돌고 있었다). 반드시 실패시킨다.
+            echo "::error::15분 내에 배포가 준비되지 않아 도메인 재연결·프로덕션 승격을 못 했습니다."
+            exit 1
           fi
 
           npm install -g vercel@latest --no-progress >/dev/null 2>&1
@@ -102,11 +106,13 @@ jobs:
             if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
               echo "✅ 프로덕션 승격 완료 ($DEP_ID) - 크론이 이 코드로 돈다"
             else
-              echo "::warning::프로덕션 승격 실패(HTTP $CODE) - 크론이 옛 배포로 돌 수 있습니다"
+              echo "::error::프로덕션 승격 실패(HTTP $CODE) - 크론이 옛 배포로 돕니다"
               cat /tmp/promote.json || true
+              exit 1
             fi
           else
-            echo "::warning::배포 ID를 못 찾아 프로덕션 승격을 건너뜁니다"
+            echo "::error::배포 ID를 못 찾아 프로덕션 승격을 건너뜁니다"
+            exit 1
           fi
 
       # 실패 시 텔레그램 알림 (웹사이트가 옛 버전에 멈추는 문제 조기 감지)
@@ -123,6 +129,6 @@ jobs:
               --data-urlencode "text=🚨 시스템 문제 발생
 
           어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
-          무엇이: momitemmom.vercel.app 이 최신 배포에 연결되지 않았을 수 있음
+          무엇이: 사이트/크론이 옛 배포에 멈췄을 수 있음 (도메인 재연결 또는 프로덕션 승격 실패)
           로그: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           fi

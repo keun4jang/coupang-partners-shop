@@ -881,8 +881,15 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
     console.error(`${number} 처리 실패:`, error);
     await db
       .from("video_items")
-      .update({ video_status: "failed", error_message: message.slice(0, 500) })
+      // landing_visible 도 내린다 - 영상 없는 번호가 랜딩에 남으면 안 된다
+      .update({
+        video_status: "failed",
+        landing_visible: false,
+        error_message: message.slice(0, 500),
+      })
       .eq("id", row.id);
+    // 실패는 재고 손실로 이어질 수 있으니(다음 큐잉에서 같은 상품을 다시 쓰긴 하지만
+    // 그날 슬롯 하나는 비어버린다) 사람이 바로 알 수 있게 알린다.
     await notify(`영상 생성 실패\n\n번호: ${number}\n오류: ${message.slice(0, 300)}`);
   } finally {
     stopHeartbeat();
@@ -1031,8 +1038,16 @@ function todaysUploadSlots(schedule: string, now: Date): Date[] {
   const m = kstNow.getUTCMonth();
   const d = kstNow.getUTCDate();
   const dayNum = y * 10000 + (m + 1) * 100 + d;
-  const parseHm = (s: string): number => {
-    const [hh, mm = 0] = s.trim().split(":").map(Number);
+  // 오타 한 글자로 그날 발행이 조용히 0편이 되지 않게 검증한다.
+  // 예: "07;30-09:30" → hh 가 NaN → 슬롯이 Invalid Date → 비교가 전부 false →
+  // "지난 슬롯 0개"로 그날 아무것도 안 나간다. 깨진 슬롯은 버리고 알린다.
+  const parseHm = (s: string): number | null => {
+    const parts = s.trim().split(":");
+    if (parts.length > 2) return null;
+    const hh = Number(parts[0]);
+    const mm = parts.length > 1 ? Number(parts[1]) : 0;
+    if (!Number.isInteger(hh) || !Number.isInteger(mm)) return null;
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
     return hh * 60 + mm;
   };
   return schedule
@@ -1047,18 +1062,28 @@ function todaysUploadSlots(schedule: string, now: Date): Date[] {
         const [a, b] = seg.split("-");
         const startMin = parseHm(a);
         const endMin = parseHm(b);
+        if (startMin === null || endMin === null) {
+          console.warn(`업로드 슬롯 형식 오류로 건너뜀: "${seg}"`);
+          return null;
+        }
         const span = Math.max(0, endMin - startMin);
         const rand01 = (seed % 10007) / 10007;
         totalMin = startMin + Math.round(rand01 * span);
       } else {
         // 고정 + ±30분 지터
+        const base = parseHm(seg);
+        if (base === null) {
+          console.warn(`업로드 슬롯 형식 오류로 건너뜀: "${seg}"`);
+          return null;
+        }
         const jitter = (seed % (SLOT_JITTER_MINUTES * 2 + 1)) - SLOT_JITTER_MINUTES;
-        totalMin = parseHm(seg) + jitter;
+        totalMin = base + jitter;
       }
       return new Date(
         Date.UTC(y, m, d, Math.floor(totalMin / 60), totalMin % 60) - KST_OFFSET_MS
       );
     })
+    .filter((d): d is Date => d !== null)
     .sort((a, b) => a.getTime() - b.getTime());
 }
 
@@ -1118,8 +1143,27 @@ async function nextUploadSlotLabel(now = new Date()): Promise<string> {
 async function allowedUploadCount(now = new Date()): Promise<number | null> {
   const schedule = await uploadSchedule();
   if (!schedule) return null;
+  return allowedUploadCountWith(schedule, now);
+}
+
+/** 주어진 스케줄 문자열로 남은 발행 가능 편수를 센다 (슬롯 폴백에서 재사용) */
+async function allowedUploadCountWith(
+  schedule: string,
+  now: Date
+): Promise<number | null> {
 
   const slots = todaysUploadSlots(schedule, now);
+  if (slots.length === 0) {
+    // 전부 형식 오류였다는 뜻. 이대로 두면 "지난 슬롯 0개"라 그날 발행이
+    // 통째로 멈추고 로그만 조용하다. 기본값으로 돌려 발행은 계속하고 알린다.
+    console.warn(
+      `업로드 슬롯을 하나도 못 읽었습니다("${schedule}") - 기본값으로 발행합니다`
+    );
+    await notify(
+      `⚠️ 업로드 슬롯 설정을 못 읽어 기본값으로 발행 중입니다.\n설정값: ${schedule}`
+    );
+    return allowedUploadCountWith(DEFAULT_UPLOAD_SCHEDULE, now);
+  }
   const passed = slots.filter((s) => now >= s).length;
   const next = slots.find((s) => now < s);
   if (passed === 0) {
@@ -1145,7 +1189,13 @@ async function allowedUploadCount(now = new Date()): Promise<number | null> {
     .select("id", { count: "exact", head: true })
     .eq("video_status", "completed")
     .neq("publish_mode", "immediate")
-    .gte("published_at", kstMidnightUtc.toISOString());
+    .gte("published_at", kstMidnightUtc.toISOString())
+    // 실제로 어딘가에 올라간 것만 슬롯을 먹은 것으로 센다.
+    // 채널이 전부 실패해 아무 데도 안 올라간 영상도 completed·published_at 이
+    // 찍히는데, 그것까지 세면 그날 슬롯만 소모되고 발행은 0편이 된다.
+    .or(
+      "youtube_url.not.is.null,instagram_url.not.is.null,facebook_url.not.is.null"
+    );
   if (error) {
     console.error("오늘 완료 수 조회 실패(안전하게 대기):", error.message);
     return 0;

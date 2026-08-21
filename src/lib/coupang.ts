@@ -58,6 +58,9 @@ async function request<T>(
   body?: unknown
 ): Promise<T> {
   const url = HOST + path + (query ? `?${query}` : "");
+  // 타임아웃이 없으면 응답이 안 오는 호출 하나가 스카우트 전체를 붙잡는다.
+  // Vercel 함수는 60초에 강제 종료되므로 그 자리에서 수집분이 통째로 날아간다
+  // (deadlineAt 도 진행 중인 fetch 는 못 끊는다).
   const res = await fetch(url, {
     method,
     headers: {
@@ -65,6 +68,7 @@ async function request<T>(
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(8000),
   });
   const text = await res.text();
   let json: { rCode?: string | number; rMessage?: string; data?: unknown };

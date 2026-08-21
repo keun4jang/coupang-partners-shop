@@ -23,6 +23,13 @@ export const BgmAudio: React.FC = () => {
     <Audio
       src={staticFile(BGM.file)}
       loop
+      // volume 콜백이 "루프 안에서의 프레임"이 아니라 절대 프레임을 받게 한다.
+      //
+      // 기본값('repeat')이면 BGM 파일 길이(24.03초)를 넘는 순간 f 가 0 으로
+      // 되돌아가 도입부 페이드인이 다시 걸리고(음악이 무음까지 떨어졌다 올라온다),
+      // 끝 페이드아웃 구간에는 f 가 영영 도달하지 못해 최대 음량에서 뚝 끊긴다.
+      // 우리 영상은 나레이션 길이에 맞춰 24초를 자주 넘긴다(실측 28~30초).
+      loopVolumeCurveBehavior="extend"
       volume={(f) =>
         interpolate(
           f,

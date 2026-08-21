@@ -86,6 +86,31 @@ const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
   </div>
 );
 
+/**
+ * 제품 사진. 로드에 실패하면 렌더 전체가 죽지 않도록 폴백으로 떨어진다.
+ *
+ * Remotion 의 <Img> 는 onError 가 없으면 로드 실패 시 예외를 던져 렌더가 통째로
+ * 실패하고, 그 영상은 failed 로 남아 자동 재시도가 없다. 제품 이미지는 워커가
+ * data URI 로 심어주지만(fetchImageAsDataUri) 그게 실패하면 원본 CDN URL 이
+ * 그대로 넘어와 헤드리스 브라우저에서 차단될 수 있다. 사진 한 장 때문에
+ * 영상을 통째로 잃는 것보다 사진 없이 나가는 편이 낫다.
+ */
+const ProductImage: React.FC<{
+  src: string | null;
+  fallbackSize: number;
+  style?: React.CSSProperties;
+}> = ({ src, fallbackSize, style }) => {
+  const [failed, setFailed] = React.useState(false);
+  if (!src || failed) return <span style={{ fontSize: fallbackSize }}>🧺</span>;
+  return (
+    <Img
+      src={src}
+      onError={() => setFailed(true)}
+      style={{ width: "100%", height: "100%", objectFit: "contain", ...style }}
+    />
+  );
+};
+
 /** 제품 사진 카드 (흰 바탕, 얇은 테두리, 은은한 그림자) */
 const ProductCard: React.FC<{
   imageUrl: string | null;
@@ -106,14 +131,7 @@ const ProductCard: React.FC<{
       ...style,
     }}
   >
-    {imageUrl ? (
-      <Img
-        src={imageUrl}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
-      />
-    ) : (
-      <span style={{ fontSize: 160 }}>🧺</span>
-    )}
+    <ProductImage src={imageUrl} fallbackSize={160} />
   </div>
 );
 
@@ -297,14 +315,7 @@ const MediaWindow: React.FC<{
               boxSizing: "border-box",
             }}
           >
-            {props.productImageUrl ? (
-              <Img
-                src={props.productImageUrl}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            ) : (
-              <span style={{ fontSize: 120 }}>🧺</span>
-            )}
+            <ProductImage src={props.productImageUrl} fallbackSize={120} />
           </div>
         </>
       ) : (
@@ -320,14 +331,7 @@ const MediaWindow: React.FC<{
             boxSizing: "border-box",
           }}
         >
-          {props.productImageUrl ? (
-            <Img
-              src={props.productImageUrl}
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          ) : (
-            <span style={{ fontSize: 160 }}>🧺</span>
-          )}
+          <ProductImage src={props.productImageUrl} fallbackSize={160} />
         </div>
       )}
     </div>
