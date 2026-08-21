@@ -13,8 +13,9 @@ name: scout
 on:
   workflow_dispatch:
   schedule:
-    # KST 07:20 / 15:20 (UTC 22:20 / 06:20)
-    - cron: "20 22 * * *"
+    # KST 06:40 / 15:20 (UTC 21:40 / 06:20)
+    # 06:40 은 첫 업로드 슬롯(07:30~)보다 앞서야 그날 영상이 제때 큐잉된다.
+    - cron: "40 21 * * *"
     - cron: "20 6 * * *"
 
 concurrency:
@@ -78,6 +79,17 @@ jobs:
           echo "NEXT_PUBLIC_SITE_URL=$(have NEXT_PUBLIC_SITE_URL)"
           echo "coupang=$(have COUPANG_ACCESS_KEY)" >> "$GITHUB_OUTPUT"
           echo "cron=$(have CRON_SECRET)" >> "$GITHUB_OUTPUT"
+
+      # 큐잉은 자격증명과 무관하게 항상 돌린다 (Supabase 만 있으면 된다).
+      #
+      # Vercel 크론도 큐잉을 하지만, 이 프로젝트는 "도메인이 가리키는 배포"와
+      # "Vercel 이 프로덕션으로 아는 배포"가 갈라져 있어 크론이 옛 코드로 돈다
+      # (vercel-domain-sync.yml 주석 참고). 실측 2026-08-21: 큐잉이 계속 3편으로
+      # 고정돼 있었다(옛 하드코딩 상수). Actions 는 브랜치를 그대로 쓰므로 항상
+      # 최신이다. 멱등이라 크론과 겹쳐도 하루 목표치를 넘기지 않는다.
+      - name: 하루치 영상 큐잉
+        if: steps.check.outputs.ready == 'true'
+        run: npm run queue
 
       # 경로 A: 러너에 쿠팡 키가 있으면 여기서 직접 수집한다.
       - name: 스카우트 실행 (직접)
