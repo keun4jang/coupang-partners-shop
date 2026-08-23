@@ -56,24 +56,31 @@ interface ScoredCandidate {
   clicks: number;
 }
 
-async function recentlyUsedProductIds(): Promise<Set<string>> {
+interface RecentLongformHistory {
+  usedProductIds: Set<string>;
+  recentCategoryLabels: string[]; // 최신순
+}
+
+async function recentLongformHistory(): Promise<RecentLongformHistory> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("longform_items")
-    .select("items")
+    .select("items, category_label")
     .eq("video_status", "completed") // 실패한 회차는 상품을 "썼다"고 치지 않는다
     .order("created_at", { ascending: false })
     .limit(REUSE_COOLDOWN_LONGFORMS);
   if (error) {
-    console.warn("최근 롱폼 이력 조회 실패(재사용 제한 없이 진행):", error.message);
-    return new Set();
+    console.warn("최근 롱폼 이력 조회 실패(제한 없이 진행):", error.message);
+    return { usedProductIds: new Set(), recentCategoryLabels: [] };
   }
-  const ids = new Set<string>();
+  const usedProductIds = new Set<string>();
+  const recentCategoryLabels: string[] = [];
   for (const row of data ?? []) {
     const items = (row.items as Array<{ productId?: string }>) ?? [];
-    for (const it of items) if (it.productId) ids.add(it.productId);
+    for (const it of items) if (it.productId) usedProductIds.add(it.productId);
+    if (row.category_label) recentCategoryLabels.push(row.category_label as string);
   }
-  return ids;
+  return { usedProductIds, recentCategoryLabels };
 }
 
 async function clickCountByProduct(): Promise<Map<string, number>> {
@@ -115,24 +122,62 @@ export interface Top10Selection {
   selected: VideoItemWithProduct[]; // rank 1 -> rank 10 순서
 }
 
+const MIN_CATEGORY_POOL = 10;
+
 /**
- * TOP10 후보 선정. 부족하면(재고 고갈) selected.length < 10 로 돌아온다 -
+ * TOP10 후보 선정 - 한 카테고리 안에서만 뽑는다.
+ *
+ * 처음엔 클릭수 상위 10개를 카테고리 안 가리고 뽑았는데, 실제로 돌려보니
+ * "수납템 TOP10"이라는 제목에 에어팟·갤럭시버즈가 섞여 나왔다(전체 후보 중
+ * 클릭수 상위를 뽑고 사후에 최빈 카테고리로 제목만 붙였기 때문 - 내용과 제목이
+ * 안 맞는 것 자체가 오인성 문제다). 그래서 카테고리를 먼저 고르고 그 안에서만
+ * 10개를 채우는 방식으로 바꿨다.
+ *
+ * 카테고리 선택: 그 카테고리 후보가 10개 이상 있어야 하고(모자라면 그 주는 후보에서
+ * 제외), 최근에 다룬 카테고리는 되도록 피한다(다양성), 동률이면 후보가 가장
+ * 많이 남은 카테고리(재고 여유)를 우선한다.
+ *
+ * 부족하면(어느 카테고리도 10개를 못 채우면) selected.length < 10 로 돌아온다 -
  * 호출부가 최소 개수를 확인해서 건너뛸지 판단한다.
  */
 export async function selectTop10(): Promise<Top10Selection> {
-  const [pool, usedIds, clicks] = await Promise.all([
+  const [pool, history, clicks] = await Promise.all([
     eligiblePool(),
-    recentlyUsedProductIds(),
+    recentLongformHistory(),
     clickCountByProduct(),
   ]);
 
   const candidates: ScoredCandidate[] = pool
     .filter((it) => it.products && it.products.status !== "paused")
-    .filter((it) => !usedIds.has(it.product_id))
+    .filter((it) => !history.usedProductIds.has(it.product_id))
     .filter((it) => Boolean(productTargetUrl(it.products)))
     .map((item) => ({ item, clicks: clicks.get(item.product_id) ?? 0 }));
 
-  candidates.sort((a, b) => {
+  const byCategory = new Map<string, ScoredCandidate[]>();
+  for (const c of candidates) {
+    const cat = c.item.products.category || "생활템";
+    const list = byCategory.get(cat) ?? [];
+    list.push(c);
+    byCategory.set(cat, list);
+  }
+
+  const viable = [...byCategory.entries()].filter(
+    ([, list]) => list.length >= MIN_CATEGORY_POOL
+  );
+  if (viable.length === 0) {
+    return { categoryLabel: "생활꿀템", selected: [] };
+  }
+
+  viable.sort((a, b) => {
+    const aRecent = history.recentCategoryLabels.indexOf(a[0]);
+    const bRecent = history.recentCategoryLabels.indexOf(b[0]);
+    // 최근에 다룬 적 없으면(-1) 가장 먼저. 둘 다 다뤘으면 더 오래전에 다룬 쪽 먼저.
+    if (aRecent !== bRecent) return (aRecent === -1 ? -1 : aRecent) - (bRecent === -1 ? -1 : bRecent);
+    return b[1].length - a[1].length; // 동률이면 후보 많은 쪽
+  });
+
+  const [categoryLabel, categoryCandidates] = viable[0];
+  categoryCandidates.sort((a, b) => {
     if (b.clicks !== a.clicks) return b.clicks - a.clicks;
     return (
       new Date(b.item.published_at ?? b.item.created_at).getTime() -
@@ -140,17 +185,10 @@ export async function selectTop10(): Promise<Top10Selection> {
     );
   });
 
-  const top = candidates.slice(0, 10).map((c) => c.item);
-
-  const categoryCount = new Map<string, number>();
-  for (const it of top) {
-    const cat = it.products.category || "생활템";
-    categoryCount.set(cat, (categoryCount.get(cat) ?? 0) + 1);
-  }
-  const categoryLabel =
-    [...categoryCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "생활꿀템";
-
-  return { categoryLabel, selected: top };
+  return {
+    categoryLabel,
+    selected: categoryCandidates.slice(0, 10).map((c) => c.item),
+  };
 }
 
 /** 렌더용 Top10Item[] (10위 -> 1위 순) + DB 스냅샷·설명란용 부가 필드 */
