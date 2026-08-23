@@ -17,6 +17,8 @@
     "worker:once": "tsx worker/render-worker.ts --once",
     "scout": "tsx worker/scout-runner.ts",
     "queue": "tsx worker/queue-runner.ts",
+    "longform": "tsx worker/longform-worker.ts",
+    "longform:dry": "tsx worker/longform-worker.ts --dry-run",
     "yt:backfill-captions": "tsx scripts/yt-caption-backfill.ts",
     "broll:check": "tsx scripts/broll-filter-check.ts",
     "remotion:studio": "remotion studio",

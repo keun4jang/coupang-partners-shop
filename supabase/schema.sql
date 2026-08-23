@@ -183,3 +183,32 @@ alter table products add column if not exists affiliate_url text;
 -- 알리 상품에는 쿠팡 링크가 없다
 alter table products alter column coupang_partner_url drop not null;
 create index if not exists idx_products_source on products (source, status);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 6. longform_items: 유튜브 롱폼 "TOP10" 영상 (숏폼 video_items 와 별도 테이블).
+--
+-- 1차 방침: 이미 발행된 숏폼 상품(N번 있음)만 재사용해 순위를 구성한다
+-- (products/video_items 를 건드리지 않으므로 숏폼 렌더 워커의 processPending 이
+-- 절대 이 데이터를 집어들 수 없다 - N번 체계·워커 충돌 위험 원천 차단).
+-- items 는 그 스냅샷(JSON) - 원본 상품이 나중에 바뀌어도 영상에 나온 값 그대로 보존.
+create table if not exists longform_items (
+  id uuid primary key default gen_random_uuid(),
+  category_label text not null,
+  items jsonb not null,
+  video_status text not null default 'pending' check (video_status in ('pending', 'completed', 'failed')),
+  youtube_url text,
+  youtube_error text,
+  published_at timestamptz,
+  error_message text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table longform_items enable row level security;
+
+drop trigger if exists trg_longform_items_updated_at on longform_items;
+create trigger trg_longform_items_updated_at
+  before update on longform_items
+  for each row execute function set_updated_at();
+
+create index if not exists idx_longform_items_created_at on longform_items (created_at desc);

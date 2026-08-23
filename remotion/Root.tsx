@@ -25,7 +25,7 @@ const calculateMetadata: CalculateMetadataFunction<ShortsProps> = ({ props }) =>
 
 /** 상품 개수에 맞춰 길이를 계산 (렌더 시간 실측 프로토타입 - 정식 연동 전) */
 const top10Metadata: CalculateMetadataFunction<Top10Props> = ({ props }) => ({
-  durationInFrames: Math.round(top10DurationSeconds(props.items) * TOP10_FPS),
+  durationInFrames: Math.round(top10DurationSeconds(props) * TOP10_FPS),
 });
 
 const defaultTop10Props: Top10Props = { categoryLabel: "생활템", items: [] };

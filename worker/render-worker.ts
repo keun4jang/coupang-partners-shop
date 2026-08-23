@@ -71,6 +71,8 @@ import {
   loadAffiliateCredsFromSettings,
   maybeRefreshAffiliateToken,
 } from "../src/lib/aliexpressAffiliate";
+import { fetchImageAsDataUri } from "../src/lib/mediaFetch";
+import { youtubeDailyCap, youtubeUploadedTodayCount } from "../src/lib/quota";
 import type { SceneTiming } from "../remotion/types";
 import { optionalEnv, siteUrl } from "../src/lib/env";
 import { VIDEO } from "../remotion/config/videoConfig";
@@ -154,30 +156,8 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
   };
 }
 
-/**
- * 상품 이미지를 미리 받아 data URI 로 변환.
- * 쿠팡 CDN 등이 헤드리스 브라우저 요청을 차단해도 영상에 사진이 확실히 실리도록,
- * 브라우저 대신 워커(Node)가 받아서 렌더에 직접 심는다. 실패 시 null (원본 URL 유지).
- */
-const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
-async function fetchImageAsDataUri(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
-      },
-    });
-    if (!res.ok) return null;
-    const type = res.headers.get("content-type") ?? "";
-    if (!type.startsWith("image/")) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0 || buf.length > IMAGE_MAX_BYTES) return null;
-    return `data:${type.split(";")[0]};base64,${buf.toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
+// fetchImageAsDataUri 는 src/lib/mediaFetch.ts 로 옮겼다 (worker/longform-worker.ts 와 공유 -
+// 이 파일을 직접 import 하면 아래 main() 이 모듈 로드 시 즉시 실행돼 버린다).
 
 /**
  * 나레이션 실측 길이(초)에 맞춰 장면 컷 타이밍을 만든다 (7장면).
@@ -527,50 +507,9 @@ interface SnsResult {
  * 즉시 발행(processItem)과 예약 발행(publishRendered)이 공유한다.
  * 각 채널 실패는 결과에 담아 돌려주고 영상 자체를 실패 처리하지 않는다.
  */
-/**
- * 유튜브 하루 업로드 상한. app_settings.youtube_daily_cap 으로 조정 가능
- * ("off"/"0" 이면 상한 없음). 기본 4편 - API 무료 할당량 10,000 units 기준
- * (편당 약 2,150 units, 5편이면 초과).
- */
-async function youtubeDailyCap(): Promise<number | null> {
-  const raw = (optionalEnv("YOUTUBE_DAILY_CAP") ?? (await getSetting("youtube_daily_cap")) ?? "4")
-    .trim()
-    .toLowerCase();
-  if (raw === "off" || raw === "none" || raw === "0") return null;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 4;
-}
-
-/** 오늘(KST) 유튜브에 올라간 편 수 */
-async function youtubeUploadedTodayCount(now = new Date()): Promise<number | null> {
-  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
-  const kstMidnightUtc = new Date(
-    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) -
-      KST_OFFSET_MS
-  );
-  const db = supabaseAdmin();
-  const { count, error } = await db
-    .from("video_items")
-    .select("id", { count: "exact", head: true })
-    .not("youtube_url", "is", null)
-    .gte("published_at", kstMidnightUtc.toISOString());
-  if (error) {
-    // 조회 실패를 "상한 도달"로 취급하면 안 된다.
-    //
-    // 예전엔 여기서 MAX_SAFE_INTEGER 를 돌려줬는데, 그러면 그날 유튜브가 0편이어도
-    // 상한 도달로 판정돼 업로드를 건너뛰고 completed 로 확정된다. 워커는 completed 를
-    // 다시 보지 않으므로 그 영상은 유튜브에 영영 안 올라가고, DB 에는 "상한 도달"이라는
-    // 거짓 사유만 남아 운영자도 구분할 수 없다. 이 조회는 Supabase 일시 오류
-    // (러너 부팅 직후 JWT 시계 오차 등, settings.ts 주석 참고)로 충분히 실패한다.
-    //
-    // 할당량을 한 편 초과하는 손해보다 "영구 누락 + 거짓 기록"이 크므로,
-    // 모르면 상한을 적용하지 않는다(null). 초과하면 유튜브 업로드가 실패할 뿐이고
-    // youtube_url 이 비어 있어 다음 재시도에서 다시 올릴 수 있다.
-    console.warn("유튜브 일일 업로드 수 조회 실패 - 상한 미적용으로 진행:", error.message.slice(0, 100));
-    return null;
-  }
-  return count ?? 0;
-}
+// youtubeDailyCap/youtubeUploadedTodayCount 는 src/lib/quota.ts 로 옮겼다
+// (worker/longform-worker.ts 와 같은 채널·같은 일일 할당량을 공유해야 해서 -
+// 이 파일을 직접 import 하면 아래 main() 이 모듈 로드 시 즉시 실행돼 버린다).
 
 async function publishToSns(
   item: VideoItem,

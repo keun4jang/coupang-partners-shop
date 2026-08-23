@@ -185,6 +185,62 @@ export async function uploadShortToYoutube(params: {
 }
 
 /**
+ * 유튜브 롱폼(TOP10) 업로드. uploadShortToYoutube 와 달리 #Shorts 분류를
+ * 유도하지 않고(가로 영상이라 어차피 Shorts 로 분류되지 않는다 - 2024.10 기준
+ * Shorts 판정은 세로/정방형에만 적용), 워치페이지 URL 을 돌려준다.
+ */
+export async function uploadLongformToYoutube(params: {
+  localPath: string;
+  title: string;
+  description: string;
+  tags?: string[];
+  thumbnailPath?: string;
+  privacyStatus?: "public" | "unlisted" | "private";
+}): Promise<YoutubeUploadResult> {
+  const youtube = youtubeClient();
+  if (!youtube) throw new Error("유튜브 업로드 환경변수 미설정 (GOOGLE_OAUTH_*)");
+
+  const { data } = await youtube.videos.insert({
+    part: ["snippet", "status"],
+    requestBody: {
+      snippet: {
+        title: params.title.slice(0, 100),
+        description: params.description,
+        tags: params.tags,
+        categoryId: CATEGORY_HOWTO_STYLE,
+      },
+      status: {
+        privacyStatus: params.privacyStatus ?? "public",
+        selfDeclaredMadeForKids: false,
+      },
+    },
+    media: {
+      body: fs.createReadStream(params.localPath),
+    },
+  });
+
+  const videoId = data.id;
+  if (!videoId) throw new Error("유튜브 업로드 실패: 응답에 video id 없음");
+
+  if (params.thumbnailPath && fs.existsSync(params.thumbnailPath)) {
+    try {
+      await youtube.thumbnails.set({
+        videoId,
+        media: { body: fs.createReadStream(params.thumbnailPath) },
+      });
+      console.log("유튜브 커스텀 썸네일 지정 완료");
+    } catch (e) {
+      console.warn(
+        "유튜브 썸네일 지정 실패(영상은 정상 업로드됨):",
+        (e as Error).message.slice(0, 150)
+      );
+    }
+  }
+
+  return { videoId, url: `https://youtube.com/watch?v=${videoId}` };
+}
+
+/**
  * 유튜브 자동자막(ASR)을 화면에서 안 뜨게 억제한다.
  *
  * 원리: 유튜브는 크리에이터가 직접 올린 "표준(standard)" 자막 트랙이 있으면

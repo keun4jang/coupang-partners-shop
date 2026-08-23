@@ -1,32 +1,35 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   Sequence,
   interpolate,
+  staticFile,
   spring,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { EDITORIAL as E, top10NameFontSize } from "../config/videoConfig";
+import { EDITORIAL as E, top10NameFontSize, BGM } from "../config/videoConfig";
 import { editorialFontFamily } from "../fonts";
 import { FontFaceStyle } from "../components/FontFaceStyle";
 
 /**
- * 프로토타입: 유튜브 롱폼 "카테고리 TOP10" 컴포지션 (1280x720, 24fps).
+ * 유튜브 롱폼 "TOP10" 컴포지션 (1280x720, 24fps).
  *
- * 목적은 실제 GH Actions 러너에서 렌더 시간을 실측하는 것 - 실측 결과(2026-08-22):
- * 1280x720/24fps/3분59초 영상이 로컬 4코어(GH Actions 퍼블릭 러너와 동일 사양)에서
- * 3분48초에 완성. 30분 제한에 8배 여유가 있어 이 방향으로 확정.
+ * 렌더 시간 실측(2026-08-22): 1280x720/24fps/3분59초 영상이 GH Actions 퍼블릭
+ * 러너와 동일 사양(로컬 4코어)에서 3분48초에 완성 - 30분 제한에 8배 여유.
  *
  * 디자인: TemplateE(살림 검증 노트)의 브랜드 톤을 그대로 가져온다 - 종이색 배경,
  * 카드 문법(EDITORIAL.card/line/radius), 포인트색(토마토)을 숏폼과 통일해
  * "같은 채널"로 보이게 한다. 순위 콘텐츠 전용 장치로 상단 진행 바(몇 위까지
  * 왔는지 항상 보임 - 롱폼 이탈 방지)와 1~3위 강조(카운트다운 페이오프)를 더했다.
  *
- * 정식 버전 전 확정할 것(README 참고): 실제 AI 대본 생성, TTS 나레이션 연동,
- * N번 재사용 정책(1차는 이미 발행된 숏폼 상품만 사용 권장), 설명란 타임스탬프
- * 자동 생성. 이 파일은 그 전 단계 - 포맷·타이밍·렌더 실현 가능성 검증용이다.
+ * 나레이션: 각 상품의 숏폼 대본(hookText/empathyLine/benefit1 - 이미 정책 검증을
+ * 거친 문구)을 그대로 재사용한다(src/lib/longform.ts). 새 AI 호출이 없어 비용도
+ * 늘지 않는다. TTS 는 렌더 전 워커가 미리 합성해 실측 길이(narrationSeconds)를
+ * props 로 넘기고, 각 카드 노출 시간은 그 실측 길이 기준으로 계산한다(고정 시간이
+ * 아님 - 숏폼 render-worker 의 나레이션 기반 컷 타이밍과 같은 방식).
  */
 
 export type Top10Item = {
@@ -36,33 +39,104 @@ export type Top10Item = {
   imageUrl: string | null;
   priceText: string;
   category: string;
+  /** data:audio/... 나레이션 (워커가 사전 합성). 없으면 무음으로 고정 최소 길이만 노출 */
+  narrationUri?: string | null;
+  /** 나레이션 실측 길이(초) */
+  narrationSeconds?: number | null;
 };
 
 export type Top10Props = {
   categoryLabel: string;
   items: Top10Item[]; // 10위 -> 1위 순으로 정렬해서 전달
+  introNarrationUri?: string | null;
+  introNarrationSeconds?: number | null;
+  outroNarrationUri?: string | null;
+  outroNarrationSeconds?: number | null;
 };
 
 export const TOP10_FPS = 24;
 export const TOP10_WIDTH = 1280;
 export const TOP10_HEIGHT = 720;
-/** 상품 1개당 화면 노출 시간(초). 10위~6위는 짧게, 5위~1위는 길게 (컨설팅 권고 반영) */
-const SECONDS_BY_RANK = (rank: number): number => {
-  if (rank >= 6) return 18;
-  if (rank >= 4) return 22;
-  return 28;
-};
-const INTRO_SECONDS = 7;
-const OUTRO_SECONDS = 14;
+
+/** 나레이션 뒤 여유(초) - 문장이 끝나자마자 컷되지 않게 */
+const ITEM_PAD_SECONDS = 2.2;
+const MIN_ITEM_SECONDS = 10;
+const MAX_ITEM_SECONDS = 26;
+/** 나레이션이 없을 때(TTS 실패)만 쓰는 고정값 */
+const FALLBACK_ITEM_SECONDS = 16;
+
+function itemSeconds(item: Top10Item): number {
+  if (!item.narrationSeconds) return FALLBACK_ITEM_SECONDS;
+  const raw = item.narrationSeconds + ITEM_PAD_SECONDS;
+  return Math.min(MAX_ITEM_SECONDS, Math.max(MIN_ITEM_SECONDS, raw));
+}
+
+const MIN_INTRO_SECONDS = 5;
+const MIN_OUTRO_SECONDS = 12;
+const INTRO_PAD_SECONDS = 1.4;
+const OUTRO_PAD_SECONDS = 3;
+
+function introSeconds(props: Top10Props): number {
+  if (!props.introNarrationSeconds) return MIN_INTRO_SECONDS + 2;
+  return Math.max(MIN_INTRO_SECONDS, props.introNarrationSeconds + INTRO_PAD_SECONDS);
+}
+
+function outroSeconds(props: Top10Props): number {
+  if (!props.outroNarrationSeconds) return MIN_OUTRO_SECONDS;
+  return Math.max(MIN_OUTRO_SECONDS, props.outroNarrationSeconds + OUTRO_PAD_SECONDS);
+}
+
 /** 1~3위는 카운트다운의 보상 구간이라 배지·타이포를 키운다 */
 const isTopThree = (rank: number) => rank <= 3;
 
-export function top10DurationSeconds(items: Top10Item[]): number {
-  const body = items.reduce((sum, it) => sum + SECONDS_BY_RANK(it.rank), 0);
-  return INTRO_SECONDS + body + OUTRO_SECONDS;
+/**
+ * 각 상품 카드의 시작 시각(초, 인트로 뒤부터 누적) + 노출 시간.
+ * Root.tsx 의 calculateMetadata·본문 Sequence 커서·설명란 타임스탬프(src/lib/longform.ts)
+ * 가 전부 이 한 함수를 공유해야 셋이 어긋나지 않는다.
+ */
+export function top10Ranges(
+  props: Top10Props
+): Array<{ item: Top10Item; from: number; dur: number }> {
+  let cursor = introSeconds(props);
+  return props.items.map((item) => {
+    const dur = itemSeconds(item);
+    const from = cursor;
+    cursor += dur;
+    return { item, from, dur };
+  });
+}
+
+export function top10DurationSeconds(props: Top10Props): number {
+  const ranges = top10Ranges(props);
+  const last = ranges[ranges.length - 1];
+  const bodyEnd = last ? last.from + last.dur : introSeconds(props);
+  return bodyEnd + outroSeconds(props);
 }
 
 const secToFrame = (s: number) => Math.round(s * TOP10_FPS);
+
+/** 배경음악. Background.tsx 의 BgmAudio 와 같은 트랙이지만 fps 를 이 컴포지션(24)
+ *  기준으로 직접 계산한다 - 그쪽은 숏폼 fps(30) 상수를 쓰고 있어 그대로 재사용하면
+ *  페이드 길이가 어긋난다. */
+const LongformBgm: React.FC = () => {
+  const { fps, durationInFrames } = useVideoConfig();
+  const fadeFrames = Math.round(BGM.fadeOutSeconds * fps);
+  return (
+    <Audio
+      src={staticFile(BGM.file)}
+      loop
+      loopVolumeCurveBehavior="extend"
+      volume={(f) =>
+        interpolate(
+          f,
+          [0, 12, durationInFrames - fadeFrames, durationInFrames],
+          [0, BGM.volume, BGM.volume, 0],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        )
+      }
+    />
+  );
+};
 
 /**
  * 상단 진행 바 - 10칸, 현재 순위까지 채워진다.
@@ -170,6 +244,7 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
         transform: `translateX(${(1 - slide) * 40}px)`,
       }}
     >
+      {item.narrationUri ? <Audio src={item.narrationUri} /> : null}
       <ProgressBar rank={item.rank} />
       <div
         style={{
@@ -266,7 +341,10 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
   );
 };
 
-const Intro: React.FC<{ categoryLabel: string }> = ({ categoryLabel }) => {
+const Intro: React.FC<{ categoryLabel: string; narrationUri?: string | null }> = ({
+  categoryLabel,
+  narrationUri,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const in1 = spring({ frame, fps, config: { damping: 20 } });
@@ -281,6 +359,7 @@ const Intro: React.FC<{ categoryLabel: string }> = ({ categoryLabel }) => {
         overflow: "hidden",
       }}
     >
+      {narrationUri ? <Audio src={narrationUri} /> : null}
       {/* 종이색 글로우 - 완전히 검지 않게, 브랜드 톤을 남긴다 */}
       <AbsoluteFill
         style={{
@@ -317,14 +396,17 @@ const Intro: React.FC<{ categoryLabel: string }> = ({ categoryLabel }) => {
           <span style={{ color: E.accent }}>TOP10</span>
         </div>
         <div style={{ fontSize: 26, opacity: 0.75 }}>
-          쿠팡 카테고리 베스트셀러 순위 기준 · 10위부터 공개합니다
+          반응이 좋았던 아이템을 모아 정리했어요 · 10위부터 공개합니다
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
   );
 };
 
-const Outro: React.FC<{ items: Top10Item[] }> = ({ items }) => {
+const Outro: React.FC<{ items: Top10Item[]; narrationUri?: string | null }> = ({
+  items,
+  narrationUri,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const in1 = spring({ frame, fps, config: { damping: 20 } });
@@ -341,6 +423,7 @@ const Outro: React.FC<{ items: Top10Item[] }> = ({ items }) => {
         justifyContent: "center",
       }}
     >
+      {narrationUri ? <Audio src={narrationUri} /> : null}
       <div style={{ fontSize: 36, fontWeight: 800, color: E.ink, marginBottom: 20 }}>
         오늘의 TOP10 요약
       </div>
@@ -409,29 +492,28 @@ const Outro: React.FC<{ items: Top10Item[] }> = ({ items }) => {
   );
 };
 
-export const TemplateTop10: React.FC<Top10Props> = ({ categoryLabel, items }) => {
-  let cursor = INTRO_SECONDS;
-  const ranges = items.map((it) => {
-    const from = cursor;
-    const dur = SECONDS_BY_RANK(it.rank);
-    cursor += dur;
-    return { item: it, from, dur };
-  });
-  const outroFrom = cursor;
+export const TemplateTop10: React.FC<Top10Props> = (props) => {
+  const { categoryLabel, items } = props;
+  const introDur = introSeconds(props);
+  const outroDur = outroSeconds(props);
+  const ranges = top10Ranges(props);
+  const last = ranges[ranges.length - 1];
+  const outroFrom = last ? last.from + last.dur : introDur;
 
   return (
     <AbsoluteFill>
       <FontFaceStyle />
-      <Sequence durationInFrames={secToFrame(INTRO_SECONDS)}>
-        <Intro categoryLabel={categoryLabel} />
+      <LongformBgm />
+      <Sequence durationInFrames={secToFrame(introDur)}>
+        <Intro categoryLabel={categoryLabel} narrationUri={props.introNarrationUri} />
       </Sequence>
       {ranges.map(({ item, from, dur }) => (
         <Sequence key={item.rank} from={secToFrame(from)} durationInFrames={secToFrame(dur)}>
           <ProductCard item={item} />
         </Sequence>
       ))}
-      <Sequence from={secToFrame(outroFrom)} durationInFrames={secToFrame(OUTRO_SECONDS)}>
-        <Outro items={items} />
+      <Sequence from={secToFrame(outroFrom)} durationInFrames={secToFrame(outroDur)}>
+        <Outro items={items} narrationUri={props.outroNarrationUri} />
       </Sequence>
     </AbsoluteFill>
   );
