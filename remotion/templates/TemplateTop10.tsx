@@ -8,7 +8,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { EDITORIAL as E } from "../config/videoConfig";
+import { EDITORIAL as E, top10NameFontSize } from "../config/videoConfig";
 import { editorialFontFamily } from "../fonts";
 import { FontFaceStyle } from "../components/FontFaceStyle";
 
@@ -225,11 +225,12 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
           <CategoryTag label={item.category} />
           <div
             style={{
-              fontSize: top3 ? 46 : 38,
+              fontSize: top10NameFontSize(item.productName, top3),
               fontWeight: 800,
               color: E.ink,
               lineHeight: 1.28,
               wordBreak: "keep-all",
+              textWrap: "balance",
             }}
           >
             {item.productName}

@@ -433,3 +433,26 @@ export const TEMPLATE_BADGE: Record<"A" | "B" | "C", string | null> = {
 };
 
 export const secondsToFrames = (s: number): number => Math.round(s * VIDEO.fps);
+
+/**
+ * 롱폼 TOP10 카드 - 제품명 크기 (1280x720, TemplateTop10 전용).
+ *
+ * 처음엔 top3 여부로만 38/46px 고정이었는데, 옵션 꼬리표를 안 자른 원본 제품명을
+ * 그대로 넣었더니 줄바꿈이 이상해졌다(사장님 지적 2026-08-23) - "청소도구, 기본형,
+ * 1개"의 "1개"만 다음 줄에 남는 식. 원인은 두 가지였다: ① 표시 전에 옵션을 안
+ * 걷어냈고(cleanProductTitle 로 해결), ② 폭·높이를 고려하지 않는 고정 크기라
+ * 이름 길이에 따라 줄 수가 들쭉날쭉했다. 다른 화면(hookFontSize 등)과 같은 방식으로
+ * 어절 단위 줄바꿈을 시뮬레이션해 실제로 들어갈 크기를 역산한다.
+ *
+ * 폭 704 = 카드 내부 폭 1152(1280 − 좌우 64) − 이미지 400 − 간격 48.
+ */
+export function top10NameFontSize(name: string, top3: boolean): number {
+  return fitKoreanText({
+    text: name,
+    maxWidth: 704,
+    maxHeight: 190, // 3줄까지 - 그 이상이면 아래 가격줄과 겹친다
+    lineHeight: 1.28,
+    maxSize: top3 ? 46 : 38,
+    minSize: 26,
+  });
+}

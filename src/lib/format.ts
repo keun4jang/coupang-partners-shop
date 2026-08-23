@@ -99,6 +99,26 @@ function coreNounIndex(words: string[]): number {
 }
 
 /**
+ * 옵션 꼬리표만 걷어낸 전체 제품명 (길이 제한 없음).
+ *
+ * shortenProductName 은 작은 배지 공간(기본 18자)에 맞춰 강하게 자르는 용도라
+ * 화면 공간이 넉넉한 곳(롱폼 순위 카드 제목 등)엔 과하게 짧다. nameWords 의
+ * "1+1 표기·옵션(쉼표 뒤)·개수/용량 토큰 제거"만 적용하고 자르지는 않는다.
+ * 예: "boomjoy 방충망 청소솔 먼지제거 브러쉬 청소도구, 기본형, 1개"
+ *  → "boomjoy 방충망 청소솔 먼지제거 브러쉬 청소도구" (옵션 "기본형, 1개"만 제거)
+ */
+export function cleanProductTitle(name: string): string {
+  const words = nameWords(name);
+  if (words.length === 0) {
+    return (name ?? "")
+      .replace(/[,()+[\]_]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return words.join(" ");
+}
+
+/**
  * 영상 카드/캡션에 쓸 짧은 제품명.
  * 긴 쿠팡 제품명("브랜드 수식어… 제품+구성품, 개수/색상")에서 옵션을 걷어내고
  * 핵심 명사를 기준으로 [브랜드 + 수식어 + 핵심명사] 형태로 줄인다.
