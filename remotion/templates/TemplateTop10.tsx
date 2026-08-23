@@ -39,6 +39,9 @@ export type Top10Item = {
   imageUrl: string | null;
   priceText: string;
   category: string;
+  /** 장점 두 줄 (숏폼 대본 재사용) - 나레이션 진행에 맞춰 순서대로 화면에 띄운다 */
+  benefit1?: string;
+  benefit2?: string;
   /** data:audio/... 나레이션 (워커가 사전 합성). 없으면 무음으로 고정 최소 길이만 노출 */
   narrationUri?: string | null;
   /** 나레이션 실측 길이(초) */
@@ -88,6 +91,24 @@ function outroSeconds(props: Top10Props): number {
 
 /** 1~3위는 카운트다운의 보상 구간이라 배지·타이포를 키운다 */
 const isTopThree = (rank: number) => rank <= 3;
+
+/**
+ * 장점 두 줄이 나타날 시점(초, 카드 시작 기준 - Sequence 로컬 프레임과 맞음).
+ * 나레이션이 "N위, 이름. 훅 [장점1] [장점2]" 순서로 합성되므로, 그 비율을
+ * 글자수로 추정해 장점 문구가 화면에도 그 타이밍쯤 나타나게 한다(정확한 워드
+ * 타임스탬프는 없어 근사치다 - 목적은 카드가 오래 떠 있어도 화면이 한 번씩
+ * 바뀌게 하는 것이라 완벽히 맞을 필요는 없다).
+ */
+const BENEFIT_INTRO_FRACTION = 0.24; // "N위, 이름. 훅" 구간이 차지할 것으로 보는 비율
+function benefitRevealSeconds(item: Top10Item): { b1: number; b2: number } {
+  const total = item.narrationSeconds ?? 0;
+  const b1Len = item.benefit1?.length ?? 0;
+  const b2Len = item.benefit2?.length ?? 0;
+  const bTotal = b1Len + b2Len || 1;
+  const introSec = total * BENEFIT_INTRO_FRACTION;
+  const remain = total - introSec;
+  return { b1: introSec, b2: introSec + remain * (b1Len / bTotal) };
+}
 
 /**
  * 각 상품 카드의 시작 시각(초, 인트로 뒤부터 누적) + 노출 시간.
@@ -225,10 +246,50 @@ const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
   );
 };
 
+/** 장점 한 줄 - revealSeconds 시점에 페이드인 (카드가 오래 떠 있어도 화면이 바뀌게) */
+const BenefitLine: React.FC<{
+  text?: string;
+  revealSeconds: number;
+  frame: number;
+  fps: number;
+}> = ({ text, revealSeconds, frame, fps }) => {
+  if (!text) return null;
+  const local = frame - revealSeconds * fps;
+  const p = interpolate(local, [0, fps * 0.4], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        opacity: p,
+        transform: `translateY(${(1 - p) * 10}px)`,
+      }}
+    >
+      <span style={{ color: E.accent, fontWeight: 800, fontSize: 22, lineHeight: 1.4 }}>✓</span>
+      <span
+        style={{
+          fontSize: 24,
+          color: E.ink,
+          fontWeight: 600,
+          lineHeight: 1.35,
+          wordBreak: "keep-all",
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  );
+};
+
 const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const slide = spring({ frame, fps, config: { damping: 22 } });
+  const benefitReveal = benefitRevealSeconds(item);
   const top3 = isTopThree(item.rank);
   // 1~3위는 등장 시 살짝 더 튀어 보이게(카운트다운 보상감)
   const pop = top3
@@ -309,6 +370,20 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
             }}
           >
             {item.productName}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <BenefitLine
+              text={item.benefit1}
+              revealSeconds={benefitReveal.b1}
+              frame={frame}
+              fps={fps}
+            />
+            <BenefitLine
+              text={item.benefit2}
+              revealSeconds={benefitReveal.b2}
+              frame={frame}
+              fps={fps}
+            />
           </div>
           <div
             style={{

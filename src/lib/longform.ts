@@ -108,6 +108,11 @@ async function eligiblePool(): Promise<VideoItemWithProduct[]> {
       .select("*, products(*)")
       .eq("video_status", "completed")
       .not("youtube_url", "is", null)
+      // range() 페이지네이션은 명시적 order 없이는 호출마다 행 순서가 안정적이라는
+      // 보장이 없다(내부 실행계획에 따라 바뀔 수 있음) - 실측: 상품 수·후보가
+      // 전혀 안 변했는데 같은 조건으로 두 번 돌렸더니 카테고리 동률 우선순위가
+      // 달라졌다. id 로 정렬해 페이지 간 순서를 고정한다.
+      .order("id", { ascending: true })
       .range(from, from + 999);
     if (error) throw new Error(`후보 조회 실패: ${error.message}`);
     const rows = (data ?? []) as unknown as VideoItemWithProduct[];
@@ -205,6 +210,7 @@ export function buildTop10Items(selected: VideoItemWithProduct[]): Top10ItemSnap
   return countdown.map((item, i) => {
     const rank = countdown.length - i;
     const p = item.products;
+    const { benefit1, benefit2 } = itemBenefitLines(item);
     return {
       rank,
       displayNumber: item.display_number,
@@ -212,6 +218,8 @@ export function buildTop10Items(selected: VideoItemWithProduct[]): Top10ItemSnap
       imageUrl: p.image_url,
       priceText: p.price_text ?? "가격 확인",
       category: p.category || "생활템",
+      benefit1,
+      benefit2,
       productId: item.product_id,
       videoItemId: item.id,
       linkUrl: productTargetUrl(p) ?? "",
@@ -219,13 +227,26 @@ export function buildTop10Items(selected: VideoItemWithProduct[]): Top10ItemSnap
   });
 }
 
-/** 상품별 나레이션 대본 - 숏폼용으로 이미 검증된 문구를 재사용한다 (신규 AI 호출 없음) */
+/** 숏폼 대본에서 장점 두 줄만 뽑는다 (화면 표시용 - 정책 검증을 이미 거친 문구) */
+export function itemBenefitLines(item: VideoItemWithProduct): { benefit1: string; benefit2: string } {
+  const lines = (item.script_text ?? "").split("\n");
+  return {
+    benefit1: (lines[2] || "").trim(),
+    benefit2: (lines[3] || "").trim(),
+  };
+}
+
+/**
+ * 상품별 나레이션 대본 - 숏폼용으로 이미 검증된 문구를 재사용한다(신규 AI 호출 없음).
+ * 장점 두 줄(benefit1·benefit2)을 포함시킨다 - 화면에도 같은 문구를 자막처럼
+ * 띄운다(TemplateTop10.tsx ProductCard) - 카드 하나가 오래 떠 있어도 화면이 계속
+ * 바뀌게(사장님 피드백: "컷이 안 바뀌어서 지루하다").
+ */
 export function itemNarrationLine(item: VideoItemWithProduct, rank: number, name: string): string {
   const lines = (item.script_text ?? "").split("\n");
   const hook = (item.hook_text || lines[0] || "").trim();
-  const empathy = (lines[1] || "").trim();
-  const benefit1 = (lines[2] || "").trim();
-  const parts = [`${rank}위, ${name}.`, hook, empathy, benefit1].filter(Boolean);
+  const { benefit1, benefit2 } = itemBenefitLines(item);
+  const parts = [`${rank}위, ${name}.`, hook, benefit1, benefit2].filter(Boolean);
   return parts.join(" ");
 }
 
