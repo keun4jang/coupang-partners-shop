@@ -336,6 +336,9 @@ const Outro: React.FC<{ items: Top10Item[] }> = ({ items }) => {
         fontFamily: editorialFontFamily,
         backgroundColor: E.paper,
         padding: 56,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
       }}
     >
       <div style={{ fontSize: 36, fontWeight: 800, color: E.ink, marginBottom: 20 }}>
