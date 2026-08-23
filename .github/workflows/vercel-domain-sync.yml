@@ -105,6 +105,13 @@ jobs:
               "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$DEP_ID?teamId=$VERCEL_TEAM_ID")
             if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
               echo "✅ 프로덕션 승격 완료 ($DEP_ID) - 크론이 이 코드로 돈다"
+            elif [ "$CODE" = "409" ] && grep -q "already the current production deployment" /tmp/promote.json; then
+              # 이미 프로덕션인 배포를 다시 승격시키려 한 것뿐이다(목표 상태는 이미
+              # 달성됨) - 실측 2026-08-23: Vercel 이 push 를 이미 프로덕션으로 반영해둔
+              # 상태에서 이 호출이 겹쳐 409 를 받았는데, 그때도 사이트·크론은 최신이었다
+              # (배포 버전 실측으로 확인). 이 조건만 성공으로 본다 - 다른 409(예: 배포가
+              # 실패 상태라 승격 불가)까지 삼키지 않도록 메시지 내용을 반드시 확인한다.
+              echo "✅ 이미 프로덕션 배포였다 ($DEP_ID) - 승격 불필요"
             else
               echo "::error::프로덕션 승격 실패(HTTP $CODE) - 크론이 옛 배포로 돕니다"
               cat /tmp/promote.json || true
