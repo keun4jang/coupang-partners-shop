@@ -601,34 +601,35 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
       <div
         style={{
           position: "absolute",
-          left: 56,
+          left: 48,
           top: 0,
           bottom: 0,
-          width: 560,
+          width: 660,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          gap: 22,
+          gap: 18,
         }}
       >
+        {/* 썸네일은 손톱만 한 크기에서도 읽혀야 한다 - 사장님 피드백(2026-08-24):
+            "키워드 키워주고, 숫자 같은 것도 키워주는 게 좋아" - 셋 다 크게 */}
         <span
           style={{
             display: "inline-block",
             background: E.green,
             color: "#FFFFFF",
             borderRadius: 999,
-            padding: "10px 26px",
-            fontSize: 34,
+            padding: "14px 34px",
+            fontSize: 52,
             fontWeight: 700,
             width: "fit-content",
           }}
         >
           {categoryLabel}
         </span>
-        {/* 썸네일은 손톱만 한 크기에서도 읽혀야 한다 - 카테고리보다 훨씬 크게 */}
         <div
           style={{
-            fontSize: 168,
+            fontSize: 178,
             fontWeight: 800,
             color: "#FFFFFF",
             lineHeight: 0.94,
@@ -638,7 +639,7 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
           TOP<span style={{ color: E.accent }}>10</span>
         </div>
         {topItem && (
-          <div style={{ fontSize: 54, fontWeight: 800, color: E.accent, lineHeight: 1.1 }}>
+          <div style={{ fontSize: 72, fontWeight: 800, color: E.accent, lineHeight: 1.1 }}>
             1위 {topItem.priceText}
           </div>
         )}
