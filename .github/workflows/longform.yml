@@ -10,9 +10,10 @@
 # "오늘 첫 업로드일 때만 진행"으로 스스로 양보하기 때문이다(worker/longform-worker.ts
 # 주석 참고). 이 크론이 숏폼보다 늦으면 매번 양보만 하다 끝난다.
 #
-# 안전장치: 처음에는 공개(public)로 올리지 않는다 - 기본은 비공개(unlisted) 업로드다.
-# 결과를 확인한 뒤 워크플로 실행 시 "npm run longform -- --publish" 로 바꾸거나,
-# 수동으로 이 저장소 담당자가 검수 후 유튜브 스튜디오에서 공개로 바꾼다.
+# 공개 여부: 2026-08-24 첫 실제 업로드(청소용품 TOP10)를 사장님이 검수 후
+# "전체공개로 진행하자"고 승인해, 예약 실행(schedule)도 기본 전체공개(public)로
+# 올린다. workflow_dispatch(수동 실행)는 반대로 기본이 비공개(unlisted)다 -
+# 이후 로직을 바꿔서 다시 검수가 필요할 때 안전하게 수동 테스트할 수 있게.
 #
 # 필요한 것: 저장소 Settings → Secrets and variables → Actions 에
 #   WORKER_ENV = .env.local 형식의 워커용 환경변수 전체 (render.yml 과 동일 시크릿)
@@ -35,8 +36,7 @@ on:
         default: false
   schedule:
     # KST 06:00 (UTC 21:00 전날) - 숏폼 첫 업로드 슬롯(07:30 KST)보다 앞선다.
-    # 예약 실행은 항상 비공개(unlisted)로 올라간다 - publish 는 workflow_dispatch 수동
-    # 실행에서만 켤 수 있다(사장님 검수 없이 자동으로 전체공개되는 일이 없게).
+    # 예약 실행은 기본 전체공개(public)로 올라간다(사장님 승인 2026-08-24).
     - cron: "0 21 * * *"
 
 concurrency:
@@ -98,9 +98,15 @@ jobs:
         env:
           LONGFORM_UPLOAD_OK: "1"
         run: |
-          ARGS=""
-          [ "${{ inputs.publish }}" = "true" ] && ARGS="$ARGS --publish"
-          [ "${{ inputs.force }}" = "true" ] && ARGS="$ARGS --force"
+          # 예약 실행(schedule)은 기본 전체공개. 수동 실행(workflow_dispatch)은
+          # 기본 비공개(unlisted) - publish 체크박스를 눌러야 전체공개된다.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ARGS=""
+            [ "${{ inputs.publish }}" = "true" ] && ARGS="$ARGS --publish"
+            [ "${{ inputs.force }}" = "true" ] && ARGS="$ARGS --force"
+          else
+            ARGS="--publish"
+          fi
           npm run longform -- $ARGS
 
       - name: 실패 시 텔레그램 알림
