@@ -68,7 +68,7 @@ import {
   type Top10ItemSnapshot,
 } from "../src/lib/longform";
 import {
-  TOP10_FPS,
+  COVER_FRAME_COUNT,
   top10Ranges,
   type Top10Props,
 } from "../remotion/templates/TemplateTop10";
@@ -176,12 +176,13 @@ async function main(): Promise<void> {
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });
 
-  // 인트로 스프링 애니메이션이 자리 잡은 시점(1.5초)을 썸네일로
+  // 썸네일 전용 커버(Top10Cover, 고지 문구 없음 - TemplateTop10.tsx 주석 참고)
+  // 스프링 팝인이 자리 잡은 중간 지점을 캡처한다
   await renderStill({
     composition,
     serveUrl,
     output: thumbnailPath,
-    frame: Math.round(1.5 * TOP10_FPS),
+    frame: Math.round(COVER_FRAME_COUNT * 0.6),
     inputProps: props as unknown as Record<string, unknown>,
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });

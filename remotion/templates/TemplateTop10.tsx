@@ -567,6 +567,103 @@ const Outro: React.FC<{ items: Top10Item[]; narrationUri?: string | null }> = ({
   );
 };
 
+/** 썸네일 정지화면 프레임 수(1초) - 그 시점 스프링 애니메이션이 자리잡은 순간을 캡처한다 */
+export const COVER_FRAME_COUNT = TOP10_FPS;
+
+/**
+ * 썸네일 전용 커버 - 재생 시작 1초간 짧게 덮어씌우고, renderStill 이 이 구간의
+ * 프레임을 썸네일로 뽑는다(TemplateE 의 CoverPoster 와 같은 패턴: 숏폼도
+ * "본편 그대로는 그리드에서 안 읽힌다"는 이유로 별도 커버를 뒀다).
+ *
+ * 대가성 고지 문구를 여기 안 넣는다(사장님 2026-08-24: "썸네일에서 빼줘") -
+ * 법적 고지 의무는 "제목 또는 영상 내"면 충족되므로(공정위 지침), 실제 재생되는
+ * Intro 화면(이 커버 바로 다음)과 설명란 맨 위에는 그대로 남겨 요건을 지킨다.
+ * 이 화면은 정지 이미지(썸네일) 용도로만 쓰이는 부분이라 뺀 것뿐이다.
+ */
+const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
+  categoryLabel,
+  topItem,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const pop = spring({ frame, fps, config: { damping: 13, mass: 0.7 } });
+
+  return (
+    <AbsoluteFill
+      style={{ backgroundColor: E.ink, fontFamily: editorialFontFamily, overflow: "hidden" }}
+    >
+      <AbsoluteFill
+        style={{
+          background:
+            "radial-gradient(60% 60% at 74% 50%, rgba(233,95,69,0.38) 0%, rgba(233,95,69,0) 70%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: 64,
+          top: 0,
+          bottom: 0,
+          width: 540,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: 24,
+        }}
+      >
+        <div style={{ fontSize: 88, fontWeight: 800, color: "#FFFFFF", lineHeight: 1.08 }}>
+          {categoryLabel}
+          <br />
+          <span style={{ color: E.accent }}>TOP10</span>
+        </div>
+        {topItem && (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+            <span style={{ fontSize: 30, color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
+              1위
+            </span>
+            <span style={{ fontSize: 40, color: E.accent, fontWeight: 800 }}>
+              {topItem.priceText}
+            </span>
+          </div>
+        )}
+      </div>
+      {topItem && (
+        <div
+          style={{
+            position: "absolute",
+            right: 56,
+            top: "50%",
+            transform: `translateY(-50%) scale(${0.88 + pop * 0.12})`,
+            width: 460,
+            height: 460,
+            background: E.card,
+            borderRadius: E.radius,
+            border: `1px solid ${E.line}`,
+            boxShadow: "0 28px 70px rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ width: "86%", height: "86%" }}>
+            {topItem.imageUrl ? (
+              <Img
+                src={topItem.imageUrl}
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+            ) : (
+              <span style={{ fontSize: 140 }}>🧺</span>
+            )}
+          </div>
+          <div style={{ position: "absolute", top: -26, left: -26 }}>
+            <RankBadge rank={1} />
+          </div>
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};
+
 export const TemplateTop10: React.FC<Top10Props> = (props) => {
   const { categoryLabel, items } = props;
   const introDur = introSeconds(props);
@@ -574,6 +671,7 @@ export const TemplateTop10: React.FC<Top10Props> = (props) => {
   const ranges = top10Ranges(props);
   const last = ranges[ranges.length - 1];
   const outroFrom = last ? last.from + last.dur : introDur;
+  const topItem = items[items.length - 1]; // items 는 10위 -> 1위 순
 
   return (
     <AbsoluteFill>
@@ -589,6 +687,10 @@ export const TemplateTop10: React.FC<Top10Props> = (props) => {
       ))}
       <Sequence from={secToFrame(outroFrom)} durationInFrames={secToFrame(outroDur)}>
         <Outro items={items} narrationUri={props.outroNarrationUri} />
+      </Sequence>
+      {/* 맨 위에 짧게 한 번 덮는다 - 썸네일 캡처 전용 화면(고지 문구 없음, Intro 는 그대로 재생됨) */}
+      <Sequence durationInFrames={COVER_FRAME_COUNT}>
+        <Top10Cover categoryLabel={categoryLabel} topItem={topItem} />
       </Sequence>
     </AbsoluteFill>
   );
