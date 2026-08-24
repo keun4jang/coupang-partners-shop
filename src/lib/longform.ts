@@ -48,11 +48,56 @@ function extractScoutKeyword(sourceMemo: string | null | undefined): string | nu
   return m ? m[1] : null;
 }
 
+const KST_OFFSET_MS = 9 * 3600_000;
+/**
+ * 오늘의 업로드 목표 시각을 이 구간(KST) 안에서 매일 다르게 고른다.
+ * 숏폼 첫 업로드 슬롯(07:30 KST)보다 앞서야 유튜브 일일 할당량 양보 로직이
+ * 제대로 작동한다(worker/longform-worker.ts 주석 참고).
+ */
+const UPLOAD_WINDOW = "05:20-06:50";
+
+/**
+ * 매일 똑같은 06:00 정각에 올라가면 "봇이 올린다"는 티가 난다(사장님 2026-08-24:
+ * "업로드 시간은 매일 다르게 해야해"). 숏폼 UPLOAD_SCHEDULE 의 "범위" 표기와 같은
+ * 방식 - 날짜로 결정되는 의사난수라 크론이 여러 번 깨어나도 그날은 항상 같은
+ * 목표 시각을 얻는다(render-worker.ts todaysUploadSlots 참고, 별도 상태 저장 불필요).
+ */
+function todaysUploadTarget(now: Date): Date {
+  const kst = new Date(now.getTime() + KST_OFFSET_MS);
+  const y = kst.getUTCFullYear();
+  const m = kst.getUTCMonth();
+  const d = kst.getUTCDate();
+  const dayNum = y * 10000 + (m + 1) * 100 + d;
+  const seed = (dayNum * 7919 + 104729) >>> 0;
+
+  const parseHm = (s: string) => {
+    const [h, mi] = s.trim().split(":").map(Number);
+    return h * 60 + mi;
+  };
+  const [a, b] = UPLOAD_WINDOW.split("-");
+  const startMin = parseHm(a);
+  const span = Math.max(0, parseHm(b) - startMin);
+  const rand01 = (seed % 10007) / 10007;
+  const totalMin = startMin + Math.round(rand01 * span);
+
+  return new Date(Date.UTC(y, m, d, Math.floor(totalMin / 60), totalMin % 60) - KST_OFFSET_MS);
+}
+
 /**
  * 오늘 롱폼을 만들 차례인지. 매일 도는 크론에서 이 함수로 "이번엔 쉬어감"을
- * 판정한다. app_settings.longform_interval_days 로 조정 가능(기본 1일 = 매일).
+ * 판정한다 - (1) 마지막 완료 이후 간격이 안 찼거나, (2) 오늘의 무작위 목표
+ * 시각에 아직 안 왔으면 건너뛴다. app_settings.longform_interval_days 로
+ * 간격을 조정할 수 있다(기본 1일 = 매일).
  */
-export async function shouldRunLongformToday(): Promise<boolean> {
+export async function shouldRunLongformToday(now = new Date()): Promise<boolean> {
+  const target = todaysUploadTarget(now);
+  if (now < target) {
+    console.log(
+      `오늘 목표 업로드 시각(KST) ${new Date(target.getTime() + KST_OFFSET_MS).toISOString().slice(11, 16)} 아직 안 됨 - 건너뜀`
+    );
+    return false;
+  }
+
   const raw = (await getSetting("longform_interval_days"))?.trim();
   const n = Number(raw);
   const intervalDays = Number.isFinite(n) && n > 0 ? n : DEFAULT_INTERVAL_DAYS;
@@ -73,7 +118,11 @@ export async function shouldRunLongformToday(): Promise<boolean> {
   }
   if (!data) return true; // 완료 이력 없음 - 첫 실행 또는 이전 시도 전부 실패
   const daysSince = (Date.now() - new Date(data.created_at).getTime()) / 86_400_000;
-  return daysSince >= intervalDays;
+  if (daysSince < intervalDays) {
+    console.log(`간격 미도달(${daysSince.toFixed(2)}/${intervalDays}일) - 건너뜀`);
+    return false;
+  }
+  return true;
 }
 
 interface ScoredCandidate {
@@ -266,7 +315,7 @@ export async function selectTop10(): Promise<Top10Selection> {
   let topicKind: "keyword" | "category";
 
   if (viableKeywords.length > 0) {
-    const kstDayOfMonth = new Date(Date.now() + 9 * 3600_000).getUTCDate(); // 1~31
+    const kstDayOfMonth = new Date(Date.now() + KST_OFFSET_MS).getUTCDate(); // 1~31
     const idx = (kstDayOfMonth - 1) % viableKeywords.length;
     [categoryLabel, categoryCandidates] = viableKeywords[idx];
     topicKind = "keyword";

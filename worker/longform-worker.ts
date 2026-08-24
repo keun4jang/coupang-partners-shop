@@ -81,8 +81,9 @@ async function main(): Promise<void> {
   const force = args.includes("--force");
   const publish = args.includes("--publish");
 
+  // shouldRunLongformToday 가 건너뛰는 구체적 이유(목표 시각 미도달/간격 미도달)를
+  // 자체적으로 로그에 남긴다.
   if (!force && !(await shouldRunLongformToday())) {
-    console.log("이번 주기는 아직 아니다 (interval 미도달) - 건너뜀");
     return;
   }
 
