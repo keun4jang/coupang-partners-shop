@@ -3,10 +3,11 @@ import { supabaseAdmin } from "./supabase";
 import { getSetting } from "./settings";
 import { cleanProductTitle, productTargetUrl, formatDisplayNumber } from "./format";
 import { DISCLOSURE_LINE } from "./ai";
+import { fetchCommissionReport } from "./coupang";
 import type { Top10Item } from "../../remotion/templates/TemplateTop10";
 
 /**
- * 롱폼 TOP10 상품 선정 (1차 방침).
+ * 롱폼 TOP10 상품 선정.
  *
  * N번 체계 충돌 방지: 이미 발행된 숏폼 상품(video_status='completed' AND
  * youtube_url 있음 = 이미 N번을 받아 검증까지 끝난 상품)만 재사용한다.
@@ -15,17 +16,41 @@ import type { Top10Item } from "../../remotion/templates/TemplateTop10";
  *
  * 순위 근거: 쿠팡 공식 판매 순위를 우리가 "이게 진짜 순위다"라고 단정할 근거가
  * 없다(수시로 바뀌고 API 응답을 그대로 재가공하는 것도 오인성 소지). 대신
- * 실측 가능한 신호(click_logs 실제 클릭 수) + 최신 발행 순으로 우리가 고른
- * "추천 TOP10"으로 정직하게 포지셔닝한다 - 영상 인트로 문구도 그렇게 쓴다.
+ * 실측 가능한 신호(subId 기반 실제 구매 커미션 → 없으면 click_logs 클릭수 →
+ * 그것도 없으면 최신 발행순)로 우리가 고른 "추천 TOP10"으로 정직하게
+ * 포지셔닝한다 - 영상 인트로 문구도 그렇게 쓴다.
  */
 
-const REUSE_COOLDOWN_LONGFORMS = 6; // 최근 이 편수에 쓰인 상품은 다음 회차에서 제외
-const DEFAULT_INTERVAL_DAYS = 7;
+const REUSE_COOLDOWN_LONGFORMS = 6; // 최근 이 편수에 쓰인 상품은 우선순위에서 밀려남(완전 제외는 아님)
+const DEFAULT_INTERVAL_DAYS = 1; // 사장님 방침(2026-08-23): 매일, 주제를 돌려가며
+const MIN_CATEGORY_POOL = 10;
+
+/**
+ * 날짜별 주제 로테이션 - 매일 다른 주제, 한 달 안에 같은 주제가 다시 돌아오면
+ * 그 사이 판매·클릭·발행 데이터가 바뀌어 순위도 자연스럽게 갱신된다
+ * (사장님 아이디어 2026-08-23: "매월 1일엔 자동차용품, 2일엔 보조배터리...
+ * 이러면 매일 다른 컨텐츠 + 한 달에 한 번씩 순위도 바뀌잖아").
+ *
+ * 세부 키워드는 products.source_memo 에 이미 있다 - 스카우트가 상품을 등록할
+ * 때 "스카우트 · '보조배터리' 검색 · [cpid:...]" 형식으로 검색 키워드를 남긴다
+ * (scout.ts). 새 태그 체계를 만들 필요 없이 이걸 그대로 "세부 키워드"로 쓴다.
+ * 후보가 MIN_CATEGORY_POOL(10) 이상인 키워드만 그날의 주제 후보가 되고,
+ * 재고가 쌓여 더 많은 키워드가 10개를 넘기면 로테이션이 자동으로 넓어진다
+ * (코드를 다시 안 건드려도 됨). 키워드가 하나도 안 쌓인 극초반 상태를 대비해
+ * products.category(6종, 이 중 차량용품은 후보 1개뿐이라 제외) 로테이션을
+ * 안전망으로 남겨둔다.
+ */
+const CATEGORY_FALLBACK_ROTATION = ["생활템", "주방템", "육아생활템", "청소템", "수납템"];
+
+/** source_memo 에서 스카우트 검색 키워드를 뽑는다. 못 찾으면 null(베스트/골드박스 소싱 등) */
+function extractScoutKeyword(sourceMemo: string | null | undefined): string | null {
+  const m = (sourceMemo ?? "").match(/스카우트 · '([^']+)' 검색/);
+  return m ? m[1] : null;
+}
 
 /**
  * 오늘 롱폼을 만들 차례인지. 매일 도는 크론에서 이 함수로 "이번엔 쉬어감"을
- * 판정한다(숏폼 재고를 열흘 만에 소진하지 않도록 - 회차당 상품 10개 소모).
- * app_settings.longform_interval_days 로 조정 가능 (기본 7일 = 주 1회).
+ * 판정한다. app_settings.longform_interval_days 로 조정 가능(기본 1일 = 매일).
  */
 export async function shouldRunLongformToday(): Promise<boolean> {
   const raw = (await getSetting("longform_interval_days"))?.trim();
@@ -54,33 +79,41 @@ export async function shouldRunLongformToday(): Promise<boolean> {
 interface ScoredCandidate {
   item: VideoItemWithProduct;
   clicks: number;
+  commissionScore: number;
+  recentlyUsed: boolean;
 }
 
 interface RecentLongformHistory {
   usedProductIds: Set<string>;
-  recentCategoryLabels: string[]; // 최신순
 }
 
+/**
+ * 최근 이력 조회. usedProductIds 는 "완전 제외"가 아니라 "우선순위에서
+ * 밀어내는" 용도로만 쓴다(selectTop10 참고) - 주제를 매일 로테이션으로
+ * 돌리면 작은 주제(예: 청소용품 10개)는 몇 바퀴만 돌아도 안 쓴 상품이
+ * 10개 밑으로 떨어진다. 완전 제외했다간 그 주제는 금방 "재고 부족"으로
+ * 스킵되는데, 실제로는 재고가 없는 게 아니라 예전에 한 번 다룬 것뿐이라
+ * TOP10에 다시 넣어도 문제없다(최근 판매·클릭·발행 데이터가 바뀌었으면 순위도
+ * 자연히 달라진다) - 완전히 새 상품만 우선하되, 모자라면 예전 것으로 채운다.
+ */
 async function recentLongformHistory(): Promise<RecentLongformHistory> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("longform_items")
-    .select("items, category_label")
+    .select("items")
     .eq("video_status", "completed") // 실패한 회차는 상품을 "썼다"고 치지 않는다
     .order("created_at", { ascending: false })
     .limit(REUSE_COOLDOWN_LONGFORMS);
   if (error) {
     console.warn("최근 롱폼 이력 조회 실패(제한 없이 진행):", error.message);
-    return { usedProductIds: new Set(), recentCategoryLabels: [] };
+    return { usedProductIds: new Set() };
   }
   const usedProductIds = new Set<string>();
-  const recentCategoryLabels: string[] = [];
   for (const row of data ?? []) {
     const items = (row.items as Array<{ productId?: string }>) ?? [];
     for (const it of items) if (it.productId) usedProductIds.add(it.productId);
-    if (row.category_label) recentCategoryLabels.push(row.category_label as string);
   }
-  return { usedProductIds, recentCategoryLabels };
+  return { usedProductIds };
 }
 
 async function clickCountByProduct(): Promise<Map<string, number>> {
@@ -96,6 +129,40 @@ async function clickCountByProduct(): Promise<Map<string, number>> {
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
   return counts;
+}
+
+/**
+ * 실제 구매(커미션 발생) 금액 - display_number(N번) 별 합계.
+ *
+ * 쿠팡 링크에 subId=v{번호} 를 심어 두면(2026-08 도입) 커미션 리포트의 subId 로
+ * "어느 영상이 실제 구매를 만들었는지"를 되짚을 수 있다(src/lib/earnings.ts 와
+ * 같은 방식). click_logs 는 "우리 사이트 클릭"일 뿐이라 실제 구매 여부는
+ * 모르는데, 이건 진짜 매출 신호다 - "판매량이 높은 걸로"(사장님 2026-08-24)
+ * 요청에 맞춰 1순위 정렬 기준으로 쓴다.
+ *
+ * 쿠팡 API 자격증명이 없거나(로컬 테스트 등) 실패하면 빈 Map - 호출부가
+ * 자동으로 클릭수 기준으로 내려간다(판매 신호는 "있으면 우선"이지 필수가
+ * 아니다 - subId 도입이 최근이라 대부분 상품은 아직 0건이 정상이다).
+ */
+async function commissionScoreByDisplayNumber(): Promise<Map<number, number>> {
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - 30 * 86_400_000);
+    const fmt = (d: Date) =>
+      `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+    const rows = await fetchCommissionReport(fmt(start), fmt(end));
+    const scores = new Map<number, number>();
+    for (const r of rows) {
+      const m = r.subId?.match(/^v(\d+)$/);
+      if (!m) continue;
+      const n = Number(m[1]);
+      scores.set(n, (scores.get(n) ?? 0) + r.commission);
+    }
+    return scores;
+  } catch (e) {
+    console.warn("커미션 리포트 조회 실패(판매 신호 없이 클릭수로 진행):", (e as Error).message.slice(0, 150));
+    return new Map();
+  }
 }
 
 /** 후보 풀 전량 (페이지네이션 - PostgREST 1000행 상한 대비) */
@@ -125,73 +192,109 @@ async function eligiblePool(): Promise<VideoItemWithProduct[]> {
 export interface Top10Selection {
   categoryLabel: string;
   selected: VideoItemWithProduct[]; // rank 1 -> rank 10 순서
+  /** 이 라벨이 세부 키워드(source_memo)에서 왔는지, 안전망 카테고리에서 왔는지 */
+  topicKind: "keyword" | "category";
 }
 
-const MIN_CATEGORY_POOL = 10;
-
-/**
- * TOP10 후보 선정 - 한 카테고리 안에서만 뽑는다.
- *
- * 처음엔 클릭수 상위 10개를 카테고리 안 가리고 뽑았는데, 실제로 돌려보니
- * "수납템 TOP10"이라는 제목에 에어팟·갤럭시버즈가 섞여 나왔다(전체 후보 중
- * 클릭수 상위를 뽑고 사후에 최빈 카테고리로 제목만 붙였기 때문 - 내용과 제목이
- * 안 맞는 것 자체가 오인성 문제다). 그래서 카테고리를 먼저 고르고 그 안에서만
- * 10개를 채우는 방식으로 바꿨다.
- *
- * 카테고리 선택: 그 카테고리 후보가 10개 이상 있어야 하고(모자라면 그 주는 후보에서
- * 제외), 최근에 다룬 카테고리는 되도록 피한다(다양성), 동률이면 후보가 가장
- * 많이 남은 카테고리(재고 여유)를 우선한다.
- *
- * 부족하면(어느 카테고리도 10개를 못 채우면) selected.length < 10 로 돌아온다 -
- * 호출부가 최소 개수를 확인해서 건너뛸지 판단한다.
- */
-export async function selectTop10(): Promise<Top10Selection> {
-  const [pool, history, clicks] = await Promise.all([
-    eligiblePool(),
-    recentLongformHistory(),
-    clickCountByProduct(),
-  ]);
-
-  const candidates: ScoredCandidate[] = pool
-    .filter((it) => it.products && it.products.status !== "paused")
-    .filter((it) => !history.usedProductIds.has(it.product_id))
-    .filter((it) => Boolean(productTargetUrl(it.products)))
-    .map((item) => ({ item, clicks: clicks.get(item.product_id) ?? 0 }));
-
-  const byCategory = new Map<string, ScoredCandidate[]>();
-  for (const c of candidates) {
-    const cat = c.item.products.category || "생활템";
-    const list = byCategory.get(cat) ?? [];
-    list.push(c);
-    byCategory.set(cat, list);
-  }
-
-  const viable = [...byCategory.entries()].filter(
-    ([, list]) => list.length >= MIN_CATEGORY_POOL
-  );
-  if (viable.length === 0) {
-    return { categoryLabel: "생활꿀템", selected: [] };
-  }
-
-  viable.sort((a, b) => {
-    const aRecent = history.recentCategoryLabels.indexOf(a[0]);
-    const bRecent = history.recentCategoryLabels.indexOf(b[0]);
-    // 최근에 다룬 적 없으면(-1) 가장 먼저. 둘 다 다뤘으면 더 오래전에 다룬 쪽 먼저.
-    if (aRecent !== bRecent) return (aRecent === -1 ? -1 : aRecent) - (bRecent === -1 ? -1 : bRecent);
-    return b[1].length - a[1].length; // 동률이면 후보 많은 쪽
-  });
-
-  const [categoryLabel, categoryCandidates] = viable[0];
-  categoryCandidates.sort((a, b) => {
+function sortByPreference(list: ScoredCandidate[]): void {
+  list.sort((a, b) => {
+    // 안 쓴 상품 우선(재사용은 최후 수단) → 실제 구매(커미션) 많은 순 →
+    // 클릭 많은 순 → 최신 발행순. 커미션·클릭이 둘 다 0인 상품이 대다수라
+    // (subId 도입이 최근이라) 사실상 마지막 두 기준이 자주 갈림을 가른다.
+    if (a.recentlyUsed !== b.recentlyUsed) return a.recentlyUsed ? 1 : -1;
+    if (b.commissionScore !== a.commissionScore) return b.commissionScore - a.commissionScore;
     if (b.clicks !== a.clicks) return b.clicks - a.clicks;
     return (
       new Date(b.item.published_at ?? b.item.created_at).getTime() -
       new Date(a.item.published_at ?? a.item.created_at).getTime()
     );
   });
+}
+
+/**
+ * TOP10 후보 선정 - 한 주제(세부 키워드 또는 안전망 카테고리) 안에서만 뽑는다.
+ *
+ * 처음엔 클릭수 상위 10개를 카테고리 안 가리고 뽑았는데, 실제로 돌려보니
+ * "수납템 TOP10"이라는 제목에 에어팟·갤럭시버즈가 섞여 나왔다(전체 후보 중
+ * 클릭수 상위를 뽑고 사후에 최빈 카테고리로 제목만 붙였기 때문 - 내용과 제목이
+ * 안 맞는 것 자체가 오인성 문제다). 그래서 주제를 먼저 고르고 그 안에서만
+ * 10개를 채우는 방식으로 바꿨다.
+ *
+ * 주제 선택 순서:
+ *   1) products.source_memo 의 스카우트 검색 키워드("보조배터리" 등)별로 묶어
+ *      후보가 MIN_CATEGORY_POOL(10) 이상인 키워드들을 키워드명 알파벳/가나다순으로
+ *      정렬 - 그날의 날짜(1~31)로 그 목록을 인덱싱해 오늘의 세부 키워드를 고른다.
+ *      재고가 쌓여 새 키워드가 10개를 넘기면 로테이션이 자동으로 넓어진다.
+ *   2) 키워드가 하나도 안 쌓인 극초반 상태에서만 products.category(6종) 로
+ *      대체한다(안전망) - 이때도 후보가 가장 많은 카테고리를 고른다.
+ *
+ * 부족하면(어느 주제도 10개를 못 채우면) selected.length < 10 로 돌아온다 -
+ * 호출부가 최소 개수를 확인해서 건너뛸지 판단한다.
+ */
+export async function selectTop10(): Promise<Top10Selection> {
+  const [pool, history, clicks, commission] = await Promise.all([
+    eligiblePool(),
+    recentLongformHistory(),
+    clickCountByProduct(),
+    commissionScoreByDisplayNumber(),
+  ]);
+
+  const candidates: ScoredCandidate[] = pool
+    .filter((it) => it.products && it.products.status !== "paused")
+    .filter((it) => Boolean(productTargetUrl(it.products)))
+    .map((item) => ({
+      item,
+      clicks: clicks.get(item.product_id) ?? 0,
+      commissionScore: commission.get(item.display_number) ?? 0,
+      recentlyUsed: history.usedProductIds.has(item.product_id),
+    }));
+
+  const byKeyword = new Map<string, ScoredCandidate[]>();
+  for (const c of candidates) {
+    const kw = extractScoutKeyword(c.item.products.source_memo);
+    if (!kw) continue;
+    const list = byKeyword.get(kw) ?? [];
+    list.push(c);
+    byKeyword.set(kw, list);
+  }
+  const viableKeywords = [...byKeyword.entries()]
+    .filter(([, list]) => list.length >= MIN_CATEGORY_POOL)
+    .sort((a, b) => a[0].localeCompare(b[0], "ko")); // 가나다순 - 로테이션 순서를 날짜마다 안정적으로
+
+  let categoryLabel: string;
+  let categoryCandidates: ScoredCandidate[];
+  let topicKind: "keyword" | "category";
+
+  if (viableKeywords.length > 0) {
+    const kstDayOfMonth = new Date(Date.now() + 9 * 3600_000).getUTCDate(); // 1~31
+    const idx = (kstDayOfMonth - 1) % viableKeywords.length;
+    [categoryLabel, categoryCandidates] = viableKeywords[idx];
+    topicKind = "keyword";
+  } else {
+    const byCategory = new Map<string, ScoredCandidate[]>();
+    for (const c of candidates) {
+      const cat = c.item.products.category || "생활템";
+      const list = byCategory.get(cat) ?? [];
+      list.push(c);
+      byCategory.set(cat, list);
+    }
+    const viableCategories = [...byCategory.entries()]
+      .filter(
+        ([cat, list]) => CATEGORY_FALLBACK_ROTATION.includes(cat) && list.length >= MIN_CATEGORY_POOL
+      )
+      .sort((a, b) => b[1].length - a[1].length);
+    if (viableCategories.length === 0) {
+      return { categoryLabel: "생활꿀템", topicKind: "category", selected: [] };
+    }
+    [categoryLabel, categoryCandidates] = viableCategories[0];
+    topicKind = "category";
+  }
+
+  sortByPreference(categoryCandidates);
 
   return {
     categoryLabel,
+    topicKind,
     selected: categoryCandidates.slice(0, 10).map((c) => c.item),
   };
 }

@@ -1,22 +1,35 @@
 /**
  * 유튜브 롱폼 "TOP10" 워커.
  *
- * 숏폼 render-worker.ts 와 달리 계속 폴링하지 않는다 - 주 1회 정도의 저빈도
- * 작업이라 GitHub Actions 크론이 매일 호출하고, 이 스크립트가
- * shouldRunLongformToday() 로 "이번엔 쉬어감"을 스스로 판단한다(idempotent -
- * worker/queue-runner.ts 와 같은 패턴).
+ * 숏폼 render-worker.ts 와 달리 계속 폴링하지 않는다 - GitHub Actions 크론이
+ * 매일 한 번 호출하고, 이 스크립트가 shouldRunLongformToday() 로 "이번엔
+ * 쉬어감"을 스스로 판단한다(idempotent - worker/queue-runner.ts 와 같은 패턴).
+ * 기본은 매일(사장님 방침 2026-08-23: 주제를 매일 로테이션으로 돌리면 매일
+ * 다른 컨텐츠가 되고, 한 달 안에 같은 주제가 돌아올 땐 그 사이 판매·클릭·발행
+ * 데이터가 바뀌어 순위도 자연히 갱신된다 - src/lib/longform.ts selectTop10 참고).
+ * 주제는 products.source_memo 에 남은 스카우트 세부 키워드 단위로 돈다
+ * (사장님 2026-08-24: "판매량이 높은걸로 세부 키워드 단위로도").
  *
  * 처리 흐름:
- *   오늘 차례인지 확인 → TOP10 선정(이미 발행된 숏폼 상품만, N번 재사용)
- *   → 상품별 나레이션 TTS(숏폼 대본 재사용 - 새 AI 호출 없음)
- *   → Remotion 렌더 → 유튜브 업로드(설명란에 상품별 쿠팡/제휴 링크 + 타임스탬프)
- *   → longform_items 기록 → 텔레그램 알림
+ *   오늘 차례인지 확인 → 오늘 배정 주제로 TOP10 선정(이미 발행된 숏폼
+ *   상품만, N번 재사용, 실제 구매(커미션)·클릭 기준 정렬) → 상품별 나레이션
+ *   TTS(숏폼 대본 재사용 - 새 AI 호출 없음) → Remotion 렌더 → 유튜브
+ *   업로드(설명란에 상품별 쿠팡/제휴 링크 + 타임스탬프) → longform_items 기록
+ *   → 텔레그램 알림
  *
  * 실행:
  *   npx tsx worker/longform-worker.ts            # 실제 업로드(공개 unlisted - 검수용)
  *   npx tsx worker/longform-worker.ts --publish   # 실제 업로드(공개 public)
  *   npx tsx worker/longform-worker.ts --dry-run   # 렌더까지만, 유튜브 업로드 안 함
  *   npx tsx worker/longform-worker.ts --force     # shouldRunLongformToday 무시하고 강행(수동 테스트용)
+ *
+ * 안전장치(LONGFORM_UPLOAD_OK): 실제 업로드는 --dry-run 여부와 별개로 이
+ * 환경변수가 "1" 일 때만 실행된다. GitHub Actions 시크릿(WORKER_ENV)에만
+ * 넣는다 - 로컬/개발 .env.local 에는 절대 넣지 않는다. 실측(2026-08-23):
+ * 타임아웃으로 죽였다고 생각한 테스트 프로세스가 백그라운드에 살아남아
+ * 몇 시간 뒤 --dry-run 인자를 무시하고(정확한 원인 미확인) 실제 채널에
+ * 업로드한 사고가 있었다. --dry-run 플래그 하나에만 기대지 않도록,
+ * 인자와 무관하게 검사하는 이 두 번째 잠금을 추가했다.
  */
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
@@ -68,7 +81,10 @@ async function main(): Promise<void> {
   }
 
   console.log("TOP10 상품 선정 중...");
-  const { categoryLabel, selected } = await selectTop10();
+  const { categoryLabel, topicKind, selected } = await selectTop10();
+  console.log(
+    `오늘 주제: ${categoryLabel} (${topicKind === "keyword" ? "세부 키워드" : "카테고리 안전망"})`
+  );
   if (selected.length < 10) {
     console.log(
       `선정 가능한 상품이 ${selected.length}/10개뿐 - 이번 회차 건너뜀(재고 부족 또는 재사용 쿨다운)`
@@ -189,6 +205,18 @@ async function main(): Promise<void> {
     console.log(`영상: ${videoPath}`);
     console.log(`썸네일: ${thumbnailPath}`);
     console.log("설명:\n" + description);
+    return;
+  }
+
+  // --dry-run 인자 하나에만 기대지 않는 두 번째 잠금. GitHub Actions 시크릿에만
+  // LONGFORM_UPLOAD_OK=1 을 넣는다 - 로컬 개발환경(.env.local)에는 절대 넣지
+  // 않으므로, 이 저장소를 로컬에서 어떻게 실행하든(인자 실수·프로세스 좀비화
+  // 등 무엇으로도) 실제 채널 업로드에 닿을 수 없다.
+  if (optionalEnv("LONGFORM_UPLOAD_OK") !== "1") {
+    console.warn(
+      "LONGFORM_UPLOAD_OK 미설정 - 유튜브 업로드 생략(렌더 결과만 남김). " +
+        "실제 업로드는 GitHub Actions(WORKER_ENV 시크릿)에서만 일어난다."
+    );
     return;
   }
 
