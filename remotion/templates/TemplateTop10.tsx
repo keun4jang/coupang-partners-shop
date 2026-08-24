@@ -595,35 +595,51 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
       <AbsoluteFill
         style={{
           background:
-            "radial-gradient(60% 60% at 74% 50%, rgba(233,95,69,0.38) 0%, rgba(233,95,69,0) 70%)",
+            "radial-gradient(65% 65% at 76% 50%, rgba(233,95,69,0.42) 0%, rgba(233,95,69,0) 70%)",
         }}
       />
       <div
         style={{
           position: "absolute",
-          left: 64,
+          left: 56,
           top: 0,
           bottom: 0,
-          width: 540,
+          width: 560,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          gap: 24,
+          gap: 22,
         }}
       >
-        <div style={{ fontSize: 88, fontWeight: 800, color: "#FFFFFF", lineHeight: 1.08 }}>
+        <span
+          style={{
+            display: "inline-block",
+            background: E.green,
+            color: "#FFFFFF",
+            borderRadius: 999,
+            padding: "10px 26px",
+            fontSize: 34,
+            fontWeight: 700,
+            width: "fit-content",
+          }}
+        >
           {categoryLabel}
-          <br />
-          <span style={{ color: E.accent }}>TOP10</span>
+        </span>
+        {/* 썸네일은 손톱만 한 크기에서도 읽혀야 한다 - 카테고리보다 훨씬 크게 */}
+        <div
+          style={{
+            fontSize: 168,
+            fontWeight: 800,
+            color: "#FFFFFF",
+            lineHeight: 0.94,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          TOP<span style={{ color: E.accent }}>10</span>
         </div>
         {topItem && (
-          <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-            <span style={{ fontSize: 30, color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
-              1위
-            </span>
-            <span style={{ fontSize: 40, color: E.accent, fontWeight: 800 }}>
-              {topItem.priceText}
-            </span>
+          <div style={{ fontSize: 54, fontWeight: 800, color: E.accent, lineHeight: 1.1 }}>
+            1위 {topItem.priceText}
           </div>
         )}
       </div>
@@ -631,15 +647,15 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
         <div
           style={{
             position: "absolute",
-            right: 56,
+            right: 40,
             top: "50%",
             transform: `translateY(-50%) scale(${0.88 + pop * 0.12})`,
-            width: 460,
-            height: 460,
+            width: 480,
+            height: 480,
             background: E.card,
             borderRadius: E.radius,
             border: `1px solid ${E.line}`,
-            boxShadow: "0 28px 70px rgba(0,0,0,0.5)",
+            boxShadow: "0 30px 74px rgba(0,0,0,0.55)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -652,11 +668,8 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
             ) : (
-              <span style={{ fontSize: 140 }}>🧺</span>
+              <span style={{ fontSize: 150 }}>🧺</span>
             )}
-          </div>
-          <div style={{ position: "absolute", top: -26, left: -26 }}>
-            <RankBadge rank={1} />
           </div>
         </div>
       )}
