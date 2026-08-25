@@ -117,9 +117,20 @@ export async function shouldRunLongformToday(now = new Date()): Promise<boolean>
     return false;
   }
   if (!data) return true; // 완료 이력 없음 - 첫 실행 또는 이전 시도 전부 실패
-  const daysSince = (Date.now() - new Date(data.created_at).getTime()) / 86_400_000;
-  if (daysSince < intervalDays) {
-    console.log(`간격 미도달(${daysSince.toFixed(2)}/${intervalDays}일) - 건너뜀`);
+
+  // 간격은 "24시간 경과"가 아니라 "KST 날짜가 며칠 바뀌었나"로 센다.
+  //
+  // 24시간 롤링으로 재면 하루 실행 창(KST 05:20~06:50, 110분)보다 간격이 길어져
+  // 회차가 통째로 누락된다: 어제 06:40 에 끝났으면 오늘 창(~06:50)에서 24시간을
+  // 넘기는 틱이 거의 없다. 실측 시뮬레이션(렌더 5분 반영) 결과 1년 365일 중
+  // 79일이 이렇게 조용히 빠졌다 - 실제로 2026-08-25 도 이 이유로 미발행이었다.
+  // 날짜 기준이면 "어제 했으면 오늘 한다"가 시각과 무관하게 성립한다.
+  const kstDayIndex = (d: Date) => Math.floor((d.getTime() + KST_OFFSET_MS) / 86_400_000);
+  const daysApart = kstDayIndex(now) - kstDayIndex(new Date(data.created_at));
+  if (daysApart < intervalDays) {
+    console.log(
+      `간격 미도달(마지막 발행 이후 ${daysApart}일 / 목표 ${intervalDays}일) - 건너뜀`
+    );
     return false;
   }
   return true;
@@ -315,8 +326,15 @@ export async function selectTop10(): Promise<Top10Selection> {
   let topicKind: "keyword" | "category";
 
   if (viableKeywords.length > 0) {
-    const kstDayOfMonth = new Date(Date.now() + KST_OFFSET_MS).getUTCDate(); // 1~31
-    const idx = (kstDayOfMonth - 1) % viableKeywords.length;
+    // 로테이션 인덱스는 "월중 며칠"이 아니라 "에포크 기준 통산 일수"로 센다.
+    //
+    // 월중 날짜(1~31)를 쓰면 달이 바뀔 때 주기가 끊긴다: 키워드가 6개일 때
+    // 8/31 은 (31-1)%6=0, 9/1 은 (1-1)%6=0 이라 이틀 연속 같은 주제가 걸리고,
+    // 후보가 딱 10개인 키워드(예: 청소용품)는 상품·순서·제목이 100% 같은
+    // 영상이 이틀 연속 올라간다. 통산 일수를 쓰면 달 경계와 무관하게 항상
+    // 균등하게 돈다(productSelector.kstDayIndex 와 같은 방식).
+    const kstDayIndex = Math.floor((Date.now() + KST_OFFSET_MS) / 86_400_000);
+    const idx = ((kstDayIndex % viableKeywords.length) + viableKeywords.length) % viableKeywords.length;
     [categoryLabel, categoryCandidates] = viableKeywords[idx];
     topicKind = "keyword";
   } else {
