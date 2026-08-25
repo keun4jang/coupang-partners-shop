@@ -246,6 +246,29 @@ const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
   );
 };
 
+/**
+ * 제품 사진 - 로드 실패 시 이모지로 폴백.
+ *
+ * onError 가 없으면 Remotion 의 Img 가 재시도 후 예외를 던져 렌더 프로세스 전체가
+ * 죽는다. 롱폼은 사진 10장을 한 영상에 쓰므로 한 장만 깨져도 그날 회차가 통째로
+ * 날아가고, 그 시점엔 longform_items 기록 전이라 DB 에 흔적도 안 남는다.
+ * 숏폼 TemplateE 가 같은 이유로 이미 쓰고 있는 패턴(ProductImage)을 그대로 가져왔다.
+ */
+const SafeImg: React.FC<{ src: string | null; fallbackSize: number }> = ({
+  src,
+  fallbackSize,
+}) => {
+  const [failed, setFailed] = React.useState(false);
+  if (!src || failed) return <span style={{ fontSize: fallbackSize }}>🧺</span>;
+  return (
+    <Img
+      src={src}
+      onError={() => setFailed(true)}
+      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+    />
+  );
+};
+
 /** 장점 한 줄 - revealSeconds 시점에 페이드인 (카드가 오래 떠 있어도 화면이 바뀌게) */
 const BenefitLine: React.FC<{
   text?: string;
@@ -336,14 +359,7 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
           }}
         >
           <div style={{ width: "88%", height: "88%", overflow: "hidden" }}>
-            {item.imageUrl ? (
-              <Img
-                src={item.imageUrl}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            ) : (
-              <span style={{ fontSize: 120 }}>🧺</span>
-            )}
+            <SafeImg src={item.imageUrl} fallbackSize={120} />
           </div>
           {/* 배지를 카드 모서리에 겹쳐 - 순위가 "표"가 아니라 "도장"처럼 보이게 */}
           <div
@@ -471,7 +487,7 @@ const Intro: React.FC<{ categoryLabel: string; narrationUri?: string | null }> =
           <span style={{ color: E.accent }}>TOP10</span>
         </div>
         <div style={{ fontSize: 26, opacity: 0.75 }}>
-          반응이 좋았던 아이템을 모아 정리했어요 · 10위부터 공개합니다
+          저희가 소개했던 아이템 중 열 가지 · 10위부터 공개합니다
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
@@ -663,14 +679,7 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
           }}
         >
           <div style={{ width: "86%", height: "86%" }}>
-            {topItem.imageUrl ? (
-              <Img
-                src={topItem.imageUrl}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            ) : (
-              <span style={{ fontSize: 150 }}>🧺</span>
-            )}
+            <SafeImg src={topItem.imageUrl} fallbackSize={150} />
           </div>
         </div>
       )}

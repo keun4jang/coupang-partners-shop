@@ -270,13 +270,31 @@ async function main(): Promise<void> {
     });
     console.log("유튜브 업로드 완료:", result.url);
 
-    await db.from("longform_items").insert({
+    // 이 기록이 실패하면 "오늘 이미 했다"는 흔적이 없어, 같은 창의 다음 10분 틱이
+    // 전 과정을 다시 돌려 같은 영상을 한 번 더 전체공개로 올린다. supabase-js 는
+    // 실패해도 throw 하지 않고 { error } 를 돌려주므로(감싼 try/catch 로는 못 잡는다)
+    // 반드시 반환값을 확인하고, 실패하면 즉시 알려 사람이 개입할 수 있게 한다.
+    const { error: recErr } = await db.from("longform_items").insert({
       category_label: categoryLabel,
       items: itemsSnapshot,
       video_status: "completed",
       youtube_url: result.url,
       published_at: new Date().toISOString(),
     });
+    if (recErr) {
+      console.error("롱폼 발행 기록 실패:", recErr.message);
+      await sendTelegramMessage(
+        [
+          "🚨 롱폼 발행 기록 실패 (중복 업로드 위험)",
+          "",
+          `영상은 올라갔습니다: ${result.url}`,
+          `그런데 DB 기록에 실패했습니다: ${recErr.message.slice(0, 200)}`,
+          "",
+          "이대로 두면 오늘 안에 같은 영상이 한 번 더 올라갈 수 있어요.",
+          "위 영상을 확인하고, 중복이 올라오면 지워주세요.",
+        ].join("\n")
+      );
+    }
 
     await sendTelegramMessage(
       [

@@ -145,7 +145,19 @@ interface ScoredCandidate {
 
 interface RecentLongformHistory {
   usedProductIds: Set<string>;
+  /** 최근 완료 회차의 주제(최신순) - 주제 LRU 선택에 쓴다 */
+  recentTopics: string[];
+  /** 주제별 이미 발행한 상품 조합(정렬된 productId 목록) - 완전 중복 차단용 */
+  publishedSetsByTopic: Map<string, Set<string>>;
 }
+
+/** 상품 조합을 순서 무관 지문으로 (같은 10개면 순서가 달라도 같은 영상이다) */
+function itemSetKey(productIds: string[]): string {
+  return [...productIds].sort().join("|");
+}
+
+/** 주제 이력은 모든 주제를 한 바퀴 돌 만큼 넉넉히 본다(키워드 수보다 커야 LRU 가 성립) */
+const TOPIC_HISTORY_LIMIT = 40;
 
 /**
  * 최근 이력 조회. usedProductIds 는 "완전 제외"가 아니라 "우선순위에서
@@ -157,23 +169,41 @@ interface RecentLongformHistory {
  * 자연히 달라진다) - 완전히 새 상품만 우선하되, 모자라면 예전 것으로 채운다.
  */
 async function recentLongformHistory(): Promise<RecentLongformHistory> {
+  const empty: RecentLongformHistory = {
+    usedProductIds: new Set(),
+    recentTopics: [],
+    publishedSetsByTopic: new Map(),
+  };
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("longform_items")
-    .select("items")
+    .select("items, category_label")
     .eq("video_status", "completed") // 실패한 회차는 상품을 "썼다"고 치지 않는다
     .order("created_at", { ascending: false })
-    .limit(REUSE_COOLDOWN_LONGFORMS);
+    .limit(TOPIC_HISTORY_LIMIT);
   if (error) {
     console.warn("최근 롱폼 이력 조회 실패(제한 없이 진행):", error.message);
-    return { usedProductIds: new Set() };
+    return empty;
   }
+  const rows = data ?? [];
   const usedProductIds = new Set<string>();
-  for (const row of data ?? []) {
+  const recentTopics: string[] = [];
+  const publishedSetsByTopic = new Map<string, Set<string>>();
+
+  rows.forEach((row, i) => {
     const items = (row.items as Array<{ productId?: string }>) ?? [];
-    for (const it of items) if (it.productId) usedProductIds.add(it.productId);
-  }
-  return { usedProductIds };
+    const ids = items.map((it) => it.productId).filter(Boolean) as string[];
+    // 상품 쿨다운은 기존대로 최근 REUSE_COOLDOWN_LONGFORMS 회차만 본다
+    if (i < REUSE_COOLDOWN_LONGFORMS) for (const id of ids) usedProductIds.add(id);
+    const topic = (row.category_label as string) || "";
+    if (topic) {
+      recentTopics.push(topic);
+      const set = publishedSetsByTopic.get(topic) ?? new Set<string>();
+      set.add(itemSetKey(ids));
+      publishedSetsByTopic.set(topic, set);
+    }
+  });
+  return { usedProductIds, recentTopics, publishedSetsByTopic };
 }
 
 async function clickCountByProduct(): Promise<Map<string, number>> {
@@ -326,16 +356,44 @@ export async function selectTop10(): Promise<Top10Selection> {
   let topicKind: "keyword" | "category";
 
   if (viableKeywords.length > 0) {
-    // 로테이션 인덱스는 "월중 며칠"이 아니라 "에포크 기준 통산 일수"로 센다.
+    // 주제는 "날짜 % 목록길이"가 아니라 "가장 오래 안 쓴 주제 우선"(LRU)으로 고른다.
     //
-    // 월중 날짜(1~31)를 쓰면 달이 바뀔 때 주기가 끊긴다: 키워드가 6개일 때
-    // 8/31 은 (31-1)%6=0, 9/1 은 (1-1)%6=0 이라 이틀 연속 같은 주제가 걸리고,
-    // 후보가 딱 10개인 키워드(예: 청소용품)는 상품·순서·제목이 100% 같은
-    // 영상이 이틀 연속 올라간다. 통산 일수를 쓰면 달 경계와 무관하게 항상
-    // 균등하게 돈다(productSelector.kstDayIndex 와 같은 방식).
-    const kstDayIndex = Math.floor((Date.now() + KST_OFFSET_MS) / 86_400_000);
-    const idx = ((kstDayIndex % viableKeywords.length) + viableKeywords.length) % viableKeywords.length;
-    [categoryLabel, categoryCandidates] = viableKeywords[idx];
+    // 날짜 나머지 방식은 실제 발행 이력을 전혀 안 보기 때문에, 후보가 딱 10개인
+    // 주제(예: 청소용품)가 한 바퀴 돌아오면 상품 10개가 그대로 다시 뽑히고
+    // 제목까지 같은 영상이 재업로드된다. 실측 2026-08-25: 다음 청소용품 차례에
+    // 선정될 10개가 8/24 발행분 스냅샷과 완전히 일치했다(순서까지).
+    // LRU 는 모든 주제를 한 바퀴 다 돌기 전엔 같은 주제를 다시 고르지 않는다.
+    //
+    // 그래도 한 바퀴 뒤엔 같은 조합이 나올 수 있으므로, 이미 그 주제로 발행한
+    // 것과 상품 구성이 완전히 같으면(itemSetKey) 그 주제는 건너뛴다.
+    const lastUsedRank = (kw: string): number => {
+      const i = history.recentTopics.indexOf(kw); // 0 = 가장 최근
+      return i === -1 ? Number.POSITIVE_INFINITY : history.recentTopics.length - i;
+    };
+    const ordered = [...viableKeywords].sort((a, b) => {
+      const d = lastUsedRank(b[0]) - lastUsedRank(a[0]); // 오래 안 쓴 주제 먼저
+      return d !== 0 ? d : a[0].localeCompare(b[0], "ko"); // 동률은 가나다순(결정적)
+    });
+
+    let chosen: (typeof ordered)[number] | null = null;
+    for (const entry of ordered) {
+      const [kw, list] = entry;
+      const preview = [...list];
+      sortByPreference(preview);
+      const key = itemSetKey(preview.slice(0, 10).map((c) => c.item.product_id));
+      if (!history.publishedSetsByTopic.get(kw)?.has(key)) {
+        chosen = entry;
+        break;
+      }
+      console.log(`주제 '${kw}' 는 이전 발행분과 상품 구성이 같아 건너뜀`);
+    }
+    // 전부 중복이면(모든 주제 풀이 고갈) 가장 오래된 주제로 진행하지 않고 비운다 -
+    // 호출부가 selected.length < 10 로 보고 이번 회차를 거른다(중복 게시보다 낫다).
+    if (!chosen) {
+      console.warn("모든 주제가 이전 발행분과 동일 - 이번 회차 건너뜀(신규 상품 필요)");
+      return { categoryLabel: "생활꿀템", topicKind: "keyword", selected: [] };
+    }
+    [categoryLabel, categoryCandidates] = chosen;
     topicKind = "keyword";
   } else {
     const byCategory = new Map<string, ScoredCandidate[]>();
@@ -421,15 +479,22 @@ export function itemNarrationLine(item: VideoItemWithProduct, rank: number, name
 }
 
 export function introNarrationLine(categoryLabel: string): string {
-  return `오늘은 저희가 소개했던 ${categoryLabel} 중에서 반응이 좋았던 열 가지를 모아봤어요. 10위부터 순서대로 보여드릴게요.`;
+  return `오늘은 저희가 소개했던 ${categoryLabel} 중에서 열 가지를 골라봤어요. 10위부터 순서대로 보여드릴게요.`;
 }
 
 export const OUTRO_NARRATION_LINE =
   "오늘 소개한 상품 정보는 전부 설명란에 순서대로 정리해 뒀어요. 다음에도 새로운 TOP10으로 찾아올게요.";
 
-/** 유튜브 롱폼 제목 (100자 제한) */
+/**
+ * 유튜브 롱폼 제목 (100자 제한).
+ *
+ * "반응이 좋았던"은 쓰지 않는다(사장님 방침: 제목은 사실대로). 우리가 가진
+ * 반응 데이터는 click_logs 126건이 49개 번호에 흩어진 정도라, 선정된 10개 중
+ * 상당수가 클릭 0건이다 - 그 상태로 "반응이 좋았던"이라고 하면 근거 없는 주장이
+ * 된다. 실제로 사실인 것만 쓴다: 우리가 이미 소개한 상품 중에서 골랐다는 것.
+ */
 export function longformTitle(categoryLabel: string): string {
-  return `${categoryLabel} 추천 TOP10 | 실제로 반응 좋았던 아이템 모음`;
+  return `${categoryLabel} 추천 TOP10 | 직접 골라본 살림템 모음`;
 }
 
 /**
@@ -460,7 +525,11 @@ export function longformDescription(
   return [
     DISCLOSURE_LINE,
     "",
-    `${categoryLabel} 중 반응이 좋았던 상품 10가지를 모아 순위로 정리했어요.`,
+    `${categoryLabel} 중 저희가 소개했던 상품 10가지를 골라 정리했어요.`,
+    // 가격은 스카우트 시점 스냅샷이라 시간이 지나면 실제와 달라진다(자동 갱신 경로가
+    // 없다 - scout.ts 는 신규 상품만 insert 한다). 영상은 계속 남아 있으므로
+    // 표기 시점을 밝혀 오인 소지를 없앤다.
+    "표시된 가격은 영상 제작 시점 기준이며, 현재 가격은 링크에서 확인해 주세요.",
     "",
     "[상품 링크]",
     ...linkLines,
