@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { requireEnv } from "./env";
+import { optionalEnv, requireEnv } from "./env";
 
 /**
  * 쿠팡파트너스 Open API 클라이언트.
@@ -10,6 +10,42 @@ import { requireEnv } from "./env";
  * 상품 API(bestcategories/goldbox/search)는 productUrl 을 이미 제휴링크로 돌려주므로
  * 별도 딥링크 생성 없이 그대로 coupang_partner_url 로 쓸 수 있다.
  */
+
+/** 쿠팡 키가 현재 프로세스 환경에 있는지 */
+export function hasCoupangEnv(): boolean {
+  return Boolean(optionalEnv("COUPANG_ACCESS_KEY") && optionalEnv("COUPANG_SECRET_KEY"));
+}
+
+/**
+ * app_settings 에 저장된 쿠팡 키가 있으면 process.env 를 채운다.
+ *
+ * 왜 필요한가(실측 2026-08-25): 쿠팡 키는 Vercel 환경변수에만 있고 GitHub Actions
+ * 시크릿(WORKER_ENV)에는 없다. 그래서 scout.yml 의 수집 단계가 매번 조용히
+ * 건너뛰어졌고(자격증명 없음 → 두 경로 모두 skip), 수집은 Vercel 크론 하나에만
+ * 매달려 있었다. 그 크론마저 결과를 못 남기면서 8/21 이후 신규 상품 유입이
+ * 0이 됐는데도 워크플로는 계속 초록불이었다.
+ *
+ * 유튜브·알리 자격증명이 이미 쓰는 패턴과 같다(loadYoutubeCredsFromSettings 등):
+ * DB 에 키를 넣어두면 배포나 시크릿 수정 없이 어느 실행 환경에서든 집어간다.
+ * 사장님은 Supabase 대시보드 app_settings 에 두 줄만 넣으면 되고, 키가 채팅이나
+ * 저장소를 거치지 않는다.
+ */
+export async function loadCoupangCredsFromSettings(): Promise<void> {
+  if (hasCoupangEnv()) return;
+  try {
+    const { getSettings } = await import("./settings");
+    const s = await getSettings(["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY"]);
+    const key = s.COUPANG_ACCESS_KEY;
+    const secret = s.COUPANG_SECRET_KEY;
+    if (key && secret) {
+      process.env.COUPANG_ACCESS_KEY = key;
+      process.env.COUPANG_SECRET_KEY = secret;
+      console.log("쿠팡 키: app_settings 값 사용");
+    }
+  } catch (e) {
+    console.warn("쿠팡 키 설정 조회 실패(env 값 유지):", (e as Error).message);
+  }
+}
 
 const HOST = "https://api-gateway.coupang.com";
 const BASE = "/v2/providers/affiliate_open_api/apis/openapi/v1";

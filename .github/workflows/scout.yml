@@ -91,15 +91,21 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         run: npm run queue
 
-      # 경로 A: 러너에 쿠팡 키가 있으면 여기서 직접 수집한다.
+      # 경로 A: 직접 수집. 쿠팡 키는 러너 환경(WORKER_ENV)에 없어도 되고,
+      # worker/scout-runner.ts 가 Supabase app_settings 에서 읽어온다
+      # (loadCoupangCredsFromSettings - 유튜브·알리 자격증명과 같은 패턴).
+      # 어느 쪽에도 키가 없으면 텔레그램으로 알리고 실패한다 - 예전엔 조용히
+      # 건너뛰어서 재고가 마를 때까지 아무도 몰랐다(실측 2026-08-25: 나흘간
+      # 신규 유입 0인데 워크플로는 계속 초록불).
       - name: 스카우트 실행 (직접)
-        if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang == 'yes'
+        id: scout_direct
+        if: steps.check.outputs.ready == 'true'
+        continue-on-error: true
         run: npm run scout
 
-      # 경로 B: 쿠팡 키가 없으면 배포된 사이트의 스카우트 엔드포인트를 호출한다
-      # (쿠팡 키는 Vercel 환경변수에만 있다). CRON_SECRET 으로 인증한다.
+      # 경로 B: 직접 수집이 실패했고 CRON_SECRET 이 있으면 배포 엔드포인트로 재시도.
       - name: 스카우트 실행 (배포 엔드포인트 호출)
-        if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang != 'yes' && steps.creds.outputs.cron == 'yes'
+        if: steps.check.outputs.ready == 'true' && steps.scout_direct.outcome == 'failure' && steps.creds.outputs.cron == 'yes'
         run: |
           SITE=$(grep '^NEXT_PUBLIC_SITE_URL=' .env.local | cut -d= -f2- | tr -d '\r' | sed 's:/*$::')
           SECRET=$(grep '^CRON_SECRET=' .env.local | cut -d= -f2- | tr -d '\r')
@@ -109,11 +115,11 @@ jobs:
           echo "HTTP $code"; cat /tmp/scout.out; echo
           [ "$code" = "200" ]
 
-      # 자격증명이 없으면 조용히 건너뛴다(실패로 두면 하루 2번씩 실패 알림만 쌓인다).
-      # 이 경우에도 Vercel 크론의 하루 1회 스카우트는 정상 동작한다.
-      - name: 자격증명 없음 안내
-        if: steps.check.outputs.ready == 'true' && steps.creds.outputs.coupang != 'yes' && steps.creds.outputs.cron != 'yes'
+      # 두 경로 모두 실패하면 잡을 실패시킨다(조용히 넘어가지 않는다).
+      - name: 수집 실패 시 잡 실패 처리
+        if: steps.check.outputs.ready == 'true' && steps.scout_direct.outcome == 'failure' && steps.creds.outputs.cron != 'yes'
         run: |
-          echo "::notice::러너에 쿠팡 키도 CRON_SECRET 도 없어 이번 스카우트는 건너뜁니다."
-          echo "하루 2회 수집을 켜려면 WORKER_ENV 시크릿에 CRON_SECRET 한 줄을 추가하세요"
-          echo "(Vercel 환경변수의 CRON_SECRET 과 같은 값). Vercel 크론의 하루 1회 수집은 계속 동작합니다."
+          echo "::error::상품 수집에 실패했습니다. Supabase app_settings 에"
+          echo "::error::COUPANG_ACCESS_KEY / COUPANG_SECRET_KEY 를 넣거나,"
+          echo "::error::WORKER_ENV 시크릿에 CRON_SECRET 을 추가하세요."
+          exit 1

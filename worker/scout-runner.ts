@@ -16,10 +16,28 @@ dotenv.config();
 
 import { runScout, formatScoutMessage } from "../src/lib/scout";
 import { sendTelegramMessage } from "../src/lib/telegram";
+import { hasCoupangEnv, loadCoupangCredsFromSettings } from "../src/lib/coupang";
 
 async function main() {
   const dry = process.argv.includes("--dry");
   console.log(dry ? "=== 스카우트 (DRY RUN) ===" : "=== 스카우트 시작 ===");
+
+  // 쿠팡 키가 러너 환경에 없으면 app_settings 에서 가져온다.
+  // (GitHub Actions WORKER_ENV 에는 쿠팡 키가 없다 - coupang.ts 주석 참고)
+  await loadCoupangCredsFromSettings();
+  if (!hasCoupangEnv()) {
+    const msg =
+      "쿠팡 API 키가 없어 상품 수집을 못 합니다. " +
+      "Supabase app_settings 에 COUPANG_ACCESS_KEY / COUPANG_SECRET_KEY 를 넣어주세요.";
+    console.error(msg);
+    // 조용히 넘어가면 재고가 마를 때까지 아무도 모른다(실측 2026-08-25).
+    try {
+      await sendTelegramMessage(`⚠️ 상품 수집 중단\n\n${msg}`);
+    } catch {
+      // 알림 실패는 무시
+    }
+    process.exit(1);
+  }
 
   const result = await runScout({ dryRun: dry });
 

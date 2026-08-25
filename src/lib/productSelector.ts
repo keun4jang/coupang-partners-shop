@@ -152,6 +152,29 @@ export async function selectProductForVideo(): Promise<Product | null> {
 }
 
 /**
+ * 아직 영상이 없는(=앞으로 쓸 수 있는) 상품 재고 수.
+ *
+ * selectProductsForVideos 와 같은 조건으로 세므로 "내일 몇 편을 만들 수 있는지"를
+ * 그대로 나타낸다. 재고 고갈 경보(worker/queue-runner.ts)에서 쓴다 - 실측
+ * 2026-08-25 에 신규 유입이 나흘째 0인데도 워크플로가 계속 초록불이라 아무도
+ * 몰랐던 일이 있었다. 재고는 발행이 멈추기 전에 미리 알아야 하는 유일한 지표다.
+ */
+export async function freshProductCount(): Promise<number> {
+  const db = supabaseAdmin();
+  const { data: products, error } = await db
+    .from("products")
+    .select("*")
+    .eq("status", "candidate");
+  if (error) throw new Error(`상품 조회 실패: ${error.message}`);
+  if (!products || products.length === 0) return 0;
+
+  const usedProductIds = new Set(await allVideoProductIds());
+  return dropSpamTitles(
+    (products as Product[]).filter((p) => !usedProductIds.has(p.id) && p.image_url)
+  ).length;
+}
+
+/**
  * 하루치 영상 제작 대상 여러 개 선택 (완전 자동 파이프라인용).
  * - status = candidate 이고 아직 영상이 한 번도 안 만들어진 상품만
  * - 포맷 D 는 제품 카드에 사진이 필요하므로 image_url 있는 것만

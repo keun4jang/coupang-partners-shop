@@ -20,13 +20,50 @@ dotenv.config();
 
 import { queueDailyVideos } from "../src/lib/videoItems";
 import { getSetting } from "../src/lib/settings";
+import { freshProductCount } from "../src/lib/productSelector";
+import { sendTelegramMessage } from "../src/lib/telegram";
 
 const DEFAULT_TARGET = 4;
+
+/** 남은 재고가 이 일수 미만이면 경보 (수집을 고칠 시간을 벌어야 한다) */
+const LOW_STOCK_DAYS = 3;
 
 async function target(): Promise<number> {
   const raw = (await getSetting("daily_video_target"))?.trim();
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 && n <= 12 ? Math.floor(n) : DEFAULT_TARGET;
+}
+
+/**
+ * 재고 고갈 경보.
+ *
+ * 실측 2026-08-25: 8/21 이후 신규 상품 유입이 0인데 하루 6편씩 소비돼 재고가
+ * 13개(약 2일치)까지 줄었는데도 아무 알림이 없었다. scout.yml 은 자격증명이
+ * 없으면 "조용히 건너뛰기"로 설계돼 있어 계속 초록불이었고(그게 의도였지만
+ * 결과적으로 유일한 수집 경로가 죽은 걸 가렸다), 발행이 실제로 멈추기 전까지는
+ * 어디에도 신호가 없었다. 재고는 멈추고 나서 알면 이미 늦으므로 미리 알린다.
+ */
+async function warnIfLowStock(perDay: number): Promise<void> {
+  try {
+    const stock = await freshProductCount();
+    const days = perDay > 0 ? stock / perDay : Infinity;
+    console.log(`미사용 상품 재고 ${stock}개 (하루 ${perDay}편 기준 약 ${days.toFixed(1)}일치)`);
+    if (days >= LOW_STOCK_DAYS) return;
+
+    await sendTelegramMessage(
+      [
+        "⚠️ 상품 재고 부족",
+        "",
+        `남은 재고: ${stock}개 (하루 ${perDay}편 기준 약 ${days.toFixed(1)}일치)`,
+        "",
+        "재고가 바닥나면 영상 발행이 멈춥니다.",
+        "쿠팡 상품 수집(스카우트)이 도는지 확인이 필요해요.",
+      ].join("\n")
+    );
+  } catch (e) {
+    // 경보 실패가 큐잉을 막지는 않는다
+    console.warn("재고 경보 실패(무시):", (e as Error).message.slice(0, 150));
+  }
 }
 
 async function main() {
@@ -35,11 +72,12 @@ async function main() {
   const queued = await queueDailyVideos(want);
   if (queued.length === 0) {
     console.log("추가 큐잉 없음 (오늘 목표치를 이미 채웠거나 후보 없음)");
-    return;
+  } else {
+    console.log(
+      `큐잉 ${queued.length}편: ${queued.map((v) => `${v.display_number}번`).join(", ")}`
+    );
   }
-  console.log(
-    `큐잉 ${queued.length}편: ${queued.map((v) => `${v.display_number}번`).join(", ")}`
-  );
+  await warnIfLowStock(want);
 }
 
 main().catch((e) => {
