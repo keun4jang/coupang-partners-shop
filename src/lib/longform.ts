@@ -494,7 +494,10 @@ export const OUTRO_NARRATION_LINE =
  * 된다. 실제로 사실인 것만 쓴다: 우리가 이미 소개한 상품 중에서 골랐다는 것.
  */
 export function longformTitle(categoryLabel: string): string {
-  return `${categoryLabel} 추천 TOP10 | 직접 골라본 살림템 모음`;
+  // 뒷문구에 품목명을 또 넣으면 키워드가 '살림템'일 때 "살림템 추천 TOP10 |
+  // 직접 골라본 살림템 모음"처럼 같은 말이 두 번 나온다. 키워드와 안 겹치는
+  // 표현만 쓴다.
+  return `${categoryLabel} 추천 TOP10 | 직접 골라 정리했어요`;
 }
 
 /**
