@@ -154,7 +154,8 @@ function rotateForToday<T>(items: T[], take: number): T[] {
  */
 const BEST_CATEGORY_IDS: Array<{ id: number; label: string }> = [
   { id: 1008, label: "주방용품" },
-  { id: 1009, label: "생활용품" },
+  // 1009(생활용품)는 쿠팡 쪽에서 비활성화됨 (rCode=400 "category id is not
+  // active", 실측 2026-08-26) - 매번 오류만 나서 뺐다.
   { id: 1010, label: "홈인테리어" },
   { id: 1011, label: "가전디지털" },
   { id: 1012, label: "스포츠레저" },
