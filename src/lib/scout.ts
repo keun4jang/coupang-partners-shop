@@ -8,7 +8,7 @@ import {
   fetchGoldbox,
 } from "./coupang";
 import { dateFolderName } from "./format";
-import { setSetting } from "./settings";
+import { getSetting, setSetting } from "./settings";
 import { appealScore, inferCategory, isSpamTitle, offBrandReason } from "./appeal";
 import {
   hasAffiliateEnv,
@@ -71,6 +71,8 @@ export interface ScoutResult {
   /** 이번에 새로 담은 알리 후보 수 */
   aliCandidates: number;
   errors: string[];
+  /** 호출 한도에 걸려 건너뛴 경우, 그 자리에서 아무 API 호출도 하지 않았음을 표시 */
+  blockedSkip?: boolean;
 }
 
 const CPID_RE = /\[cpid:(\d+)\]/;
@@ -167,6 +169,28 @@ const BEST_CATEGORY_IDS: Array<{ id: number; label: string }> = [
 const LISTING_TAKE = 8;
 
 export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
+  // 호출 한도(rCode=403)에 걸리면 재시도 가능 시각을 app_settings 에 남겨두고,
+  // 그 시각이 지나기 전까지는 API 를 아예 건드리지 않는다. 위반 1회가 2회로
+  // 이어지는 걸 막는 마지막 안전장치다(실측 2026-08-26~27: 수동 실행 없이도
+  // 1회→2회로 올라감 - 막힌 동안에도 다음 실행이 다시 API를 건드린 게 원인일
+  // 수 있다). 총 3회 초과되면 파트너스 이용 자체가 제한된다. 큐잉(queue-runner)은
+  // 이 함수와 별도로 돌아 영상 발행에는 영향이 없다.
+  const blockedUntil = await getSetting("coupang_search_blocked_until");
+  if (blockedUntil && new Date(blockedUntil).getTime() > Date.now()) {
+    const msg = `쿠팡 검색 API 호출 한도 초과로 대기 중 - 재개 예정 ${blockedUntil}`;
+    console.log(msg);
+    return {
+      registered: [],
+      skippedDuplicate: 0,
+      skippedFiltered: 0,
+      skippedSpamTitle: 0,
+      sourceStats: {},
+      aliCandidates: 0,
+      errors: [msg],
+      blockedSkip: true,
+    };
+  }
+
   // 한 번에 담을 신규 후보 수. 인스타를 하루 여러 편으로 올리려면 재고가 그만큼
   // 쌓여야 한다 (실측 2026-08-19: 미사용 재고 43개, 8/16 이후 신규 유입 0개).
   // 소스가 키워드 85개 + 골드박스 + 베스트 7종으로 늘어 후보 풀이 넓어졌으므로
@@ -215,10 +239,20 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     `키워드 ${rotated.length}/${SCOUT_KEYWORDS.length}개 검색 (날짜별 회전)`
   );
 
+  // 시간당 호출 한도(rCode=403 "시간당 사용 횟수... 초과")에 걸리면 그 즉시
+  // 멈춘다 - 걸린 뒤로도 남은 키워드를 계속 두드리면 전부 같은 오류만 쌓일
+  // 뿐더러, 쿠팡이 "초과 후에도 계속 호출한 횟수"까지 위반으로 집계하는
+  // 것으로 보인다(실측 2026-08-26~27: 수동 실행 안 했는데도 1회→2회로
+  // 올라감 - 이 함수가 막힌 뒤에도 나머지 60여 개를 계속 불러댄 게 원인일
+  // 가능성이 높다). 총 3회 초과되면 파트너스 이용 자체가 제한된다.
+  const isRateLimitError = (e: unknown): boolean =>
+    (e as Error)?.message?.includes("rCode=403") ?? false;
+
   const searchWithRetry = async (keyword: string) => {
     try {
       return await searchProducts(keyword, perKeywordFetch);
-    } catch {
+    } catch (e) {
+      if (isRateLimitError(e)) throw e; // 한도 초과는 재시도하지 않는다(더 두드릴수록 손해)
       await new Promise((r) => setTimeout(r, 1200));
       return await searchProducts(keyword, perKeywordFetch);
     }
@@ -229,9 +263,15 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   const CONCURRENCY = 3;
   const keywordResults: Array<{ kw: (typeof SCOUT_KEYWORDS)[number]; products: CoupangProduct[] }> = [];
   let searchedCount = 0;
+  let rateLimited = false;
   for (let i = 0; i < rotated.length; i += CONCURRENCY) {
     if (outOfTime()) {
       console.log(`시간 예산 초과 - 키워드 ${searchedCount}/${rotated.length}개에서 중단`);
+      break;
+    }
+    if (rateLimited) {
+      console.log(`쿠팡 호출 한도 초과 - 남은 키워드 ${rotated.length - searchedCount}개 건너뜀`);
+      errors.push(`(호출 한도로 건너뜀) 나머지 ${rotated.length - searchedCount}개 키워드`);
       break;
     }
     const chunk = rotated.slice(i, i + CONCURRENCY);
@@ -242,6 +282,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
           const products = await searchWithRetry(kw.keyword);
           keywordResults.push({ kw, products });
         } catch (e) {
+          if (isRateLimitError(e)) rateLimited = true;
           errors.push(`${kw.keyword}: ${(e as Error).message}`);
         }
       })
@@ -338,24 +379,50 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 뒤에 두면 키워드 버킷 70개가 먼저 자리를 채운다. 골드박스는 매일 바뀌는 소스라
   // 신규 확보 확률이 가장 높으므로 우선권을 준다.
   const listingBuckets: ScoutCandidate[][] = [];
-  try {
-    if (outOfTime()) throw new Error("시간 예산 초과로 건너뜀");
-    const goldbox = await fetchGoldbox();
-    const bucket = fromListing(goldbox, "골드박스");
-    if (bucket.length) listingBuckets.push(bucket.slice(0, LISTING_TAKE));
-  } catch (e) {
-    errors.push(`골드박스: ${(e as Error).message}`);
-  }
-
-  for (const cat of BEST_CATEGORY_IDS) {
+  if (rateLimited) {
+    errors.push("(호출 한도로 건너뜀) 골드박스 · 카테고리 베스트셀러 전체");
+  } else {
     try {
       if (outOfTime()) throw new Error("시간 예산 초과로 건너뜀");
-      await new Promise((r) => setTimeout(r, 120));
-      const best = await fetchBestCategory(cat.id, 50);
-      const bucket = fromListing(best, `베스트 ${cat.label}`);
+      const goldbox = await fetchGoldbox();
+      const bucket = fromListing(goldbox, "골드박스");
       if (bucket.length) listingBuckets.push(bucket.slice(0, LISTING_TAKE));
     } catch (e) {
-      errors.push(`베스트 ${cat.label}: ${(e as Error).message}`);
+      if (isRateLimitError(e)) rateLimited = true;
+      errors.push(`골드박스: ${(e as Error).message}`);
+    }
+
+    for (const cat of BEST_CATEGORY_IDS) {
+      if (rateLimited) {
+        errors.push(`(호출 한도로 건너뜀) 베스트 ${cat.label}`);
+        continue;
+      }
+      try {
+        if (outOfTime()) throw new Error("시간 예산 초과로 건너뜀");
+        await new Promise((r) => setTimeout(r, 120));
+        const best = await fetchBestCategory(cat.id, 50);
+        const bucket = fromListing(best, `베스트 ${cat.label}`);
+        if (bucket.length) listingBuckets.push(bucket.slice(0, LISTING_TAKE));
+      } catch (e) {
+        if (isRateLimitError(e)) rateLimited = true;
+        errors.push(`베스트 ${cat.label}: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  // 이번 실행에서 새로 한도에 걸렸다면, 오류 메시지에 박혀 있는 재시도 가능
+  // 시각을 뽑아 다음 실행이 미리 건너뛸 수 있게 저장해둔다.
+  if (rateLimited) {
+    const retryAt = errors
+      .map((e) => e.match(/(\d{4}-\d{2}-\d{2}T[\d:.]+)/)?.[1])
+      .find((m): m is string => Boolean(m));
+    if (retryAt) {
+      try {
+        await setSetting("coupang_search_blocked_until", retryAt);
+        console.log(`쿠팡 호출 한도 - 다음 재개 예정: ${retryAt}`);
+      } catch {
+        // 저장 실패해도 이번 실행 자체는 계속 진행한다
+      }
     }
   }
 
