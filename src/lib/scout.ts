@@ -283,8 +283,17 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 즉 403 을 받은 시점엔 이미 위반이 기록된 뒤라, 여기서 멈추는 건 피해 확산
   // 방지일 뿐이고 진짜 예방은 KEYWORDS_PER_RUN 축소 + 60분 잠금이다.
   // 총 3회 초과되면 파트너스 이용 자체가 제한된다.
-  const isRateLimitError = (e: unknown): boolean =>
-    (e as Error)?.message?.includes("rCode=403") ?? false;
+  // rCode=403(쿠팡의 정상 한도 응답) 외에, 쿠팡이 응답 형태를 바꾸는 경우
+  // (HTTP 403/429 직접 반환, 비-JSON 오류 페이지)도 한도로 간주한다 -
+  // 미탐하면 재시도가 호출 수를 두 배로 불리고 차단 시각도 저장이 안 된다.
+  const isRateLimitError = (e: unknown): boolean => {
+    const m = (e as Error)?.message ?? "";
+    return (
+      m.includes("rCode=403") ||
+      m.includes("시간당 사용 횟수") ||
+      /\((403|429)[,)]/.test(m)
+    );
+  };
 
   // 일시 오류 재시도는 실행 전체에서 소수만 허용한다 - 쿠팡 쪽 장애로 대량
   // 실패하는 날 재시도가 호출 수를 두 배로 불려 한도를 넘기는 걸 막는다.
@@ -455,18 +464,20 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   }
 
   // 이번 실행에서 새로 한도에 걸렸다면, 오류 메시지에 박혀 있는 재시도 가능
-  // 시각을 뽑아 다음 실행이 미리 건너뛸 수 있게 저장해둔다.
+  // 시각을 뽑아 다음 실행이 미리 건너뛸 수 있게 저장해둔다. 시각을 못 뽑으면
+  // (메시지 형식 변경 등) now+24h 로 보수적으로 잡는다 - 저장을 안 하면 다음
+  // 실행이 가드 없이 또 전체 스윕을 돌아 위반이 쌓인다.
   if (rateLimited) {
-    const retryAt = errors
-      .map((e) => e.match(/(\d{4}-\d{2}-\d{2}T[\d:.]+)/)?.[1])
-      .find((m): m is string => Boolean(m));
-    if (retryAt) {
-      try {
-        await setSetting("coupang_search_blocked_until", retryAt);
-        console.log(`쿠팡 호출 한도 - 다음 재개 예정: ${retryAt}`);
-      } catch {
-        // 저장 실패해도 이번 실행 자체는 계속 진행한다
-      }
+    const retryAt =
+      errors
+        .map((e) => e.match(/(\d{4}-\d{2}-\d{2}T[\d:.]+)/)?.[1])
+        .find((m): m is string => Boolean(m)) ??
+      new Date(Date.now() + 24 * 3600_000).toISOString();
+    try {
+      await setSetting("coupang_search_blocked_until", retryAt);
+      console.log(`쿠팡 호출 한도 - 다음 재개 예정: ${retryAt}`);
+    } catch {
+      // 저장 실패해도 이번 실행 자체는 계속 진행한다
     }
   }
 

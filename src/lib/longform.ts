@@ -366,9 +366,14 @@ export async function selectTop10(): Promise<Top10Selection> {
     //
     // 그래도 한 바퀴 뒤엔 같은 조합이 나올 수 있으므로, 이미 그 주제로 발행한
     // 것과 상품 구성이 완전히 같으면(itemSetKey) 그 주제는 건너뛴다.
+    // 값이 클수록 "오래 안 씀": 안 쓴 주제 = Infinity, 쓴 주제 = 최근 목록에서의
+    // 위치 i (0 = 가장 최근이라 가장 작다). 내림차순 정렬로 오래 안 쓴 것부터.
+    // (2026-08-28 전체 점검에서 잡은 역전 버그 수정: 예전 식 length - i 는
+    //  "가장 최근에 쓴 주제"에 가장 큰 값을 줘서, 미사용 주제가 소진되는
+    //  시점부터 매일 어제 주제를 다시 고르게 돼 있었다)
     const lastUsedRank = (kw: string): number => {
       const i = history.recentTopics.indexOf(kw); // 0 = 가장 최근
-      return i === -1 ? Number.POSITIVE_INFINITY : history.recentTopics.length - i;
+      return i === -1 ? Number.POSITIVE_INFINITY : i;
     };
     const ordered = [...viableKeywords].sort((a, b) => {
       const d = lastUsedRank(b[0]) - lastUsedRank(a[0]); // 오래 안 쓴 주제 먼저
