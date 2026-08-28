@@ -87,6 +87,31 @@ const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
 );
 
 /**
+ * 대가성 고지 - 작고 차분한 한 줄. 번호 칩 옆에 붙여 늘 함께 떠 있게 한다
+ * (첫 프레임 커버 1장만 예외 - CoverPoster 가 덮는다).
+ *
+ * 공정위 「추천·보증 등에 관한 표시·광고 심사지침」: 표시문구는 "게시물의 제목
+ * 또는 동영상 내"에 있어야 하고 "'더보기'를 눌러야만 확인 가능한 경우"는
+ * 부적절 - 랜딩 페이지에만 두던 기존 구성은 이 기준에 못 미쳤다(2026-08-28
+ * 전체 점검, 사장님 확인 후 복원). 문구는 TemplateTop10 Intro 화면과 통일.
+ */
+const DisclosureTag: React.FC = () => (
+  <div
+    style={{
+      fontSize: 22,
+      lineHeight: 1.4,
+      color: E.sub,
+      opacity: 0.82,
+      fontWeight: 500,
+      letterSpacing: "-0.005em",
+      wordBreak: "keep-all",
+    }}
+  >
+    [광고] 쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
+  </div>
+);
+
+/**
  * 제품 사진. 로드에 실패하면 렌더 전체가 죽지 않도록 폴백으로 떨어진다.
  *
  * Remotion 의 <Img> 는 onError 가 없으면 로드 실패 시 예외를 던져 렌더가 통째로
@@ -186,7 +211,10 @@ const Poster: React.FC<{
           gap: 30,
         }}
       >
-        <NumberChip displayNumber={props.displayNumber} />
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <NumberChip displayNumber={props.displayNumber} />
+          <DisclosureTag />
+        </div>
         {/* 문제 훅 - 왼쪽 정렬 대형 타이포, 외곽선 없이 잉크색 */}
         <div
           style={{
@@ -593,8 +621,9 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
               gap: 26,
             }}
           >
-            {/* 헤더: 번호 칩 + 제품명 한 줄 */}
-            <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            {/* 헤더: 번호 칩 + 제품명 + 고지 - 제품명이 좁아지더라도 번호 칩과
+                고지는 항상 온전히 보이게 flexShrink:0 (ellipsis 는 제품명만) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
               <NumberChip displayNumber={props.displayNumber} />
               <div
                 style={{
@@ -604,10 +633,14 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
-                  minWidth: 0,
+                  minWidth: 60,
+                  flex: "1 1 auto",
                 }}
               >
                 {props.productName}
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                <DisclosureTag />
               </div>
             </div>
 
