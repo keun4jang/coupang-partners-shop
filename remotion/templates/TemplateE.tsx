@@ -98,16 +98,40 @@ const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
 const DisclosureTag: React.FC = () => (
   <div
     style={{
-      fontSize: 22,
-      lineHeight: 1.4,
+      fontSize: 20,
+      lineHeight: 1.3,
       color: E.sub,
       opacity: 0.82,
       fontWeight: 500,
       letterSpacing: "-0.005em",
       wordBreak: "keep-all",
+      whiteSpace: "nowrap",
     }}
   >
     [광고] 쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
+  </div>
+);
+
+/**
+ * 번호 칩 + 대가성 고지를 한 세트로 묶는다 - 고지는 항상 칩 바로 아래 자기
+ * 줄에 고정(gap 8, 세로 높이 ≈ 34px 로 고정)한다. 예전에는 남는 가로폭에
+ * 따라(flexWrap) 제품명이 길고 짧음에 따라 매번 줄바꿈 위치가 달라졌는데,
+ * 영상마다 모양이 들쑥날쑥해 보여 고정 2줄 블록으로 바꿨다(2026-08-28).
+ */
+const ChipWithDisclosure: React.FC<{
+  displayNumber: number;
+  trailing?: React.ReactNode;
+}> = ({ displayNumber, trailing }) => (
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0 }}>
+      {/* flexShrink:0 필수 - 안 붙이면 옆의 긴 제품명에 밀려 칩 자체가
+          찌그러지면서 "오늘의 체크" 글자가 줄바꿈된다(실측으로 발견) */}
+      <div style={{ flexShrink: 0 }}>
+        <NumberChip displayNumber={displayNumber} />
+      </div>
+      {trailing}
+    </div>
+    <DisclosureTag />
   </div>
 );
 
@@ -211,10 +235,7 @@ const Poster: React.FC<{
           gap: 30,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <NumberChip displayNumber={props.displayNumber} />
-          <DisclosureTag />
-        </div>
+        <ChipWithDisclosure displayNumber={props.displayNumber} />
         {/* 문제 훅 - 왼쪽 정렬 대형 타이포, 외곽선 없이 잉크색 */}
         <div
           style={{
@@ -621,32 +642,33 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
               gap: 26,
             }}
           >
-            {/* 헤더: 번호 칩 + 제품명 + 고지 - 제품명이 좁아지더라도 번호 칩과
-                고지는 항상 온전히 보이게 flexShrink:0 (ellipsis 는 제품명만) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-              <NumberChip displayNumber={props.displayNumber} />
-              <div
-                style={{
-                  color: E.sub,
-                  fontSize: 32,
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  minWidth: 60,
-                  flex: "1 1 auto",
-                }}
-              >
-                {props.productName}
-              </div>
-              <div style={{ flexShrink: 0 }}>
-                <DisclosureTag />
-              </div>
-            </div>
+            {/* 헤더: 번호 칩 + 제품명(칩 옆, 길면 ellipsis) + 고지(칩 아래 고정 줄) -
+                고지 줄 위치가 제품명 길이에 안 흔들리게 ChipWithDisclosure 로 고정했다 */}
+            <ChipWithDisclosure
+              displayNumber={props.displayNumber}
+              trailing={
+                <div
+                  style={{
+                    color: E.sub,
+                    fontSize: 32,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    minWidth: 0,
+                    flex: "1 1 auto",
+                  }}
+                >
+                  {props.productName}
+                </div>
+              }
+            />
 
             {/* 사진 창 (본문) → CTA 카드 (마지막).
-                높이 526 = 936÷16×9, 정확한 16:9 (행 4개 최악 높이까지 더해도
-                콘텐츠 안전대 1220px 안: 54+26+526+26+554 = 1186) */}
+                높이 526 = 936÷16×9, 정확한 16:9 (헤더 블록 90 = 칩54+gap8+고지28,
+                행 4개 최악 높이까지 더해도 콘텐츠 안전대 1220px 안:
+                90+26+526+26+554 = 1222 - 여유 폭 안. 고지 줄이 항상 고정 높이라
+                제품명 길이와 무관하게 이 계산이 매번 그대로 성립한다) */}
             <div style={{ width: "100%", height: 526, position: "relative" }}>
               <Sequence durationInFrames={f(ctaFrom - bodyFrom)} layout="none">
                 <MediaWindow
