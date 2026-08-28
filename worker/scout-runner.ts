@@ -55,6 +55,13 @@ async function main() {
     return;
   }
 
+  // 한도 보호로 통째로 건너뛴 실행은 텔레그램을 보내지 않는다 - 차단 기간에
+  // 하루 3번씩 같은 알림이 오면 정작 중요한 경보가 묻힌다. 콘솔 로그로 충분.
+  if (result.blockedSkip) {
+    console.log("(한도 보호 건너뜀 - 텔레그램 알림 생략)");
+    return;
+  }
+
   try {
     await sendTelegramMessage(formatScoutMessage(result));
     console.log("\n텔레그램 알림 전송 완료");

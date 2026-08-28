@@ -125,10 +125,19 @@ function passesFilter(
 
 /**
  * 한 번 실행에서 검색할 키워드 개수.
- * Vercel 함수 60초 제한 안에 끝나야 한다 (동시 3개 × 왕복 ~0.4초 기준
- * 70개면 약 10초, 목록형 소스와 DB 저장까지 더해도 여유가 있다).
+ *
+ * 쿠팡 검색 API "시간당 사용 횟수" 한도 때문에 70 → 45 로 줄였다
+ * (2026-08-28 전체 점검). 실측: 70키워드 + 골드박스 1 + 베스트 6 = 77회
+ * 호출이, 완주된 두 번 모두 정확히 76번째 호출에서 위반으로 등록됐다
+ * (GH Actions 로그 2건 재구성 - 시간당 한도 약 75회 추정). 403 을 받은
+ * 시점엔 이미 위반이 기록된 뒤라, 예방은 실행당 호출량을 한도 아래로
+ * 줄이는 것뿐이다. 45 + 7 = 52회면 재시도 여유까지 포함해도 한도 아래.
+ * 같은 이유로 60분 안의 재실행도 runScout 입구에서 막는다
+ * (last_scout_sweep_at). Vercel 60초 제한에도 여유가 더 생긴다.
+ * (같은 날은 같은 묶음을 검색하므로(rotateForToday) 하루 1조각,
+ *  195개 키워드는 닷새면 한 바퀴 돈다)
  */
-const KEYWORDS_PER_RUN = 70;
+const KEYWORDS_PER_RUN = 45;
 
 /**
  * 날짜로 회전시켜 오늘 몫의 키워드를 잘라낸다.
@@ -170,14 +179,35 @@ const LISTING_TAKE = 8;
 
 export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 호출 한도(rCode=403)에 걸리면 재시도 가능 시각을 app_settings 에 남겨두고,
-  // 그 시각이 지나기 전까지는 API 를 아예 건드리지 않는다. 위반 1회가 2회로
-  // 이어지는 걸 막는 마지막 안전장치다(실측 2026-08-26~27: 수동 실행 없이도
-  // 1회→2회로 올라감 - 막힌 동안에도 다음 실행이 다시 API를 건드린 게 원인일
-  // 수 있다). 총 3회 초과되면 파트너스 이용 자체가 제한된다. 큐잉(queue-runner)은
+  // 그 시각이 지나기 전까지는 API 를 아예 건드리지 않는다.
+  // (2026-08-28 전체 점검 실측 정정: 차단 중의 403 재호출은 위반 횟수를
+  //  올리지 않는 것으로 확인됐다 - 약 300회를 두드려도 카운터가 1회 그대로였다.
+  //  그래도 헛호출 없이 조용히 쉬는 게 안전하고 로그도 깨끗해 가드는 유지한다.)
+  // 총 3회 초과되면 파트너스 이용 자체가 제한된다. 큐잉(queue-runner)은
   // 이 함수와 별도로 돌아 영상 발행에는 영향이 없다.
   const blockedUntil = await getSetting("coupang_search_blocked_until");
   if (blockedUntil && new Date(blockedUntil).getTime() > Date.now()) {
     const msg = `쿠팡 검색 API 호출 한도 초과로 대기 중 - 재개 예정 ${blockedUntil}`;
+    console.log(msg);
+    return {
+      registered: [],
+      skippedDuplicate: 0,
+      skippedFiltered: 0,
+      skippedSpamTitle: 0,
+      sourceStats: {},
+      aliCandidates: 0,
+      errors: [msg],
+      blockedSkip: true,
+    };
+  }
+
+  // 60분 안에 이미 스윕이 돌았다면 이번 실행은 통째로 건너뛴다.
+  // GH 스케줄 지연(1~4시간 실측)으로 두 실행(GH 2회 + Vercel 1회)이 같은
+  // 1시간에 겹치면, 실행당 호출량을 줄여도 합산(52+52=104회)으로 시간당
+  // 한도(약 75회)를 넘는다. 실제로 1차 위반이 "19분 간격 두 실행"에서 났다.
+  const lastSweepAt = await getSetting("last_scout_sweep_at");
+  if (lastSweepAt && Date.now() - new Date(lastSweepAt).getTime() < 60 * 60_000) {
+    const msg = `직전 스카우트(${lastSweepAt})가 60분 이내라 이번 실행은 건너뜀 (시간당 한도 보호)`;
     console.log(msg);
     return {
       registered: [],
@@ -239,20 +269,34 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     `키워드 ${rotated.length}/${SCOUT_KEYWORDS.length}개 검색 (날짜별 회전)`
   );
 
-  // 시간당 호출 한도(rCode=403 "시간당 사용 횟수... 초과")에 걸리면 그 즉시
-  // 멈춘다 - 걸린 뒤로도 남은 키워드를 계속 두드리면 전부 같은 오류만 쌓일
-  // 뿐더러, 쿠팡이 "초과 후에도 계속 호출한 횟수"까지 위반으로 집계하는
-  // 것으로 보인다(실측 2026-08-26~27: 수동 실행 안 했는데도 1회→2회로
-  // 올라감 - 이 함수가 막힌 뒤에도 나머지 60여 개를 계속 불러댄 게 원인일
-  // 가능성이 높다). 총 3회 초과되면 파트너스 이용 자체가 제한된다.
+  // 스윕 시작을 먼저 기록한다 - 도중에 죽어도 60분 잠금이 걸리게.
+  // (기록 실패가 수집을 막지는 않는다)
+  try {
+    await setSetting("last_scout_sweep_at", new Date().toISOString());
+  } catch {
+    // 무시
+  }
+
+  // 시간당 호출 한도(rCode=403)에 걸리면 그 즉시 멈춘다. 2026-08-28 전체
+  // 점검 실측으로 확인된 위반 메커니즘: 위반은 "새 시간 창에서 한도(약 75회)를
+  // 처음 넘는 그 호출"에서 등록된다(완주된 두 스윕 모두 76번째 호출에서 위반).
+  // 즉 403 을 받은 시점엔 이미 위반이 기록된 뒤라, 여기서 멈추는 건 피해 확산
+  // 방지일 뿐이고 진짜 예방은 KEYWORDS_PER_RUN 축소 + 60분 잠금이다.
+  // 총 3회 초과되면 파트너스 이용 자체가 제한된다.
   const isRateLimitError = (e: unknown): boolean =>
     (e as Error)?.message?.includes("rCode=403") ?? false;
 
+  // 일시 오류 재시도는 실행 전체에서 소수만 허용한다 - 쿠팡 쪽 장애로 대량
+  // 실패하는 날 재시도가 호출 수를 두 배로 불려 한도를 넘기는 걸 막는다.
+  let retriesUsed = 0;
+  const MAX_RETRIES_PER_RUN = 10;
   const searchWithRetry = async (keyword: string) => {
     try {
       return await searchProducts(keyword, perKeywordFetch);
     } catch (e) {
       if (isRateLimitError(e)) throw e; // 한도 초과는 재시도하지 않는다(더 두드릴수록 손해)
+      if (retriesUsed >= MAX_RETRIES_PER_RUN) throw e;
+      retriesUsed++;
       await new Promise((r) => setTimeout(r, 1200));
       return await searchProducts(keyword, perKeywordFetch);
     }
