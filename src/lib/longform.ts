@@ -518,10 +518,14 @@ export function longformDescription(
   chapterSeconds: number[] // items 와 같은 순서(10위 -> 1위), 각 항목 시작 초
 ): string {
   const ranked1to10 = items.slice().reverse(); // 1위 -> 10위로 나열(설명은 1위부터 읽기 좋음)
-  const linkLines = ranked1to10.map((it) => {
-    const url = it.linkUrl ?? "";
-    return `${it.rank}위. ${it.productName} - ${it.priceText} (${formatDisplayNumber(it.displayNumber)})\n${url}`;
-  });
+  // 상품 사이에 빈 줄을 하나씩 둬서 링크 블록이 뭉쳐 보이지 않게 한다
+  // (사장님 피드백: 줄바꿈 없이 붙어 있으니 어디까지가 한 상품인지 구분이 안 됨).
+  const linkSection = ranked1to10
+    .map((it) => {
+      const url = it.linkUrl ?? "";
+      return `${it.rank}위. ${it.productName} - ${it.priceText} (${formatDisplayNumber(it.displayNumber)})\n${url}`;
+    })
+    .join("\n\n");
 
   const chapterLines = items.map((it, i) => {
     const sec = Math.round(chapterSeconds[i] ?? 0);
@@ -540,7 +544,7 @@ export function longformDescription(
     "표시된 가격은 영상 제작 시점 기준이며, 현재 가격은 링크에서 확인해 주세요.",
     "",
     "[상품 링크]",
-    ...linkLines,
+    linkSection,
     "",
     "[타임스탬프]",
     "0:00 인트로",
