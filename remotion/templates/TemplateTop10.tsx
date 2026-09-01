@@ -628,15 +628,17 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
         }}
       >
         {/* 썸네일은 손톱만 한 크기에서도 읽혀야 한다 - 사장님 피드백(2026-08-24):
-            "키워드 키워주고, 숫자 같은 것도 키워주는 게 좋아" - 셋 다 크게 */}
+            "키워드 키워주고, 숫자 같은 것도 키워주는 게 좋아" - 셋 다 크게.
+            2026-08-29: 카테고리 글자가 여전히 안 보인다는 피드백으로 52→68px
+            로 더 키움 (10자짜리 긴 키워드도 660px 컬럼 안에 들어가는 걸 확인). */}
         <span
           style={{
             display: "inline-block",
             background: E.green,
             color: "#FFFFFF",
             borderRadius: 999,
-            padding: "14px 34px",
-            fontSize: 52,
+            padding: "16px 38px",
+            fontSize: 68,
             fontWeight: 700,
             width: "fit-content",
           }}
