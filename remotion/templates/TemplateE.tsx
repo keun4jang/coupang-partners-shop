@@ -236,7 +236,10 @@ const Poster: React.FC<{
         }}
       >
         <ChipWithDisclosure displayNumber={props.displayNumber} />
-        {/* 문제 훅 - 왼쪽 정렬 대형 타이포, 외곽선 없이 잉크색 */}
+        {/* 문제 훅 - 왼쪽 정렬 대형 타이포, 외곽선 없이 잉크색.
+            textWrap:balance - 줄바꿈을 브라우저가 균형 있게 나눠준다(사장님
+            피드백: "법?" 처럼 마지막 줄에 한 단어만 외로이 남는 줄바꿈이
+            어색해 보임). 없으면 그냥 폭이 차는 대로 기계적으로 끊긴다. */}
         <div
           style={{
             color: E.ink,
@@ -246,6 +249,7 @@ const Poster: React.FC<{
             letterSpacing: "-0.02em",
             wordBreak: "keep-all",
             textAlign: "left",
+            textWrap: "balance",
           }}
         >
           {words.map((w, i) => (
@@ -264,6 +268,7 @@ const Poster: React.FC<{
             lineHeight: 1.3,
             letterSpacing: "-0.01em",
             wordBreak: "keep-all",
+            textWrap: "balance",
             textAlign: "left",
             opacity: empathyIn,
             transform: `translateY(${(1 - empathyIn) * 24}px)`,
@@ -437,6 +442,7 @@ const NoteRowView: React.FC<{
           lineHeight: 1.32,
           letterSpacing: "-0.01em",
           wordBreak: "keep-all",
+          textWrap: "balance",
           paddingTop: 2,
         }}
       >
@@ -551,6 +557,7 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
           lineHeight: 1.1,
           letterSpacing: "-0.03em",
           wordBreak: "keep-all",
+          textWrap: "balance",
           textAlign: "left",
         }}
       >
