@@ -41,7 +41,18 @@ import {
   driveDirectDownloadUrl,
   downloadDriveFile,
 } from "../src/lib/drive";
-import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, youtubeDescription, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
+import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
+import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
+import { shortsVariantOf } from "../src/lib/tracking";
+import { checkPublishTexts, describePublishIssues } from "../src/lib/policy";
+import {
+  DIRECTED_SCENE_LABEL,
+  STAGED_SCENE_LABEL,
+  existingBrollFiles,
+  overlayLabelFor,
+  pickCatalogAssets,
+  sceneTagsFor,
+} from "../src/lib/brollCatalog";
 import {
   hasInstagramEnv,
   maybeRefreshInstagramToken,
@@ -146,13 +157,16 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     benefit1: lines[2] ?? product.main_benefit ?? "하나 있으면 은근 편해 보여요",
     benefit2: lines[3] ?? "쓰기도 간편해 보이고요",
     usageTip: isLegacy6 ? null : lines[4] ?? null,
-    reviewLine: (isLegacy6 ? lines[4] : lines[5]) ?? "후기 많은 제품이라 한번 볼만해요",
+    checkPoint: (isLegacy6 ? lines[4] : lines[5]) ?? "놓을 자리 크기를 먼저 재보면 좋아요",
     ctaText: ctaLine(item.display_number),
     productImageUrl: product.image_url,
     category: product.category,
     // 배경은 렌더 직전에 스톡 검색으로 brollFiles(4컷)에 채운다.
     // 정적 폴백 경로(pickBrollFile)는 가리키는 파일이 하나도 없어 걷어냈다.
     brollFile: null,
+    // 배경을 실제로 넣는 쪽(renderVideo)에서 소재 성격에 맞는 라벨을 채운다.
+    // 배경이 없으면 라벨도 없다 - 제품 사진만 보이는 화면엔 오해의 소지가 없다.
+    brollNotice: null,
   };
 }
 
@@ -173,14 +187,14 @@ function buildSceneTiming(sec: number[], hasTip: boolean): SceneTiming {
   const need = (i: number, min: number) =>
     Math.max(min, (sec[i] ?? 0) + NARRATION_GAP);
   // 최소 장면 길이: 자막을 읽을 시간 + 카드 등장 모션 여유
-  // 순서: 후킹 · 공감 · 장점1(카드 등장) · 장점2 · 사용팁 · 후기 · CTA
+  // 순서: 후킹 · 공감 · 장점1(카드 등장) · 장점2 · 사용팁 · 확인할 점 · CTA
   let scenes = [
     need(0, 1.5), // 후킹
     need(1, 1.5), // 공감
     need(2, 2.4), // 장점1 (제품 카드 등장)
     need(3, 2.1), // 장점2
     hasTip ? need(4, 2.1) : 0, // 사용팁 (구버전 대본이면 생략)
-    need(5, 2.1), // 후기
+    need(5, 2.1), // 확인할 점
     Math.max(2.4, (sec[6] ?? 0) + 0.8), // CTA (마무리 여유)
   ];
   const total = scenes.reduce((a, b) => a + b, 0);
@@ -248,7 +262,25 @@ async function renderVideo(
   const usesBroll = effectiveTemplate === "D" || effectiveTemplate === "E";
   const BROLL_CUT_COUNT = effectiveTemplate === "E" ? 3 : 6;
   let brollOrigin = "배경 없음(블러 사진)";
-  if (usesBroll && item.footage_paths?.length) {
+
+  // 사장님이 직접 넣은 소재(public/assets/broll/catalog.json)가 있으면 그게 1순위다.
+  // 상품명에서 "어느 자리에 놓는 물건인지"를 읽어 그 장면 태그로 고른다.
+  // 카탈로그가 없으면(기본 상태) 빈 배열이 돌아와 기존 경로가 그대로 돈다.
+  if (usesBroll) {
+    const tags = sceneTagsFor(product.product_name, product.category);
+    const picked = pickCatalogAssets(tags, BROLL_CUT_COUNT);
+    if (picked.length > 0) {
+      inputProps.brollFiles = picked.map((a) => a.file);
+      inputProps.brollDurations = brollFileDurations(picked.map((a) => a.file));
+      // 실사용 영상이 아니면 화면에 "사용 상황 예시" 라벨을 띄운다
+      inputProps.brollNotice = overlayLabelFor(picked[0]);
+      cachedBundle = null;
+      brollOrigin = `직접 등록 소재(카탈로그: ${tags[0]})`;
+      console.log(`카탈로그 소재 사용: ${picked.map((a) => a.file).join(", ")}`);
+    }
+  }
+
+  if (usesBroll && !inputProps.brollFiles && item.footage_paths?.length) {
     console.log(`직접 업로드 소재 처리 중 (${item.footage_paths.length}개)...`);
     const files = await segmentsFromFootage(
       item.footage_paths,
@@ -265,6 +297,9 @@ async function renderVideo(
       inputProps.brollDurations = brollFileDurations(files);
       cachedBundle = null;
       brollOrigin = "직접 업로드 소재";
+      // 직접 올린 소재도 대개 연출 화면이라 라벨을 띄운다(실사용이 확인되면
+      // catalog.json 에 isActualProductUse:true 로 등록해 라벨을 뺄 수 있다).
+      inputProps.brollNotice = DIRECTED_SCENE_LABEL;
       console.log(`직접 소재 사용: ${files.join(", ")}`);
     } else {
       console.warn("직접 소재 처리 실패 - 자동 소싱/스톡으로 폴백");
@@ -282,6 +317,7 @@ async function renderVideo(
       inputProps.brollDurations = brollFileDurations(sourced.files);
       cachedBundle = null;
       brollOrigin = sourced.origin;
+      inputProps.brollNotice = STAGED_SCENE_LABEL;
       console.log(`상품 영상 사용 (${sourced.origin}): ${sourced.files.join(", ")}`);
     } else {
       console.log("실사용 스톡 영상 검색 중 (4컷)...");
@@ -300,11 +336,34 @@ async function renderVideo(
         // 새로 받은 클립이 번들에 포함되도록 번들 캐시 무효화
         cachedBundle = null;
         brollOrigin = "실사용 스톡(Pexels)";
+        inputProps.brollNotice = STAGED_SCENE_LABEL;
         console.log(
           `스톡 클립 ${brolls.length}개 사용: ` +
             brolls.map((b) => `${b.file}(${b.durationSec}s)`).join(", ")
         );
       }
+    }
+  }
+
+  // 렌더에 넘기기 직전, 실제로 존재하는 클립만 남긴다.
+  // 없는 파일이 하나라도 섞이면 Remotion 이 delayRender 타임아웃으로 렌더를
+  // 통째로 실패시킨다(템플릿의 onError 로는 못 막는다 - brollCatalog.ts 주석 참고).
+  // 배경을 전부 잃더라도 제품 사진 화면으로 나가는 편이 낫다.
+  if (inputProps.brollFiles?.length) {
+    const usable = existingBrollFiles(inputProps.brollFiles);
+    if (usable.length !== inputProps.brollFiles.length) {
+      const missing = inputProps.brollFiles.filter((f) => !usable.includes(f));
+      console.warn(`배경 클립 누락 ${missing.length}개 제외: ${missing.join(", ")}`);
+    }
+    if (usable.length > 0) {
+      // 길이 배열도 남은 파일 기준으로 다시 잡는다 (인덱스가 어긋나면 Loop 판정이 틀어진다)
+      inputProps.brollFiles = usable;
+      inputProps.brollDurations = brollFileDurations(usable);
+    } else {
+      inputProps.brollFiles = null;
+      inputProps.brollDurations = null;
+      inputProps.brollNotice = null;
+      brollOrigin = "배경 없음(클립 파일 없음)";
     }
   }
 
@@ -329,7 +388,7 @@ async function renderVideo(
     inputProps.benefit1,
     inputProps.benefit2,
     inputProps.usageTip ?? "", // 구버전 대본이면 빈 줄 → 무음(0초 장면)
-    inputProps.reviewLine,
+    inputProps.checkPoint,
     inputProps.ctaText,
   ]);
   if (narrationLines) {
@@ -349,7 +408,10 @@ async function renderVideo(
     console.log("나레이션 없음 (TTS 실패 또는 비활성) - 고정 15초 타이밍으로 진행");
   }
 
-  const compositionId = `Template${effectiveTemplate}`;
+  // 사용상황형 변형은 E 계열일 때만 의미가 있다 (D 는 전면 배경 포맷이라 구조가 다르다).
+  // 다른 포맷을 강제한 상태에서는 기존 동작을 그대로 둔다.
+  const useUseCase = effectiveTemplate === "E" && shortsVariantOf(item) === "usecase";
+  const compositionId = useUseCase ? "TemplateEUseCase" : `Template${effectiveTemplate}`;
 
   const composition = await selectComposition({
     serveUrl,
@@ -529,6 +591,55 @@ async function publishToSns(
     if (error) console.warn("채널 URL 즉시 기록 실패(무시):", error.message.slice(0, 100));
   };
 
+  // 캡션 맨 위에 대가성 고지를 붙인다. 발행 직전에 붙이므로 이미 문구가
+  // 만들어져 큐에 들어가 있던 항목에도 그대로 적용된다.
+  const snsCaption = instagramCaption(captionText, item.display_number);
+  const shortName = shortenProductName(product.product_name);
+  const ytTitle = youtubeTitle(item.display_number, shortName);
+  const ytDescription = youtubeShortsDescription(
+    item.display_number,
+    shortName,
+    shortsVariantOf(item)
+  );
+
+  // 발행 직전 정책 검사.
+  //
+  // 대본 생성 단계(ai.ts)에도 같은 검사가 있지만, 실제로 채널에 올라가는 건
+  // 거기서 만들어진 문구가 아니라 제목·설명·캡션으로 "조립된" 텍스트다.
+  // 조립 과정에서 상품명이 섞여 들어오므로(쿠팡 제목에 마케팅 문구가 붙어 있는
+  // 경우가 있다) 나가기 직전에 완성본을 한 번 더 본다.
+  // 걸리면 올리지 않는다 - 정지 사유가 될 문구를 내보내는 것보다 한 편 늦는 게 낫다.
+  const policyIssues = checkPublishTexts({
+    title: ytTitle,
+    script: item.script_text,
+    caption: snsCaption,
+    description: ytDescription,
+  });
+  if (policyIssues.length > 0) {
+    const summary = describePublishIssues(policyIssues);
+    const message = `정책 위반 표현이 있어 발행을 중단했습니다 - ${summary}`;
+    console.error(`${formatDisplayNumber(item.display_number)} ${message}`);
+    await notify(
+      [
+        "🚫 발행 중단 (정책 검사)",
+        "",
+        `${formatDisplayNumber(item.display_number)} ${shortName}`,
+        "",
+        `걸린 표현 → ${summary}`,
+        "",
+        "영상·문구는 만들어져 있으니 문구만 고쳐서 다시 올리면 됩니다.",
+      ].join("\n")
+    );
+    return {
+      youtubeUrl: null,
+      youtubeError: message,
+      instagramUrl: null,
+      instagramError: message,
+      facebookUrl: null,
+      facebookError: message,
+    };
+  }
+
   // 유튜브 쇼츠
   //
   // 하루 상한이 있는 이유: 유튜브 Data API 무료 할당량은 하루 10,000 units 인데
@@ -553,8 +664,8 @@ async function publishToSns(
       console.log("유튜브 업로드 중...");
       const result = await uploadShortToYoutube({
         localPath: videoPath,
-        title: youtubeTitle(item.display_number, shortenProductName(product.product_name)),
-        description: youtubeDescription(item.display_number, shortenProductName(product.product_name)),
+        title: ytTitle,
+        description: ytDescription,
         tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
         thumbnailPath,
       });
@@ -589,7 +700,7 @@ async function publishToSns(
         await makeFilePublic(driveVideoFileId);
         const result = await publishReelToInstagram({
           videoUrl: driveDirectDownloadUrl(driveVideoFileId),
-          caption: captionText,
+          caption: snsCaption,
         });
         instagramUrl = result.url;
         console.log("인스타 업로드 완료:", instagramUrl);
@@ -615,7 +726,7 @@ async function publishToSns(
         await makeFilePublic(driveVideoFileId);
         const result = await publishReelToFacebook({
           videoUrl: driveDirectDownloadUrl(driveVideoFileId),
-          caption: captionText,
+          caption: snsCaption,
         });
         facebookUrl = result.url;
         console.log("페이스북 업로드 완료:", facebookUrl);
@@ -1268,7 +1379,7 @@ async function runDemo(): Promise<void> {
   console.log("대본:");
   console.log(
     `  후킹: ${copy.hookText}\n  공감: ${copy.empathyLine}\n  장점1: ${copy.benefit1}\n` +
-      `  장점2: ${copy.benefit2}\n  팁: ${copy.usageTip}\n  후기: ${copy.reviewLine}`
+      `  장점2: ${copy.benefit2}\n  팁: ${copy.usageTip}\n  확인: ${copy.checkPoint}`
   );
 
   const demoItem: VideoItem = {

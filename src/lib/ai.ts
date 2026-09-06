@@ -1,5 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { Product, VideoCopy, TemplateType } from "@/types/db";
+import type {
+  Product,
+  ShortsTemplateVariant,
+  TemplateType,
+  VideoCopy,
+} from "@/types/db";
 import { optionalEnv } from "./env";
 import { shortenProductName } from "./format";
 import {
@@ -10,65 +15,17 @@ import {
   pick,
 } from "./copyPresets";
 import { getSetting } from "./settings";
+import {
+  BANNED_PHRASES,
+  DISCLOSURE_LINE,
+  POLICY_BANNED_PHRASES,
+} from "./policy";
+
+// 대가성 고지 문구의 원래 자리가 여기라 기존 import 경로를 유지한다
+// (longform.ts, scripts/yt-disclosure-backfill.ts 가 여기서 가져다 쓴다).
+export { DISCLOSURE_LINE } from "./policy";
 
 const DEFAULT_MODEL = "claude-opus-4-8";
-
-/**
- * 쿠팡파트너스 운영정책 위반 표현 (2026-08 공지 대응).
- * 클릭 유도·긴급성·희소성·과장·오인성 표현은 계정 제재 사유라 코드로 막는다.
- * 걸리면 안전한 프리셋 문구로 폴백한다(내보내지 않는다).
- */
-// 부분 문자열로 검사하므로 "달려 있어요"·"담아두면" 같은 정상 표현이
-// 걸리지 않도록 명령형 형태까지 포함해 좁게 적는다.
-const POLICY_BANNED_PHRASES = [
-  // 클릭 명령·유도
-  "클릭",
-  "눌러보세요",
-  "누르세요",
-  "장바구니 담",
-  "지금 달려",
-  "달려가",
-  // 긴급성·희소성
-  "서둘러",
-  "품절되기 전",
-  "마지막 기회",
-  "놓치지 마",
-  "지나가면 못",
-  "다시 찾기 어려",
-  "한정수량",
-  "수량 한정",
-  "마감 임박",
-  "오늘만",
-  // 과장·오인성
-  "미쳤",
-  "실화",
-  "가격 오류",
-  "역대급",
-  "최저가",
-  "핫딜",
-  "특가",
-  "반값",
-  "떨이",
-  "쿠팡 사고",
-  "무조건",
-];
-
-/** 허위 후기/과장으로 보일 수 있어 금지하는 표현 */
-const BANNED_PHRASES = [
-  "직접 써봤",
-  "제가 써봤",
-  "써보니",
-  "우리 아이가 써",
-  "매일 쓰고 있",
-  "효과 확실",
-  "무조건 사세요",
-  "무조건 사야",
-  "인생템",
-  "대박템",
-  "안 사면 손해",
-  "완전 강추",
-  "강추",
-];
 
 /**
  * hookText/empathyLine/benefit1/benefit2 는 script_text 에 줄 단위로 합쳐져
@@ -86,7 +43,7 @@ function sanitizeCopy(copy: VideoCopy): VideoCopy {
     benefit1: singleLine(copy.benefit1),
     benefit2: singleLine(copy.benefit2),
     usageTip: singleLine(copy.usageTip),
-    reviewLine: singleLine(copy.reviewLine),
+    checkPoint: singleLine(copy.checkPoint),
     captionText: (copy.captionText ?? "").trim(),
   };
 }
@@ -178,7 +135,7 @@ export function findNegativeLines(copy: VideoCopy): string[] {
     copy.benefit1,
     copy.benefit2,
     copy.usageTip,
-    copy.reviewLine,
+    copy.checkPoint,
     copy.captionText,
   ].filter((line) => line && hasNegativeTone(line));
 }
@@ -190,7 +147,7 @@ function containsBannedPhrase(copy: VideoCopy): boolean {
     copy.benefit1,
     copy.benefit2,
     copy.usageTip,
-    copy.reviewLine,
+    copy.checkPoint,
     copy.captionText,
   ].join("\n");
   return BANNED_PHRASES.some((p) => all.includes(p));
@@ -208,7 +165,7 @@ export function findPolicyViolations(copy: VideoCopy): string[] {
     copy.benefit1,
     copy.benefit2,
     copy.usageTip,
-    copy.reviewLine,
+    copy.checkPoint,
     (copy.captionText ?? "").replace(DISCLOSURE_LINE, ""),
   ].join("\n");
   return POLICY_BANNED_PHRASES.filter((p) => body.includes(p));
@@ -216,7 +173,7 @@ export function findPolicyViolations(copy: VideoCopy): string[] {
 
 /**
  * 스크립트 전문(줄 단위, 워커가 그대로 장면으로 사용):
- * 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 후기 → 번호 CTA (7줄)
+ * 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 확인할 점 → 번호 CTA (7줄)
  */
 export function composeScriptText(copy: VideoCopy, displayNumber: number): string {
   return [
@@ -225,7 +182,7 @@ export function composeScriptText(copy: VideoCopy, displayNumber: number): strin
     copy.benefit1,
     copy.benefit2,
     copy.usageTip,
-    copy.reviewLine,
+    copy.checkPoint,
     ctaLine(displayNumber),
   ].join("\n");
 }
@@ -255,27 +212,17 @@ export function ctaLine(displayNumber: number): string {
 }
 
 /**
- * 대가성 고지 문구.
- *
- * 2026-08-05 ~ 2026-08-28: SNS(영상·캡션)에는 안 넣고 랜딩 페이지에만 뒀었다.
- * 전체 점검에서 이 구성이 공정위 「추천·보증 등에 관한 표시·광고 심사지침」
- * ("게시물의 제목 또는 동영상 내"에 있어야 하고 "'더보기'를 눌러야만 확인
- * 가능한 경우"는 부적절)에 못 미친다는 지적이 나왔고, 사장님 확인 후
- * 2026-08-28 화면 안(TemplateE DisclosureTag)에 작고 차분하게 복원했다.
- * 캡션·설명란은 그대로 두되(영상 자체로 요건 충족), 되돌릴 때를 대비해
- * 이 상수와 소급 적용 스크립트(scripts/yt-disclosure-backfill.ts)는 남겨둔다.
- */
-export const DISCLOSURE_LINE =
-  "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
-
-/**
  * AI 미설정/실패 시 사용하는 폴백 문구.
- * 구성: 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 후기 → CTA. (7장면)
- * - 카테고리별 변형(후킹/공감/팁/후기)을 시드로 골라 매번 다르게 (copyPresets).
+ * 구성: 후킹 → 공감 → 장점1 → 장점2 → 사용팁 → 확인할 점 → CTA. (7장면)
+ * - 카테고리별 변형(후킹/공감/팁/확인할 점)을 시드로 골라 매번 다르게 (copyPresets).
  * - 장점1·2 는 상품명에서 뽑은 "실제 제품 특징"을 우선 쓴다 → 제품 설명이 들어감.
  * - 시드 = displayNumber + 상품명 해시 → 같은 카테고리라도 상품마다 조합이 달라짐.
  */
-export function fallbackCopy(product: Product, displayNumber: number): VideoCopy {
+export function fallbackCopy(
+  product: Product,
+  displayNumber: number,
+  variant: ShortsTemplateVariant = "classic"
+): VideoCopy {
   const category = product.category || "생활템";
   // 관리자 폼으로 들어온 값이라 개행이 섞여 있을 수 있다. 이 값이 훅/장점 줄이
   // 되므로 개행을 정리하지 않으면 script_text 7줄 규칙이 깨진다(줄 밀림).
@@ -300,22 +247,36 @@ export function fallbackCopy(product: Product, displayNumber: number): VideoCopy
   // 장점2: 상품명 특징 2순위 → 구성 스펙 → 카테고리 폴백
   const benefit2 = features[1] ?? spec ?? v.b2;
 
-  const copy: VideoCopy = {
-    hookText,
-    empathyLine: pick(v.empathies, seed >> 1),
-    benefit1,
-    benefit2,
-    usageTip: pick(v.tips, seed >> 2),
-    reviewLine: pick(v.reviews, seed >> 3),
-    captionText: "",
-  };
+  // 사용상황형은 "제품 자랑" 대신 "이 물건이 놓이는 자리" 순서로 말한다.
+  // 줄 수(7줄)와 각 줄의 자리는 그대로 두고 내용만 바꾼다 - 대본 파싱·나레이션
+  // 슬롯·장면 타이밍이 전부 줄 위치에 묶여 있어서, 구조를 건드리면 전 템플릿이 흔들린다.
+  const copy: VideoCopy =
+    variant === "usecase"
+      ? {
+          hookText: pick(v.situationHooks, seed),
+          empathyLine: pick(v.empathies, seed >> 1),
+          benefit1: pick(v.usages, seed >> 2), // 용도
+          benefit2: pick(v.structures, seed >> 3), // 구조
+          usageTip: pick(v.checks, seed >> 4), // 확인할 점
+          checkPoint: pick(v.fits, seed >> 5), // 맞는 집
+          captionText: "",
+        }
+      : {
+          hookText,
+          empathyLine: pick(v.empathies, seed >> 1),
+          benefit1,
+          benefit2,
+          usageTip: pick(v.tips, seed >> 2),
+          checkPoint: pick(v.checks, seed >> 3),
+          captionText: "",
+        };
 
   copy.captionText = [
     `${copy.hookText} ${copy.empathyLine}.`,
     `${shortenProductName(product.product_name)}, ${copy.benefit1}. ${copy.benefit2}.`,
     copy.usageTip,
     "",
-    "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요.",
+    "쿠팡 카테고리 베스트에서 눈에 띈 살림템을 번호로 정리하고 있어요.",
     `영상 속 제품은 프로필 링크에 정리해 뒀어요. (${displayNumber}번)`,
     "",
     "#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템",
@@ -351,10 +312,10 @@ const COPY_SCHEMA = {
       description:
         "생활 속 활용팁. 이 제품을 언제/어디서/어떻게 쓰면 좋은지 구체적인 장면 하나를 제안 (예: '자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 달라요'). 30자 내외.",
     },
-    reviewLine: {
+    checkPoint: {
       type: "string",
       description:
-        "긍정적 후기 언급(사회적 증거). '후기가 많다', '평이 괜찮아 보인다'처럼 남들의 반응을 전하는 톤. 본인이 써봤다는 주장 금지. 25자 내외.",
+        "사기 전에 확인해 보면 좋은 점 하나(사이즈·설치 방식·재질·세척·호환 규격 등). 상품 정보로 알 수 있는 사실만. 후기·평점·판매량 언급 금지. 25자 내외.",
     },
     captionText: {
       type: "string",
@@ -368,7 +329,7 @@ const COPY_SCHEMA = {
     "benefit1",
     "benefit2",
     "usageTip",
-    "reviewLine",
+    "checkPoint",
     "captionText",
   ],
   additionalProperties: false,
@@ -446,8 +407,11 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
    benefit1 과 겹치지 않는 새로운 장점이어야 한다. 여전히 "제품의 장점"이지 후기가 아니다.
 5. usageTip: 생활 속 활용팁. 언제/어디서/어떻게 쓰면 좋은지 구체적 장면 하나를 그려준다.
    예) "자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 달라요"
-6. reviewLine: 긍정적 후기를 언급한다(사회적 증거). "후기가 꽤 많더라고요",
-   "평이 괜찮아 보여요"처럼 남들의 반응을 전하는 톤. 절대 본인이 써봤다고 하지 않는다.
+6. checkPoint: 사기 전에 확인해 보면 좋은 점을 하나 알려준다(사이즈·설치 방식·재질·
+   세척 방법·호환 규격 등). 상품 정보로 확인할 수 있는 사실만 쓴다.
+   * 후기·평점·판매량은 언급하지 않는다. 우리는 그 데이터를 가지고 있지 않아서
+     "후기가 많다", "평이 좋다"는 근거 없는 주장이 된다(표시광고법 위반 소지).
+   예) "놓을 자리 폭을 먼저 재보면 좋아요", "식기세척기를 써도 되는지 보면 좋아요"
 7. (CTA 는 시스템이 자동 생성)
 - hookText 와 empathyLine 은 같은 화면에 위아래로 쌓여 나오므로 자연스럽게 이어지게.
 - benefit1 → benefit2 는 제품의 장점을 충분히 소개하는 구간이니 서로 다른 매력을 짚어준다.
@@ -464,8 +428,9 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
 캡션 규칙:
 - 본문은 후킹+공감+장점을 자연스럽게 2~3문장으로.
 - 첫 문장이 접힌 캡션에서 유일하게 보이는 줄이다 - 훅의 궁금증을 이어받아 더보기를 누르게 쓴다.
-- "가성비 좋고 후기까지 확인한 제품만 골라서 정리하고 있어요." 같은 큐레이션 기준 문장 포함
-  (직접 사용해봤다는 표현은 금지 - 고른 기준만 말한다).
+- "쿠팡 카테고리 베스트에서 눈에 띈 살림템을 번호로 정리하고 있어요." 처럼
+  우리가 실제로 하는 일만 적는다. 후기 수·평점·판매량은 우리가 가진 데이터가
+  아니므로 언급하지 않는다(직접 사용해봤다는 표현도 금지).
 - 반드시 "영상 속 제품은 프로필 링크에 정리해 뒀어요. ({번호}번)" 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
 - 캡션에도 클릭 유도·긴급성·과장 표현을 쓰지 않는다(영상 본문과 같은 규정 적용).
 - 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;
@@ -479,7 +444,7 @@ const GEMINI_COPY_SCHEMA = {
     benefit1: { type: "STRING" },
     benefit2: { type: "STRING" },
     usageTip: { type: "STRING" },
-    reviewLine: { type: "STRING" },
+    checkPoint: { type: "STRING" },
     captionText: { type: "STRING" },
   },
   required: [
@@ -488,7 +453,7 @@ const GEMINI_COPY_SCHEMA = {
     "benefit1",
     "benefit2",
     "usageTip",
-    "reviewLine",
+    "checkPoint",
     "captionText",
   ],
   propertyOrdering: [
@@ -497,7 +462,7 @@ const GEMINI_COPY_SCHEMA = {
     "benefit1",
     "benefit2",
     "usageTip",
-    "reviewLine",
+    "checkPoint",
     "captionText",
   ],
 };
@@ -529,7 +494,8 @@ function hookPatternHint(displayNumber: number): string {
 function buildUserPrompt(
   product: Product,
   displayNumber: number,
-  templateType: TemplateType
+  templateType: TemplateType,
+  variant: ShortsTemplateVariant = "classic"
 ): string {
   const templateHint: Record<TemplateType, string> = {
     A: "템플릿 A(생활 문제 해결형): 문제 제기 → 공감 → 제품 등장 → 장점 → 번호 CTA 흐름.",
@@ -554,8 +520,35 @@ function buildUserPrompt(
     "hookText 는 매번 새롭고 다르게, 뻔한 첫 문장(예: '이거 하나면')은 피해라.",
     "hookText 는 18자 이내로 짧게 - 썸네일에 초대형으로 박힌다.",
     hookPatternHint(displayNumber),
+    ...(variant === "usecase" ? ["", USECASE_PROMPT_BLOCK] : []),
   ].join("\n");
 }
+
+/**
+ * 사용상황형 변형 지시.
+ *
+ * 기본 대본은 "제품이 이래서 좋다"를 두 줄(benefit1·benefit2) 연달아 말한다.
+ * 그게 광고처럼 들려 링크까지 안 간다는 판단으로 만든 변형이라, 같은 7줄
+ * 자리에 다른 성격의 내용을 채운다. 줄 수·순서는 절대 바꾸지 않는다
+ * (대본 파싱·나레이션·장면 타이밍이 전부 줄 위치에 묶여 있다).
+ */
+const USECASE_PROMPT_BLOCK = [
+  "[이번 영상은 '사용상황형'이다 - 각 필드의 성격이 아래로 바뀐다]",
+  "- hookText: 제품 칭찬이 아니라 '생활 상황'으로 연다.",
+  "  좋은 예) '싱크대 아래가 자주 흐트러지면', '책상 위 케이블이 눈에 밟히면'",
+  "  나쁜 예) '주부들 난리난 아이템', '무조건 사야 하는 제품', '역대급 가성비'",
+  "- empathyLine: 그 상황을 한 줄로 이어받는다(불평이 아니라 바람으로).",
+  "- benefit1 → 이 자리에는 '용도'를 쓴다. 어디에 두고 무엇에 쓰는 물건인지.",
+  "  예) '싱크대 아래처럼 자잘한 물건이 모이는 공간에 두고 쓰는 타입이에요'",
+  "- benefit2 → 이 자리에는 '구조'를 쓴다. 설치·작동 방식이 어떻게 갈리는지.",
+  "  예) '걸이형·선반형·흡착형처럼 설치 방식이 먼저 갈려요'",
+  "- usageTip → 이 자리에는 '확인할 점'을 쓴다. 사기 전에 재보거나 봐야 할 것.",
+  "  예) '설치 위치 두께와 전체 사이즈를 먼저 확인하는 게 좋아요'",
+  "- checkPoint → 이 자리에는 '맞는 집 / 맞지 않을 수 있는 경우'를 쓴다.",
+  "  예) '바닥보다 벽면·문틈 공간이 남는 집에 맞아요'",
+  "  단점을 지어내지 말고, 상품 성격상 자연히 갈리는 조건만 담백하게 적는다.",
+  "- 이 변형에서도 후기·평점·판매량 언급은 금지다(우리에겐 그 데이터가 없다).",
+].join("\n");
 
 /** 약한 훅이 나왔을 때 재생성에 붙이는 교정 지시 */
 function weakHookRetryNote(rejected: string): string {
@@ -718,7 +711,8 @@ export async function geminiGenerateJson<T>(opts: {
 export async function generateVideoCopy(
   product: Product,
   displayNumber: number,
-  templateType: TemplateType
+  templateType: TemplateType,
+  variant: ShortsTemplateVariant = "classic"
 ): Promise<VideoCopy> {
   // 환경변수 우선, 없으면 Supabase app_settings 에서 조회
   // (GitHub 시크릿을 손대지 않고 키를 넣을 수 있게 - 배포 없이 갱신 가능)
@@ -727,10 +721,10 @@ export async function generateVideoCopy(
   const anthropicKey =
     optionalEnv("AI_API_KEY") ?? (await getSetting("AI_API_KEY")) ?? undefined;
   if (!geminiKey && !anthropicKey) {
-    return fallbackCopy(product, displayNumber);
+    return fallbackCopy(product, displayNumber, variant);
   }
 
-  const userPrompt = buildUserPrompt(product, displayNumber, templateType);
+  const userPrompt = buildUserPrompt(product, displayNumber, templateType, variant);
   const run = (prompt: string) =>
     geminiKey
       ? generateWithGemini(geminiKey, prompt)
@@ -738,10 +732,10 @@ export async function generateVideoCopy(
 
   try {
     const raw = await run(userPrompt);
-    if (!raw) return fallbackCopy(product, displayNumber);
+    if (!raw) return fallbackCopy(product, displayNumber, variant);
     let copy = sanitizeCopy(raw);
     if (containsBannedPhrase(copy)) {
-      return fallbackCopy(product, displayNumber);
+      return fallbackCopy(product, displayNumber, variant);
     }
 
     // 운영정책 위반 표현(클릭유도·긴급성·과장)은 재생성 없이 바로 안전한
@@ -751,7 +745,7 @@ export async function generateVideoCopy(
       console.warn(
         `쿠팡 운영정책 위반 표현 감지(${violations.join(", ")}) - 프리셋 문구로 폴백`
       );
-      return fallbackCopy(product, displayNumber);
+      return fallbackCopy(product, displayNumber, variant);
     }
 
     // 훅이 약하면(순한 호명·동의구걸 등) 교정 지시를 붙여 1회만 재생성한다.
@@ -816,11 +810,11 @@ export async function generateVideoCopy(
       console.warn(
         `재생성본에서 운영정책 위반 감지(${finalViolations.join(", ")}) - 프리셋 문구로 폴백`
       );
-      return fallbackCopy(product, displayNumber);
+      return fallbackCopy(product, displayNumber, variant);
     }
     return copy;
   } catch (error) {
     console.error("AI 문구 생성 실패, 기본 문구로 폴백:", error);
-    return fallbackCopy(product, displayNumber);
+    return fallbackCopy(product, displayNumber, variant);
   }
 }

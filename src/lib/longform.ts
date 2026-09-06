@@ -4,6 +4,7 @@ import { getSetting } from "./settings";
 import { cleanProductTitle, productTargetUrl, formatDisplayNumber } from "./format";
 import { DISCLOSURE_LINE } from "./ai";
 import { fetchCommissionReport } from "./coupang";
+import { outboundUrl } from "./tracking";
 import type { Top10Item } from "../../remotion/templates/TemplateTop10";
 
 /**
@@ -522,7 +523,18 @@ export function longformDescription(
   // (사장님 피드백: 줄바꿈 없이 붙어 있으니 어디까지가 한 상품인지 구분이 안 됨).
   const linkSection = ranked1to10
     .map((it) => {
-      const url = it.linkUrl ?? "";
+      // 제휴 링크로 바로 가되 /go 를 거친다 - 어느 순위 칸의 링크가 실제로
+      // 눌리는지 알아야 다음 편 구성을 고칠 수 있다(순위별 성과 비교).
+      // 번호가 없는 예외 상황에서만 원본 링크로 떨어뜨린다.
+      const url =
+        it.displayNumber > 0
+          ? outboundUrl(it.displayNumber, {
+              source: "youtube_longform",
+              channel: "youtube",
+              templateVariant: "top10",
+              rank: it.rank,
+            })
+          : (it.linkUrl ?? "");
       return `${it.rank}위. ${it.productName} - ${it.priceText} (${formatDisplayNumber(it.displayNumber)})\n${url}`;
     })
     .join("\n\n");

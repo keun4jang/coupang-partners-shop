@@ -212,3 +212,12 @@ create trigger trg_longform_items_updated_at
   for each row execute function set_updated_at();
 
 create index if not exists idx_longform_items_created_at on longform_items (created_at desc);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 이후 변경분은 supabase/migrations/ 아래에 날짜별 파일로 둔다.
+-- 새 프로젝트에 처음 올릴 때는 이 파일을 먼저 실행하고, migrations 폴더의
+-- 파일들을 이름순으로 이어서 실행하면 된다.
+--   · 20260906_product_event_daily.sql
+--     (product_event_daily 집계 테이블 + increment_product_event_daily 함수
+--      + video_items.template_variant 컬럼)
+-- ─────────────────────────────────────────────────────────────────────

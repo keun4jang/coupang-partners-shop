@@ -12,7 +12,7 @@ export type SceneTiming = {
   benefit2To: number;
   /** 사용팁 장면 종료 */
   tipTo: number;
-  /** 후기 장면 종료 */
+  /** 확인할 점 장면 종료 (필드명은 예전 "후기" 슬롯 시절 그대로 - 타이밍 키라 유지) */
   reviewTo: number;
   /** = 영상 전체 길이(초) */
   ctaTo: number;
@@ -32,8 +32,8 @@ export type ShortsProps = {
   benefit2: string;
   /** 사용팁/활용법 - 생활 속에서 어떻게 쓰면 좋은지 (구버전 대본엔 없어서 null 허용) */
   usageTip: string | null;
-  /** 후기 언급(사회적 증거) */
-  reviewLine: string;
+  /** 확인할 점 - 사이즈·설치 방식·재질 등 (근거 없는 후기 언급을 대체한 슬롯) */
+  checkPoint: string;
   /** CTA (예: 영상 속 제품은 17번에 정리해뒀어요) */
   ctaText: string;
   productImageUrl: string | null;
@@ -45,8 +45,17 @@ export type ShortsProps = {
   /** brollFiles 각 클립의 길이(초). 컷 구간보다 짧으면 Loop 로 이어 붙인다. */
   brollDurations?: number[] | null;
   /**
+   * 배경 클립 위에 띄울 안내 라벨 ("사용 상황 예시" / "연출 화면").
+   *
+   * 우리가 쓰는 배경은 스톡 또는 연출 소재라 "실제로 그 제품을 쓰는 장면"이
+   * 아니다. 라벨이 없으면 시청자가 제품 사용 영상으로 오해할 수 있어
+   * (표시광고법상 오인 소지) 화면 안에 작게 붙인다.
+   * null 이면 라벨을 띄우지 않는다 - 실사용 영상이 확인된 경우에만.
+   */
+  brollNotice?: string | null;
+  /**
    * 장면별 나레이션 오디오 (data URI mp3).
-   * 순서: [후킹, 공감, 장점1, 장점2, 사용팁, 후기, CTA] (7개, 사용팁 없으면 null).
+   * 순서: [후킹, 공감, 장점1, 장점2, 사용팁, 확인할 점, CTA] (7개, 사용팁 없으면 null).
    * null 이면 해당 장면 무음.
    */
   narration?: (string | null)[] | null;
@@ -62,13 +71,14 @@ export const defaultShortsProps: ShortsProps = {
   benefit1: "차에 하나 놔주면 괜찮아 보여요",
   benefit2: "작아서 신랑도 부담 없이 쓸 것 같고요",
   usageTip: "시트 틈새랑 컵홀더까지 구석구석 밀어주면 돼요",
-  reviewLine: "후기도 많고 평이 괜찮아 보이더라고요",
-  ctaText: "이 영상 지나가면 다시 찾기 어려워요, 프로필 링크에 있어요",
+  checkPoint: "시트 사이 폭이 맞는지 먼저 재보면 좋아요",
+  ctaText: "영상 속 제품은 프로필 링크에 정리해 뒀어요",
   productImageUrl: null,
   category: "차량용품",
   brollFile: null,
   brollFiles: null,
   brollDurations: null,
+  brollNotice: "사용 상황 예시",
   narration: null,
   timing: null,
 };

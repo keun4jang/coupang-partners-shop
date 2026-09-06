@@ -34,7 +34,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         brollFiles={props.brollFiles}
         brollDurations={props.brollDurations}
         // 배경 컷 경계. 예전엔 4개뿐이라 마지막 컷이 영상의 49%(21초 중 10.2초)를
-        // 혼자 차지해 후반 내내 같은 배경이 깔렸다. 사용팁·후기 경계를 넣어 고르게 나눈다.
+        // 혼자 차지해 후반 내내 같은 배경이 깔렸다. 사용팁·확인할 점 경계를 넣어 고르게 나눈다.
         // 사용팁이 없는 구버전 대본은 tip.to === benefit2.to 라 0초 컷이 생기므로
         // 중복을 제거한다.
         cutSeconds={[
@@ -77,7 +77,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
 
       {/* 제품 노출: 장점1에서 한 번 등장한 뒤 CTA 직전까지 화면 전환 없이 쭉 유지.
           (같은 상품 사진이 장면마다 다시 팝인되면 3번 전환되는 것처럼 보여서
-           하나의 연속 노출로 합침 - 자막만 장점1→장점2→후기로 바뀐다) */}
+           하나의 연속 노출로 합침 - 자막만 장점1→장점2→확인할 점으로 바뀐다) */}
       <Sequence
         from={f(T.product.from)}
         durationInFrames={ctaFrom - f(T.product.from)}
@@ -136,13 +136,13 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         </Sequence>
       )}
 
-      {/* 후기 언급 */}
+      {/* 확인할 점 */}
       <Sequence
         from={f(T.review.from)}
         durationInFrames={f(T.review.to - T.review.from)}
       >
         <Subtitle
-          text={props.reviewLine}
+          text={props.checkPoint}
           size={FONT_SIZES.benefit}
           variant="bubble"
           y={0.13}

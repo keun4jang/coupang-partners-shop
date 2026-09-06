@@ -29,23 +29,32 @@ import { BgmAudio } from "../components/Background";
 import { Narration } from "../components/Narration";
 
 /**
- * Template E: 살림 검증 노트 (2026-08 디자인 컨설팅 A안 첫3초 + C안 본문 하이브리드)
+ * Template E-UseCase: 사용상황형 (클릭률 개선 1차, 2026-09)
  *
- * 기존 D(전면 스톡영상 + 떠다니는 자막)와 완전히 다른 문법:
- *  - 종이색 단색 배경. 텍스트는 외곽선 없이 잉크색으로 (노래방 자막 제거)
- *  - 0초부터 제품 사진이 보인다 (D 는 4.6초 - 평균 시청 2.72초라 대부분 못 봄)
- *  - 본문은 "검증 노트": 장점1→장점2→사용TIP→확인 행이 나레이션에 맞춰 쌓이고
- *    끝까지 남아 마지막 화면이 그대로 "한눈 요약"이 된다 (저장 유도 장치)
- *  - 스톡 영상은 둥근 사진 창 안에만, 컷 3개 이하
- *  - CTA 는 전체 화면 점거(380px 원) 대신 사진 창 자리의 포인트 카드
+ * TemplateE(살림 검증 노트)를 대체하지 않고 나란히 둔다 - 어느 쪽이 링크까지
+ * 데려가는지 비교해야 하기 때문이다(video_items.template_variant + /go 추적).
  *
- * 화면 문구 = 나레이션 원칙 유지: 행 본문은 전부 나레이션된 문장 그대로이고,
- * "장점 1 / 사용 TIP / 확인" 라벨은 D 의 "보관 TIP" 배지와 같은 구조 라벨이다.
+ * E 와 무엇이 다른가:
+ *  · E 는 "제품이 이래서 좋다"(장점1·장점2)를 연달아 말한다. 광고 문법이라
+ *    실측 CTR 이 0.08% 수준까지 떨어졌다.
+ *  · 여기서는 "생활 상황 → 용도 → 구조 → 확인할 점 → 맞는 집" 순으로 간다.
+ *    사기 전에 궁금한 순서라, 다음 행동이 자연스럽게 "정보 더 보기"가 된다.
+ *  · 배경도 제품 사진 한 장이 아니라 "그 물건이 놓이는 자리" 영상을 쓴다.
+ *
+ * 공통으로 지키는 것(E 와 동일):
+ *  · 종이색 배경 · Pretendard · EDITORIAL 팔레트 (같은 채널로 보이게)
+ *  · 대가성 고지는 본편 첫 화면부터 끝까지 (ChipWithDisclosure)
+ *  · 자막 외곽선·노래방 스타일 없음
+ *  · 첫 프레임 커버 1장은 썸네일 전용 (고지 없음 - 바로 다음 화면부터 나온다)
+ *
+ * 배경 영상 라벨(중요): 우리가 쓰는 배경은 스톡·연출 소재이지 "그 제품을 쓰는
+ * 영상"이 아니다. 오인 소지를 없애려고 창 안에 작게 "사용 상황 예시"를 띄운다.
+ * 판매자 상세페이지 영상·리뷰 영상은 어떤 경우에도 쓰지 않는다.
  */
 
 const CONTENT_W = VIDEO.width - E.safeX * 2;
 
-/** 절제된 팝인 (밀리는 정도 24px, 오버슈트 거의 없음) */
+/** 절제된 팝인 (E 와 같은 모션 언어 - 채널 톤 유지) */
 function useRise(delayFrames = 0) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -60,11 +69,7 @@ function useRise(delayFrames = 0) {
   };
 }
 
-/** 번호 칩 - 시청 내내 떠 있어 번호를 초반부터 기억시킨다 */
-const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
-  displayNumber,
-  label = "오늘의 체크",
-}) => (
+const NumberChip: React.FC<{ displayNumber: number }> = ({ displayNumber }) => (
   <div
     style={{
       display: "inline-flex",
@@ -80,21 +85,12 @@ const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
       width: "fit-content",
     }}
   >
-    <span style={{ opacity: 0.85, fontSize: 30 }}>{label}</span>
-    {/* 번호는 시청자가 기억해서 랜딩에서 찾아야 하는 값이라 라벨보다 크게 */}
+    <span style={{ opacity: 0.85, fontSize: 30 }}>메모장</span>
     <span style={{ fontWeight: 800, fontSize: 42 }}>{displayNumber}번</span>
   </div>
 );
 
-/**
- * 대가성 고지 - 작고 차분한 한 줄. 번호 칩 옆에 붙여 늘 함께 떠 있게 한다
- * (첫 프레임 커버 1장만 예외 - CoverPoster 가 덮는다).
- *
- * 공정위 「추천·보증 등에 관한 표시·광고 심사지침」: 표시문구는 "게시물의 제목
- * 또는 동영상 내"에 있어야 하고 "'더보기'를 눌러야만 확인 가능한 경우"는
- * 부적절 - 랜딩 페이지에만 두던 기존 구성은 이 기준에 못 미쳤다(2026-08-28
- * 전체 점검, 사장님 확인 후 복원). 문구는 TemplateTop10 Intro 화면과 통일.
- */
+/** 대가성 고지 - 문구·크기 모두 TemplateE / TemplateTop10 과 통일 */
 const DisclosureTag: React.FC = () => (
   <div
     style={{
@@ -113,10 +109,9 @@ const DisclosureTag: React.FC = () => (
 );
 
 /**
- * 번호 칩 + 대가성 고지를 한 세트로 묶는다 - 고지는 항상 칩 바로 아래 자기
- * 줄에 고정(gap 8, 세로 높이 ≈ 34px 로 고정)한다. 예전에는 남는 가로폭에
- * 따라(flexWrap) 제품명이 길고 짧음에 따라 매번 줄바꿈 위치가 달라졌는데,
- * 영상마다 모양이 들쑥날쑥해 보여 고정 2줄 블록으로 바꿨다(2026-08-28).
+ * 번호 칩 + 고지 2줄 고정 블록.
+ * 고지 줄이 제품명 길이에 밀리지 않도록 flexShrink:0 을 반드시 유지한다
+ * (TemplateE 에서 실측으로 찾은 문제 - 긴 제품명이 칩을 찌그러뜨렸다).
  */
 const ChipWithDisclosure: React.FC<{
   displayNumber: number;
@@ -124,8 +119,6 @@ const ChipWithDisclosure: React.FC<{
 }> = ({ displayNumber, trailing }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0 }}>
-      {/* flexShrink:0 필수 - 안 붙이면 옆의 긴 제품명에 밀려 칩 자체가
-          찌그러지면서 "오늘의 체크" 글자가 줄바꿈된다(실측으로 발견) */}
       <div style={{ flexShrink: 0 }}>
         <NumberChip displayNumber={displayNumber} />
       </div>
@@ -135,15 +128,7 @@ const ChipWithDisclosure: React.FC<{
   </div>
 );
 
-/**
- * 제품 사진. 로드에 실패하면 렌더 전체가 죽지 않도록 폴백으로 떨어진다.
- *
- * Remotion 의 <Img> 는 onError 가 없으면 로드 실패 시 예외를 던져 렌더가 통째로
- * 실패하고, 그 영상은 failed 로 남아 자동 재시도가 없다. 제품 이미지는 워커가
- * data URI 로 심어주지만(fetchImageAsDataUri) 그게 실패하면 원본 CDN URL 이
- * 그대로 넘어와 헤드리스 브라우저에서 차단될 수 있다. 사진 한 장 때문에
- * 영상을 통째로 잃는 것보다 사진 없이 나가는 편이 낫다.
- */
+/** 제품 사진 - 로드 실패해도 렌더가 죽지 않게 이모지로 떨어진다 */
 const ProductImage: React.FC<{
   src: string | null;
   fallbackSize: number;
@@ -160,7 +145,6 @@ const ProductImage: React.FC<{
   );
 };
 
-/** 제품 사진 카드 (흰 바탕, 얇은 테두리, 은은한 그림자) */
 const ProductCard: React.FC<{
   imageUrl: string | null;
   style?: React.CSSProperties;
@@ -185,13 +169,161 @@ const ProductCard: React.FC<{
 );
 
 /**
- * 본편 첫 장면: 문제 훅 + 공감 + 제품 사진.
- * (썸네일은 별도 CoverPoster 를 쓴다 - 그리드에서 읽히려면 훅이 훨씬 커야 해서 분리했다)
+ * 배경 클립.
+ *
+ * onError 를 다는 이유: 이게 없으면 Remotion 이 cancelRender() 로 렌더를 즉시
+ * 죽인다. 달아두면 최소한 "이 컷만 비는" 쪽으로 흘러간다.
+ *
+ * 다만 이것만으로 안전해지지는 않는다(실측 2026-09-06). 파일이 아예 없으면
+ * Remotion 은 onError 를 부르고도 delayRender() 핸들을 닫지 않아, 결국 28초 뒤
+ * 타임아웃으로 렌더가 실패한다. 그래서 진짜 방어선은 워커 쪽이다 -
+ * 렌더에 넘기기 전에 존재하는 파일만 남긴다(src/lib/brollCatalog.ts
+ * existingBrollFiles). 여기 onError 는 그 뒤에 남는 예외(코덱 문제 등)를 위한
+ * 2차 그물이다.
  */
-const Poster: React.FC<{
+const SafeBroll: React.FC<{ file: string }> = ({ file }) => {
+  const [failed, setFailed] = React.useState(false);
+  if (failed) return null;
+  return (
+    <OffthreadVideo
+      src={staticFile(`assets/broll/${file}`)}
+      muted
+      onError={() => setFailed(true)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
+};
+
+/** "사용 상황 예시" 안내 - 배경이 실제 제품 사용 영상으로 오해되지 않게 */
+const SceneNotice: React.FC<{ text: string }> = ({ text }) => (
+  <div
+    style={{
+      position: "absolute",
+      right: 20,
+      top: 18,
+      background: "rgba(36,33,30,0.62)",
+      color: "rgba(255,255,255,0.94)",
+      borderRadius: 999,
+      padding: "8px 18px",
+      fontSize: 24,
+      fontWeight: 600,
+      letterSpacing: "-0.01em",
+      whiteSpace: "nowrap",
+    }}
+  >
+    {text}
+  </div>
+);
+
+/**
+ * 상황 창 - 그 물건이 놓이는 자리를 보여준다.
+ * 배경 클립이 없으면 제품 사진만 크게 (라벨도 띄우지 않는다 - 사진은 상품 사진이라
+ * 오해할 여지가 없다).
+ */
+const SceneWindow: React.FC<{
+  props: ShortsProps;
+  cutSeconds: number[];
+  fromSecond: number;
+  toSecond: number;
+  /** 제품 사진을 함께 얹을지 (첫 화면에서는 크게, 본문에서는 작게) */
+  productOverlaySize?: number;
+}> = ({ props, cutSeconds, fromSecond, toSecond, productOverlaySize = 410 }) => {
+  const files = props.brollFiles ?? [];
+  const durations = props.brollDurations ?? [];
+  const notice = props.brollNotice ?? null;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        borderRadius: E.radius,
+        overflow: "hidden",
+        border: `1px solid ${E.line}`,
+        background: E.card,
+      }}
+    >
+      {files.length > 0 ? (
+        <>
+          {cutSeconds.map((startSec, i) => {
+            const endSec = i + 1 < cutSeconds.length ? cutSeconds[i + 1] : toSecond;
+            if (endSec <= startSec) return null;
+            const file = files[i % files.length];
+            const clipFrames = durations[i % files.length]
+              ? Math.max(1, Math.round(durations[i % files.length] * VIDEO.fps))
+              : null;
+            const seqFrames = f(endSec - startSec);
+            const video = <SafeBroll file={file} />;
+            return (
+              <Sequence
+                key={i}
+                from={f(startSec - fromSecond)}
+                durationInFrames={seqFrames}
+              >
+                {clipFrames && clipFrames < seqFrames ? (
+                  <Loop durationInFrames={clipFrames}>{video}</Loop>
+                ) : (
+                  video
+                )}
+              </Sequence>
+            );
+          })}
+          <div
+            style={{
+              position: "absolute",
+              left: 28,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: productOverlaySize,
+              height: productOverlaySize,
+              borderRadius: E.radius,
+              background: E.card,
+              border: `1px solid ${E.line}`,
+              boxShadow: "0 14px 40px rgba(36,33,30,0.28)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+              boxSizing: "border-box",
+            }}
+          >
+            <ProductImage src={props.productImageUrl} fallbackSize={120} />
+          </div>
+          {/* 배경이 스톡·연출이면 반드시 라벨을 띄운다 */}
+          {notice ? <SceneNotice text={notice} /> : null}
+        </>
+      ) : (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 32,
+            boxSizing: "border-box",
+          }}
+        >
+          <ProductImage src={props.productImageUrl} fallbackSize={160} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * 본편 첫 화면: 생활 상황 훅 + 공감 + 상황 창(제품은 창 안에 카드로).
+ *
+ * E 의 Poster 와 다른 점은 아래 사진 자리다. E 는 제품 사진 카드 한 장이고,
+ * 여기서는 "그 물건이 놓이는 자리"가 배경으로 깔리고 제품이 그 위에 얹힌다.
+ * 배경이 없으면 자동으로 E 와 같은 모습(제품 사진 카드)이 된다.
+ */
+const SituationPoster: React.FC<{
   props: ShortsProps;
   empathyDelayFrames: number;
-}> = ({ props, empathyDelayFrames }) => {
+  toSecond: number;
+}> = ({ props, empathyDelayFrames, toSecond }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const hookSize = eHookFontSize(props.hookLine);
@@ -236,10 +368,6 @@ const Poster: React.FC<{
         }}
       >
         <ChipWithDisclosure displayNumber={props.displayNumber} />
-        {/* 문제 훅 - 왼쪽 정렬 대형 타이포, 외곽선 없이 잉크색.
-            textWrap:balance - 줄바꿈을 브라우저가 균형 있게 나눠준다(사장님
-            피드백: "법?" 처럼 마지막 줄에 한 단어만 외로이 남는 줄바꿈이
-            어색해 보임). 없으면 그냥 폭이 차는 대로 기계적으로 끊긴다. */}
         <div
           style={{
             color: E.ink,
@@ -259,7 +387,6 @@ const Poster: React.FC<{
             </React.Fragment>
           ))}
         </div>
-        {/* 공감 문장 - 나레이션 시작에 맞춰 훅 아래로 (보조 위계: 600/회색) */}
         <div
           style={{
             color: E.sub,
@@ -276,7 +403,6 @@ const Poster: React.FC<{
         >
           {props.empathyLine}
         </div>
-        {/* 제품 사진 - 0초부터 화면에 (첫 3초 안에 "무엇에 대한 영상인지" 증거) */}
         <div
           style={{
             flex: 1,
@@ -285,110 +411,16 @@ const Poster: React.FC<{
             transform: `translateY(${(1 - cardIn) * 30}px)`,
           }}
         >
-          <ProductCard imageUrl={props.productImageUrl} style={{ width: "100%", height: "100%" }} />
+          <SceneWindow
+            props={props}
+            cutSeconds={[0]}
+            fromSecond={0}
+            toSecond={toSecond}
+            productOverlaySize={360}
+          />
         </div>
       </div>
     </AbsoluteFill>
-  );
-};
-
-/** 사진 창 - 스톡 클립을 둥근 창 안에서만 재생 (컷 경계에서 다음 클립으로) */
-const MediaWindow: React.FC<{
-  props: ShortsProps;
-  /** 창 안 컷 시작 시각(초, 본문 시작 기준 절대 시각) */
-  cutSeconds: number[];
-  fromSecond: number;
-  toSecond: number;
-}> = ({ props, cutSeconds, fromSecond, toSecond }) => {
-  const files = props.brollFiles ?? [];
-  const durations = props.brollDurations ?? [];
-
-  return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        borderRadius: E.radius,
-        overflow: "hidden",
-        border: `1px solid ${E.line}`,
-        background: E.card,
-      }}
-    >
-      {/* 실사용 클립이 카드 전체(≈16:9 가로)에 깔리고, 제품 사진 카드가 그 위에
-          얹힌다 (사장님 피드백 2026-08-18: 영상 소스는 16:9 가로로, 제품은 그 위에).
-          워커가 E 용으로는 가로 클립을 받아오므로 크롭 손실이 거의 없다. */}
-      {files.length > 0 ? (
-        <>
-          {cutSeconds.map((startSec, i) => {
-            const endSec = i + 1 < cutSeconds.length ? cutSeconds[i + 1] : toSecond;
-            if (endSec <= startSec) return null;
-            const file = files[i % files.length];
-            const clipFrames = durations[i % files.length]
-              ? Math.max(1, Math.round(durations[i % files.length] * VIDEO.fps))
-              : null;
-            const seqFrames = f(endSec - startSec);
-            const video = (
-              <OffthreadVideo
-                src={staticFile(`assets/broll/${file}`)}
-                muted
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            );
-            return (
-              <Sequence
-                key={i}
-                from={f(startSec - fromSecond)}
-                durationInFrames={seqFrames}
-              >
-                {clipFrames && clipFrames < seqFrames ? (
-                  <Loop durationInFrames={clipFrames}>{video}</Loop>
-                ) : (
-                  video
-                )}
-              </Sequence>
-            );
-          })}
-          {/* 제품 사진 오버레이 카드 - 왼쪽에 크게, 영상 위에 떠 있다 */}
-          <div
-            style={{
-              position: "absolute",
-              left: 28,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 410,
-              height: 410,
-              borderRadius: E.radius,
-              background: E.card,
-              border: `1px solid ${E.line}`,
-              boxShadow: "0 14px 40px rgba(36,33,30,0.28)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 20,
-              boxSizing: "border-box",
-            }}
-          >
-            <ProductImage src={props.productImageUrl} fallbackSize={120} />
-          </div>
-        </>
-      ) : (
-        // 스톡이 없으면 제품 사진을 카드 전체에 크게
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 32,
-            boxSizing: "border-box",
-          }}
-        >
-          <ProductImage src={props.productImageUrl} fallbackSize={160} />
-        </div>
-      )}
-    </div>
   );
 };
 
@@ -400,10 +432,8 @@ type NoteRow = {
   fromSecond: number;
 };
 
-/** 검증 노트 행: 라벨 칩 + 나레이션과 동일한 문장. 등장 후 끝까지 남는다 */
 const NoteRowView: React.FC<{
   row: NoteRow;
-  /** 이 행의 나레이션 구간이 지났는지 (지나면 살짝 가라앉음) */
   isPast: boolean;
   bodyFromSecond: number;
 }> = ({ row, isPast, bodyFromSecond }) => {
@@ -421,7 +451,7 @@ const NoteRowView: React.FC<{
       <div
         style={{
           flexShrink: 0,
-          width: 132,
+          width: 148,
           borderRadius: 14,
           background: row.labelBg,
           color: row.labelColor,
@@ -437,7 +467,8 @@ const NoteRowView: React.FC<{
       <div
         style={{
           color: E.ink,
-          fontSize: eRowTextSize(row.text),
+          // 라벨 칩이 E(132)보다 16px 넓어 본문 폭도 그만큼 줄여 잡는다
+          fontSize: eRowTextSize(row.text) - 2,
           fontWeight: 600,
           lineHeight: 1.32,
           letterSpacing: "-0.01em",
@@ -452,11 +483,13 @@ const NoteRowView: React.FC<{
   );
 };
 
-/** CTA 카드 - 사진 창 자리를 이어받는 포인트 카드 (전체 화면 점거 없음) */
-const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
-  displayNumber,
-  ctaText,
-}) => {
+/**
+ * CTA 카드 - "어디에 정리돼 있는지"만 담백하게.
+ *
+ * 클릭 명령("링크 클릭"), 긴급성("품절 전"), 최저가 단정은 쿠팡파트너스
+ * 운영정책 위반이라 어떤 문구도 쓰지 않는다. 위치 안내는 정보 제공이다.
+ */
+const CtaCard: React.FC<{ displayNumber: number }> = ({ displayNumber }) => {
   const rise = useRise(0);
   return (
     <div
@@ -469,7 +502,7 @@ const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 18,
+        gap: 14,
         padding: "0 48px",
         boxSizing: "border-box",
         opacity: rise.opacity,
@@ -477,13 +510,13 @@ const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
       }}
     >
       <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 30, fontWeight: 600 }}>
-        영상 속 제품 번호
+        제품명 · 가격 · 상세 정보
       </div>
       <div
         style={{
           color: "#FFFFFF",
           fontWeight: 800,
-          fontSize: 168,
+          fontSize: 150,
           lineHeight: 1,
           letterSpacing: "-0.02em",
           whiteSpace: "nowrap",
@@ -492,11 +525,10 @@ const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
         {displayNumber}
         <span style={{ fontSize: "0.5em" }}>번</span>
       </div>
-      {/* 나레이션과 동일한 문장 */}
       <div
         style={{
           color: "#FFFFFF",
-          fontSize: 38,
+          fontSize: 34,
           fontWeight: 600,
           lineHeight: 1.35,
           textAlign: "center",
@@ -504,21 +536,13 @@ const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
           textWrap: "balance",
         }}
       >
-        {ctaText}
+        살림템 메모장에 정리해 뒀어요
       </div>
     </div>
   );
 };
 
-/**
- * 커버(썸네일) 전용 화면.
- *
- * 본편 첫 장면(Poster)을 그대로 쓰다가 사장님 지적으로 분리했다 - 피드 그리드에서
- * 훅이 안 읽혔다(실측: 200px 폭으로 줄이면 글자당 3px 남짓, 위아래 빈 공간만 컸다).
- * 커버는 재생 중 1프레임만 보이므로 본편과 달라도 되고, 오직 "손톱만 한 크기에서
- * 읽히는가"만 보면 된다. 그래서 훅을 최대 150px 까지 키우고 요소를 화면 가운데
- * 띠(COVER_BAND)에 모은다 - 인스타 그리드가 9:16 을 가운데 정사각으로 자르기 때문.
- */
+/** 커버(썸네일) 전용 - E 와 같은 규격(COVER_BAND)이라 피드에서 한 채널로 읽힌다 */
 const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
   <AbsoluteFill style={{ backgroundColor: E.paper, fontFamily: editorialFontFamily }}>
     <div
@@ -533,10 +557,6 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
         gap: 28,
       }}
     >
-      {/* 번호는 칩 대신 큰 글씨로 (사장님 지적 2026-08-20: 초록 칩 안 글씨가
-          그리드에서 안 읽힌다 → "그냥 번호만 크게"). 칩은 배경이 글자 자리를
-          잡아먹어 30px 이 한계였는데, 맨글씨로 빼면 96px 까지 키울 수 있다.
-          색은 포인트색(토마토) - 종이색 위에서 대비가 가장 세고 시선이 걸린다. */}
       <div
         style={{
           color: E.accent,
@@ -563,7 +583,6 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
       >
         {props.hookLine}
       </div>
-      {/* 남는 높이를 전부 제품 카드가 가져간다 - 세로로 긴 제품도 크게 보이게 */}
       <ProductCard
         imageUrl={props.productImageUrl}
         style={{ width: "100%", flex: 1, minHeight: COVER_BAND.cardMinHeight }}
@@ -572,22 +591,28 @@ const CoverPoster: React.FC<{ props: ShortsProps }> = ({ props }) => (
   </AbsoluteFill>
 );
 
-export const TemplateE: React.FC<ShortsProps> = (props) => {
+export const TemplateEUseCase: React.FC<ShortsProps> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const T = resolveTiming(props.timing);
   const bodyFrom = T.product.from;
   const ctaFrom = T.cta.from;
 
+  /**
+   * 대본 7줄의 자리는 그대로 두고 라벨만 사용상황형으로 바꾼다.
+   *   3번째 줄(benefit1) → 용도 / 4번째(benefit2) → 구조
+   *   5번째(usageTip) → 확인 / 6번째(checkPoint) → 맞는 집
+   * ai.ts 의 USECASE_PROMPT_BLOCK 이 각 자리에 그 성격의 문장을 채운다.
+   */
   const rows: NoteRow[] = [
     {
-      label: "장점 1",
+      label: "용도",
       labelBg: E.green,
       labelColor: "#FFFFFF",
       text: props.benefit1,
       fromSecond: T.product.from,
     },
     {
-      label: "장점 2",
+      label: "구조",
       labelBg: E.green,
       labelColor: "#FFFFFF",
       text: props.benefit2,
@@ -596,7 +621,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
     ...(props.usageTip && T.tip.to > T.tip.from
       ? [
           {
-            label: "사용 TIP",
+            label: "확인",
             labelBg: E.highlight,
             labelColor: E.ink,
             text: props.usageTip,
@@ -605,7 +630,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
         ]
       : []),
     {
-      label: "확인",
+      label: "맞는 집",
       labelBg: E.ink,
       labelColor: "#FFFFFF",
       text: props.checkPoint,
@@ -613,7 +638,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
     },
   ];
 
-  // 사진 창 컷 경계 - 최대 3컷 (본문 시작 / 장점2 / 확인할 점)
+  // 상황 창 컷 경계 - 최대 3컷 (본문 시작 / 구조 / 맞는 집)
   const windowCuts = [
     ...new Set([bodyFrom, T.benefit2.from, T.review.from]),
   ].filter((s) => s < ctaFrom);
@@ -623,9 +648,13 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
       <FontFaceStyle />
       <BgmAudio />
 
-      {/* ── 포스터 장면: 문제 훅 + 공감 + 제품 (0초부터) ── */}
+      {/* ── 첫 화면: 생활 상황 훅 + 공감 + 상황 창 ── */}
       <Sequence durationInFrames={f(T.empathy.to)}>
-        <Poster props={props} empathyDelayFrames={f(T.empathy.from)} />
+        <SituationPoster
+          props={props}
+          empathyDelayFrames={f(T.empathy.from)}
+          toSecond={T.empathy.to}
+        />
       </Sequence>
       <Sequence durationInFrames={f(T.hook.to)}>
         <Narration src={props.narration?.[0]} />
@@ -634,7 +663,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
-      {/* ── 본문: 검증 노트 (행이 쌓이고, CTA까지 남아 한눈 요약이 된다) ── */}
+      {/* ── 본문: 용도 → 구조 → 확인 → 맞는 집 (쌓이고 끝까지 남는다) ── */}
       <Sequence from={f(bodyFrom)} durationInFrames={durationInFrames - f(bodyFrom)}>
         <AbsoluteFill style={{ fontFamily: editorialFontFamily }}>
           <div
@@ -649,8 +678,6 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
               gap: 26,
             }}
           >
-            {/* 헤더: 번호 칩 + 제품명(칩 옆, 길면 ellipsis) + 고지(칩 아래 고정 줄) -
-                고지 줄 위치가 제품명 길이에 안 흔들리게 ChipWithDisclosure 로 고정했다 */}
             <ChipWithDisclosure
               displayNumber={props.displayNumber}
               trailing={
@@ -671,14 +698,11 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
               }
             />
 
-            {/* 사진 창 (본문) → CTA 카드 (마지막).
-                높이 526 = 936÷16×9, 정확한 16:9 (헤더 블록 90 = 칩54+gap8+고지28,
-                행 4개 최악 높이까지 더해도 콘텐츠 안전대 1220px 안:
-                90+26+526+26+554 = 1222 - 여유 폭 안. 고지 줄이 항상 고정 높이라
-                제품명 길이와 무관하게 이 계산이 매번 그대로 성립한다) */}
+            {/* 높이 526 = 936÷16×9 (E 와 같은 안전대 계산 - 헤더 90 + 26 + 526 + 26 +
+                행 4개 최악 554 = 1222, 콘텐츠 안전대 1220px 여유 폭 안) */}
             <div style={{ width: "100%", height: 526, position: "relative" }}>
               <Sequence durationInFrames={f(ctaFrom - bodyFrom)} layout="none">
-                <MediaWindow
+                <SceneWindow
                   props={props}
                   cutSeconds={windowCuts}
                   fromSecond={bodyFrom}
@@ -686,11 +710,10 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
                 />
               </Sequence>
               <Sequence from={f(ctaFrom - bodyFrom)} layout="none">
-                <CtaCard displayNumber={props.displayNumber} ctaText={props.ctaText} />
+                <CtaCard displayNumber={props.displayNumber} />
               </Sequence>
             </div>
 
-            {/* 검증 노트 행 - 나레이션에 맞춰 쌓임 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
               {rows.map((row, i) => (
                 <RowAtTime
@@ -707,7 +730,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
         </AbsoluteFill>
       </Sequence>
 
-      {/* 본문·CTA 나레이션 */}
+      {/* 본문·CTA 나레이션 (슬롯 순서는 E 와 동일) */}
       <Sequence from={f(T.product.from)} durationInFrames={f(T.product.to - T.product.from)}>
         <Narration src={props.narration?.[2]} />
       </Sequence>
@@ -726,7 +749,7 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
         <Narration src={props.narration?.[6]} />
       </Sequence>
 
-      {/* 첫 프레임 커버 (썸네일) - 그리드에서 읽히도록 훅을 크게 키운 전용 화면 */}
+      {/* 썸네일 전용 커버 1프레임 */}
       <Sequence durationInFrames={COVER_FRAME_COUNT}>
         <CoverPoster props={props} />
       </Sequence>
@@ -734,7 +757,6 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
   );
 };
 
-/** 행 렌더 - 나레이션 구간이 지나면 살짝 가라앉혀 현재 행이 도드라지게 */
 const RowAtTime: React.FC<{
   row: NoteRow;
   rows: NoteRow[];
@@ -745,7 +767,6 @@ const RowAtTime: React.FC<{
   const frame = useCurrentFrame();
   const next = rows[index + 1];
   const rowEnd = next ? next.fromSecond : ctaFromSecond;
-  // CTA 구간에서는 전 행을 또렷하게 - 마지막 화면 자체가 "한눈 요약"
   const inCta = frame >= f(ctaFromSecond - bodyFromSecond);
   const isPast = !inCta && frame >= f(rowEnd - bodyFromSecond);
   return <NoteRowView row={row} isPast={isPast} bodyFromSecond={bodyFromSecond} />;

@@ -86,12 +86,12 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
         </Sequence>
       )}
 
-      {/* 후기 언급 */}
+      {/* 확인할 점 */}
       <Sequence
         from={f(T.review.from)}
         durationInFrames={f(T.review.to - T.review.from)}
       >
-        <Subtitle text={props.reviewLine} size={FONT_SIZES.benefit} variant="bubble" y={0.14} />
+        <Subtitle text={props.checkPoint} size={FONT_SIZES.benefit} variant="bubble" y={0.14} />
         <Narration src={props.narration?.[5]} />
       </Sequence>
 

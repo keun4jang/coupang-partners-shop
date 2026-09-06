@@ -337,20 +337,6 @@ export function youtubeTitle(displayNumber: number, shortProductName: string): s
   return `${displayNumber}번 | ${shortProductName} 살림템 추천 #Shorts`;
 }
 
-/**
- * 유튜브 설명: 간단하게. 제품명 + 프로필 링크 안내 + 해시태그만 (대가성 문구 없음).
- * 쇼츠는 설명·댓글의 링크 클릭이 막혀 있어(2023.8~) URL 을 넣어도 모바일에선 안 눌린다.
- * 유일하게 클릭되는 외부 링크는 "채널 프로필 링크"이므로 그쪽으로 유도한다.
- */
-export function youtubeDescription(
-  displayNumber: number,
-  shortProductName: string
-): string {
-  return [
-    shortProductName,
-    "",
-    `영상 속 제품은 프로필 링크 누르면 바로 나와요 🔎 (${displayNumber}번)`,
-    "",
-    "#Shorts #살림템 #생활템 #쿠팡추천템",
-  ].join("\n");
-}
+// 쇼츠 설명 본문은 src/lib/publishCopy.ts 의 youtubeShortsDescription() 이 만든다.
+// (대가성 고지를 맨 위에 두는 규칙과 N번 추적 링크를 캡션·설명 한곳에서 관리하려고
+//  옮겼다 - 이 파일은 API 호출만 담당한다)

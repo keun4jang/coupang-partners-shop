@@ -90,8 +90,11 @@ function HeroCard({
         <p className="text-ink/70 text-sm mt-1.5 leading-relaxed">
           {shortDescription(item)}
         </p>
+        {/* 버튼 문구는 "정보를 보러 간다"는 사실만 말한다.
+            구매 재촉·최저가 단정 같은 표현은 쿠팡파트너스 운영정책 위반이다. */}
         <div className="mt-4 bg-primary hover:bg-primary-dark transition-colors text-white font-extrabold rounded-xl py-3.5 text-center text-base">
-          가격 보기 →
+          {product.source === "aliexpress" ? "알리익스프레스" : "쿠팡"}에서 상품
+          정보 보기
         </div>
       </div>
     </a>
@@ -133,7 +136,7 @@ function ItemCard({ item }: { item: VideoItemWithProduct }) {
         </h3>
       </div>
       <span className="shrink-0 text-primary-dark font-extrabold text-sm">
-        보기 →
+        정보 보기
       </span>
     </a>
   );
@@ -192,6 +195,17 @@ export default async function Home({
           영상 속 제품, 여기서 바로 확인하세요.
         </p>
       </header>
+
+      {/*
+        대가성 고지 - 링크(히어로 카드)보다 위. 카드 전체가 제휴 링크라
+        아래 푸터에만 두면 바로 누른 사람은 고지를 못 본 채 넘어간다.
+        공정위 지침도 "더보기/스크롤 없이 보이는 곳"을 요구한다.
+      */}
+      <p className="mb-4 bg-accent-soft text-ink/80 text-[13px] leading-relaxed rounded-xl px-4 py-3">
+        {hasAli
+          ? "이 사이트는 쿠팡파트너스 및 알리익스프레스 어필리에이트 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
+          : "이 사이트는 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
+      </p>
 
       {!dbReady && (
         <p className="text-center text-sub text-sm mt-6">

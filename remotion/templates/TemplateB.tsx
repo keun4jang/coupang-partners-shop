@@ -114,7 +114,7 @@ export const TemplateB: React.FC<ShortsProps> = (props) => {
         durationInFrames={f(T.review.to - T.review.from)}
       >
         <Subtitle
-          text={props.reviewLine}
+          text={props.checkPoint}
           size={FONT_SIZES.benefit}
           variant="bubble"
           y={0.15}

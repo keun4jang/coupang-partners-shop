@@ -23,7 +23,9 @@
     "broll:check": "tsx scripts/broll-filter-check.ts",
     "remotion:studio": "remotion studio",
     "remotion:render": "remotion render TemplateA renders/sample.mp4",
-    "yt:backfill-disclosure": "tsx scripts/yt-disclosure-backfill.ts"
+    "yt:backfill-disclosure": "tsx scripts/yt-disclosure-backfill.ts",
+    "policy:check": "tsx scripts/policy-selftest.ts",
+    "metrics:links": "tsx scripts/metrics-links.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

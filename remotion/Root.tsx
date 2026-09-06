@@ -7,6 +7,7 @@ import { TemplateB } from "./templates/TemplateB";
 import { TemplateC } from "./templates/TemplateC";
 import { TemplateD } from "./templates/TemplateD";
 import { TemplateE } from "./templates/TemplateE";
+import { TemplateEUseCase } from "./templates/TemplateEUseCase";
 import {
   TOP10_FPS,
   TOP10_HEIGHT,
@@ -47,6 +48,12 @@ export const RemotionRoot: React.FC = () => {
       <Composition id="TemplateC" component={TemplateC} {...shared} />
       <Composition id="TemplateD" component={TemplateD} {...shared} />
       <Composition id="TemplateE" component={TemplateE} {...shared} />
+      {/* 사용상황형 변형 - 같은 props 규격을 쓰므로 shared 를 그대로 재사용한다 */}
+      <Composition
+        id="TemplateEUseCase"
+        component={TemplateEUseCase}
+        {...shared}
+      />
       <Composition
         id="TemplateTop10"
         component={TemplateTop10}

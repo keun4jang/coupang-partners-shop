@@ -12,6 +12,11 @@ export type VideoStatus =
   | "completed"
   | "failed";
 export type TemplateType = "A" | "B" | "C" | "D";
+/**
+ * 숏폼 템플릿 변형 (클릭률 A/B 비교축).
+ * classic = 기존 "살림 검증 노트"(TemplateE) / usecase = 사용상황형(TemplateEUseCase)
+ */
+export type ShortsTemplateVariant = "classic" | "usecase";
 /** auto: 슬롯 시간에 렌더+발행 / immediate: 즉시 발행 / scheduled: 즉시 렌더→슬롯 발행 */
 export type PublishMode = "auto" | "immediate" | "scheduled";
 
@@ -51,6 +56,12 @@ export interface VideoItem {
   script_text: string | null;
   caption_text: string | null;
   template_type: TemplateType;
+  /**
+   * 어떤 숏폼 변형으로 만들었나 (성과 비교용).
+   * 마이그레이션(20260906_product_event_daily.sql) 적용 전에는 컬럼이 없어
+   * undefined 로 온다 - 그때는 기존 동작(classic)으로 본다.
+   */
+  template_variant?: ShortsTemplateVariant | null;
   video_status: VideoStatus;
   publish_mode: PublishMode;
   drive_video_url: string | null;
@@ -120,8 +131,8 @@ export interface VideoCopy {
   benefit2: string;
   /** 사용팁/활용법 - 생활 속에서 구체적으로 어떻게 쓰면 좋은지 */
   usageTip: string;
-  /** 긍정 후기 언급 - 남들의 반응 톤 (예: "후기도 많고 평이 괜찮아 보이더라고요") */
-  reviewLine: string;
+  /** 사기 전 확인할 점 - 사이즈·설치 방식·재질 등 상품 정보로 알 수 있는 사실 */
+  checkPoint: string;
   /** SNS 업로드용 캡션 전문 */
   captionText: string;
 }

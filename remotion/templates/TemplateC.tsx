@@ -174,7 +174,7 @@ export const TemplateC: React.FC<ShortsProps> = (props) => {
             />
           )}
           <MemoLine
-            text={props.reviewLine}
+            text={props.checkPoint}
             delayFrames={f(T.review.from - T.empathy.from)}
           />
         </div>

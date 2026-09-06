@@ -1,7 +1,15 @@
-import type { Product, PublishMode, TemplateType, VideoItem } from "@/types/db";
+import type {
+  Product,
+  PublishMode,
+  ShortsTemplateVariant,
+  TemplateType,
+  VideoItem,
+} from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { composeScriptText, generateVideoCopy } from "./ai";
 import { selectProductsForVideos } from "./productSelector";
+import { shortsVariantOf } from "./tracking";
+import { pickShortsVariant } from "./usecaseScore";
 
 // 자동 로테이션은 A/B/C. D(실사용 스톡영상 배경)는 텔레그램 "영상D" 로 명시 선택.
 const TEMPLATE_ROTATION: TemplateType[] = ["A", "B", "C"];
@@ -22,6 +30,8 @@ export async function createVideoItem(
     footagePaths?: string[];
     /** 발행 방식. scheduled = 즉시 렌더하되 SNS 발행은 업로드 슬롯 시간에 */
     publishMode?: PublishMode;
+    /** 숏폼 변형 강제 지정 (테스트·수동 요청용). 없으면 점수로 자동 배정 */
+    variant?: ShortsTemplateVariant;
   }
 ): Promise<VideoItem> {
   const db = supabaseAdmin();
@@ -38,6 +48,9 @@ export async function createVideoItem(
     const nextNumber = (maxRow?.display_number ?? 0) + 1;
     const template =
       templateType ?? TEMPLATE_ROTATION[nextNumber % TEMPLATE_ROTATION.length];
+    // 사용상황형 변형 배정 (클릭률 A/B). display_number 는 건드리지 않는다 -
+    // 이미 정해진 번호를 읽어 변형만 고른다.
+    const variant = opts?.variant ?? pickShortsVariant(product, nextNumber);
 
     const { data, error } = await db
       .from("video_items")
@@ -45,6 +58,7 @@ export async function createVideoItem(
         display_number: nextNumber,
         product_id: product.id,
         template_type: template,
+        template_variant: variant,
         video_status: "pending",
         landing_visible: false,
         manual: opts?.manual ?? false,
@@ -122,7 +136,8 @@ export async function fillVideoCopy(
   const copy = await generateVideoCopy(
     product,
     item.display_number,
-    item.template_type
+    item.template_type,
+    shortsVariantOf(item)
   );
 
   const db = supabaseAdmin();

@@ -67,6 +67,7 @@ import {
   longformDescription,
   type Top10ItemSnapshot,
 } from "../src/lib/longform";
+import { checkPublishTexts, describePublishIssues } from "../src/lib/policy";
 import {
   COVER_FRAME_COUNT,
   top10Ranges,
@@ -206,6 +207,33 @@ async function main(): Promise<void> {
     category: it.category,
     linkUrl: it.linkUrl,
   }));
+
+  // 발행 직전 정책 검사 (숏폼과 같은 잣대).
+  // 롱폼 설명란은 상품 10개의 이름·가격이 그대로 들어가므로, 그중 하나에
+  // 마케팅 문구가 섞여 있으면 여기서 잡힌다.
+  const policyIssues = checkPublishTexts({ title, description });
+  if (policyIssues.length > 0) {
+    const summary = describePublishIssues(policyIssues);
+    console.error(`롱폼 발행 중단 (정책 검사): ${summary}`);
+    await sendTelegramMessage(
+      [
+        "🚫 롱폼 발행 중단 (정책 검사)",
+        "",
+        `${categoryLabel} TOP10`,
+        "",
+        `걸린 표현 → ${summary}`,
+        "",
+        "영상은 만들어져 있으니 문구만 고쳐서 다시 돌리면 됩니다.",
+      ].join("\n")
+    );
+    await db.from("longform_items").insert({
+      category_label: categoryLabel,
+      items: itemsSnapshot,
+      video_status: "failed",
+      error_message: `정책 위반 표현: ${summary}`.slice(0, 500),
+    });
+    return;
+  }
 
   if (dryRun) {
     console.log("--dry-run: 유튜브 업로드 생략. 결과물 확인용:");

@@ -45,7 +45,7 @@ export const LAYOUT = {
 
 /**
  * 고정 장면 타이밍 (초) - 나레이션 timing props 가 없을 때의 폴백 (약 21초 기준).
- * product = 장점1 장면(제품 카드 등장). benefit2 = 장점2. tip = 사용팁. review = 후기.
+ * product = 장점1 장면(제품 카드 등장). benefit2 = 장점2. tip = 사용팁. review = 확인할 점.
  */
 export const TIMING = {
   hook: { from: 0, to: 2.2 },
@@ -67,7 +67,7 @@ export type SceneRanges = {
   benefit2: { from: number; to: number };
   /** 사용팁 */
   tip: { from: number; to: number };
-  /** 후기 */
+  /** 확인할 점 (예전 "후기" 슬롯 - 타이밍 키 이름은 그대로 둔다) */
   review: { from: number; to: number };
   cta: { from: number; to: number };
 };
@@ -404,8 +404,8 @@ export const ctaTemplate = (_displayNumber: number): string =>
 
 export const CTA_SUB_TEXT = "프로필 링크에 제품 정보";
 
-/** CTA 화면 신뢰 문구 - 큐레이션 기준을 진실하게 전달 (허위 사용 후기 아님) */
-export const TRUST_TEXT = "가성비 좋고 후기까지 확인한 제품만 골라요";
+/** CTA 화면 신뢰 문구 - 우리가 실제로 하는 일만 말한다 (후기 수·평점은 우리 데이터가 아님) */
+export const TRUST_TEXT = "쿠팡 베스트에서 눈에 띈 살림템을 정리해요";
 
 /** 하단 대가성 문구 (모든 영상에 항상 표시) */
 export const DISCLOSURE_TEXT =
