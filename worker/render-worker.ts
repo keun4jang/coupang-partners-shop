@@ -1461,7 +1461,19 @@ async function main(): Promise<void> {
   }
 
   const once = process.argv.includes("--once");
-  console.log(`렌더 워커 시작 (${once ? "1회 실행" : `${POLL_INTERVAL_MS / 1000}초 간격 감시`})`);
+  const maxMinutes = numArg("--max-minutes");
+  const pollMs = (numArg("--poll-seconds") ?? POLL_INTERVAL_MS / 1000) * 1000;
+  const deadline =
+    maxMinutes !== null ? Date.now() + maxMinutes * 60_000 : null;
+
+  console.log(
+    `렌더 워커 시작 (${
+      once
+        ? "1회 실행"
+        : `${pollMs / 1000}초 간격 감시` +
+          (maxMinutes !== null ? ` · 최대 ${maxMinutes}분 상주` : "")
+    })`
+  );
 
   // 유튜브 자격증명: app_settings 에 force-ssl 토큰이 있으면 우선 사용
   // (GitHub Actions WORKER_ENV 의 구토큰은 captions/thumbnails 스코프가 없음)
@@ -1484,8 +1496,26 @@ async function main(): Promise<void> {
     } catch (e) {
       console.error("워커 루프 오류:", e);
     }
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+    // 상주 시간이 다 됐으면 여기서 끝낸다. 판정을 루프 "사이"에서만 하므로
+    // 렌더·업로드가 중간에 잘리는 일은 없다(한 편을 끝낸 뒤에 나간다).
+    // 정상 종료(exit 0)여야 Actions 가 실패로 보지 않는다 - 실패로 보면
+    // 상주가 끝날 때마다 텔레그램 경보가 울린다.
+    if (deadline !== null && Date.now() >= deadline) {
+      console.log(`상주 시간(${maxMinutes}분) 종료 - 워커를 정상 종료합니다`);
+      return;
+    }
+
+    await new Promise((r) => setTimeout(r, pollMs));
   }
+}
+
+/** `--flag 30` 형태의 숫자 인자를 읽는다. 없거나 숫자가 아니면 null */
+function numArg(flag: string): number | null {
+  const i = process.argv.indexOf(flag);
+  if (i < 0) return null;
+  const n = Number(process.argv[i + 1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 main().catch(async (e) => {

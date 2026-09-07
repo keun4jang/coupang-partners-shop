@@ -1,8 +1,19 @@
 # 클라우드 렌더 워커 (PC 불필요).
 #
-# 15분마다 GitHub 러너가 켜져서 대기중(pending) 영상이 있으면
-# 렌더 → 구글드라이브 업로드 → 텔레그램 알림 후 종료한다.
-# (public 저장소라 GitHub Actions 사용량은 무료)
+# 러너가 켜지면 워커가 그 안에서 계속 상주하며 대기중(pending) 영상을
+# 렌더 → 구글드라이브 업로드 → 발행 → 텔레그램 알림 한다.
+# (public 저장소라 GitHub Actions 사용량은 무료 - 오래 떠 있어도 비용 0)
+#
+# 왜 "1회 실행"이 아니라 "상주"인가 (실측 2026-09-07):
+#   cron 은 15분마다 요청하지만 GitHub 이 공개 저장소의 잦은 예약 실행을
+#   대부분 버린다. 최근 실행 간격을 재보니 평균 165분(최소 102, 최대 286)으로
+#   실제 도달률이 9% 였다. 그 결과 하루 6개 업로드 슬롯 중 마지막 슬롯이
+#   지나도 자정 전에 워커가 안 떠서 그날 1편이 통째로 날아갔다
+#   (발행 실적이 매일 5편, pending 은 16편까지 쌓였다).
+#
+#   도달률은 우리가 못 고치므로, 한 번 뜬 워커가 오래 살아 있게 해서
+#   크론에 기대지 않는다. --max-minutes 로 정상 종료하므로 job timeout 에
+#   걸려 실패로 찍히지 않는다(실패로 찍히면 끝날 때마다 경보가 울린다).
 #
 # 필요한 것: 저장소 Settings → Secrets and variables → Actions 에
 #   WORKER_ENV  = .env.local 형식의 워커용 환경변수 전체 (한 번만 등록)
@@ -25,7 +36,8 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 상주 170분 + 준비 단계(체크아웃·의존성·ffmpeg) 여유
+    timeout-minutes: 180
     steps:
       - name: 워커 환경변수 확인
         id: check
@@ -81,9 +93,11 @@ jobs:
           fi
           ffmpeg -version | head -1
 
-      - name: 대기중 영상 렌더
+      # 상주 시간(170분)은 job timeout(180분)보다 짧아야 한다 - 스스로 정상
+      # 종료해야 실패 알림이 안 울린다. 폴링은 60초 간격이면 슬롯을 놓치지 않는다.
+      - name: 대기중 영상 렌더 (상주)
         if: steps.check.outputs.ready == 'true'
-        run: npm run worker:once
+        run: npm run worker -- --max-minutes 170 --poll-seconds 60
 
       # 어느 단계에서든 실패하면 텔레그램으로 알린다 (렌더/의존성/브라우저 등)
       - name: 실패 시 텔레그램 알림
