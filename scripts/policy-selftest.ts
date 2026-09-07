@@ -148,6 +148,9 @@ const REAL_WORLD_NAMES = [
   "오늘만 이 가격 대용량 주방세제 1.5L",
   "국민 대박템 실리콘 주방장갑 2개",
   "최저가 도전 논슬립 옷걸이 50개",
+  // 실제 대기 항목에서 나온 케이스 (217번). 낱말 목록으로는 안 잡히는 숫자 조합이다.
+  "80％OFF[게으른 사람의 신기]원터치 얼음 제조 신기 휴대용고속제빙기",
+  "50% 할인 대용량 스텐 밀폐용기 4종",
 ];
 for (const raw of REAL_WORLD_NAMES) {
   const clean = shortenProductName(stripBannedFromProductName(raw));
@@ -173,6 +176,17 @@ const LEGACY_REVIEW_LINES = [
 ];
 for (const line of LEGACY_REVIEW_LINES) {
   expectFlagged("구버전 후기 줄", line);
+}
+
+// ── 9. 할인율 표기는 잡고, 성분·함량 표기는 놓아준다 ──
+//
+// 낱말 목록으로는 "80％OFF" 같은 숫자 조합을 못 잡는다(217번에서 실제로 새어나갔다).
+// 반대로 "99% 순면"까지 잡으면 멀쩡한 상품명이 막히므로, 할인 맥락만 좁게 본다.
+for (const t of ["80％OFF 원터치 제빙기", "50% 할인 중인 세제", "세일 30% 진행", "70%OFF"]) {
+  expectFlagged("할인율 표기", t);
+}
+for (const t of ["99% 순면 극세사 행주", "100% 국산 원목 도마", "면 95% 혼방 수건"]) {
+  expectClean("성분·함량 표기", t);
 }
 
 if (failures > 0) {

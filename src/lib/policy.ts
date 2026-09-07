@@ -115,16 +115,37 @@ export const BANNED_PHRASES = [
 ];
 
 /**
+ * 숫자가 섞여 낱말 목록으로는 못 잡는 위반 표현.
+ *
+ * "80％OFF", "50% 할인" 같은 할인율 표기가 대표적이다. 쿠팡파트너스는 확인되지
+ * 않은 할인율 표기를 금지하는데, 우리는 그 할인이 지금도 유효한지 알 방법이 없고
+ * 영상은 영구히 남는다(가격도 수집 시점 스냅샷이라 같은 이유로 시점을 밝힌다).
+ *
+ * "99% 순면", "100% 국산"처럼 성분·함량 표기는 잡히면 안 되므로,
+ * 숫자+% 뒤에 할인 맥락(OFF·할인·세일)이 붙은 경우만 좁게 본다.
+ */
+const REGEX_BANNED: { label: string; re: RegExp }[] = [
+  { label: "할인율 표기", re: /\d+\s*[%％]\s*(off|할인|세일|다운|↓)/gi },
+  { label: "할인율 표기", re: /(할인|세일)\s*\d+\s*[%％]/gi },
+];
+
+/**
  * 텍스트 한 덩어리에서 정책 위반 표현을 찾는다.
  * 대가성 고지 문구 자체는 검사 대상에서 뺀다(고지에 들어가는 표현이
  * 금지어와 겹치면 자기 고지에 자기가 걸린다).
  */
 export function findPolicyIssues(text: string): string[] {
   const body = (text ?? "").split(DISCLOSURE_LINE).join(" ");
-  return [
+  const hits = [
     ...POLICY_BANNED_PHRASES.filter((p) => body.includes(p)),
     ...BANNED_PHRASES.filter((p) => body.includes(p)),
   ];
+  for (const { label, re } of REGEX_BANNED) {
+    // 전역 정규식은 lastIndex 가 남으므로 매번 초기화한다(안 하면 호출마다 결과가 달라진다)
+    re.lastIndex = 0;
+    if (re.test(body) && !hits.includes(label)) hits.push(label);
+  }
+  return hits;
 }
 
 /** 발행 직전 검사 대상 (없는 항목은 건너뛴다) */
@@ -178,6 +199,12 @@ export function stripBannedFromProductName(name: string): string {
   );
   for (const phrase of phrases) {
     if (out.includes(phrase)) out = out.split(phrase).join(" ");
+  }
+
+  // 숫자가 섞인 표현(할인율 등)은 낱말 목록으로 못 잡으므로 정규식으로 지운다
+  for (const { re } of REGEX_BANNED) {
+    re.lastIndex = 0;
+    out = out.replace(re, " ");
   }
 
   // 지우고 남은 구두점·공백 정리 ("[  ] 극세사" → "극세사")
