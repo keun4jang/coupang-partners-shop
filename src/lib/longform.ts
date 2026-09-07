@@ -5,6 +5,7 @@ import { cleanProductTitle, productTargetUrl, formatDisplayNumber } from "./form
 import { DISCLOSURE_LINE } from "./ai";
 import { fetchCommissionReport } from "./coupang";
 import { outboundUrl } from "./tracking";
+import { stripBannedFromProductName } from "./policy";
 import type { Top10Item } from "../../remotion/templates/TemplateTop10";
 
 /**
@@ -448,7 +449,8 @@ export function buildTop10Items(selected: VideoItemWithProduct[]): Top10ItemSnap
     return {
       rank,
       displayNumber: item.display_number,
-      productName: cleanProductTitle(p.product_name),
+      // 설명란·화면에 그대로 나가는 이름이라 마케팅 문구를 걷어낸다
+      productName: cleanProductTitle(stripBannedFromProductName(p.product_name)),
       imageUrl: p.image_url,
       priceText: p.price_text ?? "가격 확인",
       category: p.category || "생활템",

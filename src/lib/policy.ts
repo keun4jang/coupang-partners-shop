@@ -156,6 +156,44 @@ export function checkPublishTexts(texts: PublishTexts): PublishIssue[] {
   return issues;
 }
 
+/**
+ * 판매자가 붙인 상품명에서 금칙 표현만 걷어낸다.
+ *
+ * 왜 차단이 아니라 정화인가: 쿠팡파트너스가 제재하는 건 "파트너가 쓴 홍보 문구"이지
+ * 판매자 원 상품명이 아니다. 그런데 우리 제목·설명·캡션은 상품명을 그대로 품기
+ * 때문에, 검사만 걸어두면 "쿠팡특가 스텐 3단 선반" 같은 이름 하나 때문에 렌더까지
+ * 끝낸 영상이 발행 직전에 통째로 막힌다. 우리가 고칠 수 있는 문구도 아니라
+ * (스카우트가 쿠팡에서 받아온 값이다) 알림을 봐도 손쓸 데가 없다.
+ *
+ * 그래서 나가는 텍스트에서 그 표현만 지운다. 금칙어가 채널에 안 나가는 결과는
+ * 같으면서, 멀쩡한 영상이 사라지지 않는다.
+ * 실제 사례: "쿠팡특가", "[한정수량]", "무조건 잘 붙는", "오늘만 이 가격", "대박템"
+ */
+export function stripBannedFromProductName(name: string): string {
+  let out = name ?? "";
+
+  // 긴 표현부터 지운다. "대박"을 먼저 지우면 "대박템"이 "템"이라는 부스러기로 남는다.
+  const phrases = [...POLICY_BANNED_PHRASES, ...BANNED_PHRASES].sort(
+    (a, b) => b.length - a.length
+  );
+  for (const phrase of phrases) {
+    if (out.includes(phrase)) out = out.split(phrase).join(" ");
+  }
+
+  // 지우고 남은 구두점·공백 정리 ("[  ] 극세사" → "극세사")
+  out = out
+    .replace(/\[\s*\]|\(\s*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 앞머리에 홀로 남은 지시어·조각 제거 ("오늘만 이 가격 세제" → "가격 세제" 대신
+  // "이"까지 떼어 "가격 세제"). 뒤쪽은 핵심 명사라 건드리지 않는다.
+  const LEADING_FRAGMENT = /^(이|그|저|및|등|또는|외)\s+/;
+  while (LEADING_FRAGMENT.test(out)) out = out.replace(LEADING_FRAGMENT, "");
+
+  return out.trim();
+}
+
 /** 사람이 읽을 수 있는 한 줄 요약 (텔레그램 알림·로그용) */
 export function describePublishIssues(issues: PublishIssue[]): string {
   return issues

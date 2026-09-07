@@ -52,21 +52,38 @@ export async function createVideoItem(
     // 이미 정해진 번호를 읽어 변형만 고른다.
     const variant = opts?.variant ?? pickShortsVariant(product, nextNumber);
 
-    const { data, error } = await db
+    const row = {
+      display_number: nextNumber,
+      product_id: product.id,
+      template_type: template,
+      video_status: "pending",
+      landing_visible: false,
+      manual: opts?.manual ?? false,
+      footage_paths: opts?.footagePaths ?? null,
+      publish_mode: opts?.publishMode ?? "auto",
+    };
+
+    let { data, error } = await db
       .from("video_items")
-      .insert({
-        display_number: nextNumber,
-        product_id: product.id,
-        template_type: template,
-        template_variant: variant,
-        video_status: "pending",
-        landing_visible: false,
-        manual: opts?.manual ?? false,
-        footage_paths: opts?.footagePaths ?? null,
-        publish_mode: opts?.publishMode ?? "auto",
-      })
+      .insert({ ...row, template_variant: variant })
       .select("*")
       .single();
+
+    // PGRST204 = 스키마 캐시에 컬럼 없음. template_variant 마이그레이션을 아직
+    // 안 돌렸으면 여기서 걸린다. 변형 기록을 포기하고(=classic 취급) 영상 생성은
+    // 계속한다 - 통계 컬럼 하나 때문에 하루치 발행이 통째로 멈추면 안 된다.
+    // (/api/click 이 slot 컬럼에 쓰는 것과 같은 패턴)
+    if (error?.code === "PGRST204") {
+      console.warn(
+        "template_variant 컬럼이 아직 없어 변형 기록 없이 생성합니다 " +
+          "(supabase/migrations/20260906_product_event_daily.sql 적용 필요)"
+      );
+      ({ data, error } = await db
+        .from("video_items")
+        .insert(row)
+        .select("*")
+        .single());
+    }
 
     if (!error && data) return data as VideoItem;
 

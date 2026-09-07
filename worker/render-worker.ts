@@ -44,7 +44,11 @@ import {
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { shortsVariantOf } from "../src/lib/tracking";
-import { checkPublishTexts, describePublishIssues } from "../src/lib/policy";
+import {
+  checkPublishTexts,
+  describePublishIssues,
+  stripBannedFromProductName,
+} from "../src/lib/policy";
 import {
   DIRECTED_SCENE_LABEL,
   STAGED_SCENE_LABEL,
@@ -562,6 +566,14 @@ interface SnsResult {
   instagramError: string | null;
   facebookUrl: string | null;
   facebookError: string | null;
+  /**
+   * 정책 검사에 걸려 한 채널도 시도하지 않고 돌아왔는지.
+   *
+   * 호출부가 이걸 안 보면 "아무 데도 안 올라간 영상"을 completed +
+   * landing_visible=true 로 마감해 버린다 - 영상 없는 번호가 랜딩에 뜨고
+   * 재시도 경로도 없어진다. failed 로 남겨야 관리자 화면에서 다시 시도할 수 있다.
+   */
+  policyBlocked?: boolean;
 }
 
 /**
@@ -594,7 +606,12 @@ async function publishToSns(
   // 캡션 맨 위에 대가성 고지를 붙인다. 발행 직전에 붙이므로 이미 문구가
   // 만들어져 큐에 들어가 있던 항목에도 그대로 적용된다.
   const snsCaption = instagramCaption(captionText, item.display_number);
-  const shortName = shortenProductName(product.product_name);
+  // 판매자 상품명에 붙은 마케팅 문구는 지우고 내보낸다(차단이 아니라 정화 -
+  // policy.ts stripBannedFromProductName 주석 참고). 이게 없으면 "쿠팡특가 …"
+  // 같은 이름 하나 때문에 렌더까지 끝낸 영상이 발행 직전에 통째로 막힌다.
+  const shortName = shortenProductName(
+    stripBannedFromProductName(product.product_name)
+  );
   const ytTitle = youtubeTitle(item.display_number, shortName);
   const ytDescription = youtubeShortsDescription(
     item.display_number,
@@ -637,6 +654,7 @@ async function publishToSns(
       instagramError: message,
       facebookUrl: null,
       facebookError: message,
+      policyBlocked: true,
     };
   }
 
@@ -856,7 +874,33 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       instagramError,
       facebookUrl,
       facebookError,
+      policyBlocked,
     } = await publishToSns(item, product, videoPath, driveVideoFileId, captionText, thumbnailPath);
+
+    // 정책 검사에 걸려 한 채널도 못 올렸으면 completed 로 마감하지 않는다.
+    // completed + landing_visible 로 두면 영상 없는 번호가 랜딩에 뜨고,
+    // processPending 이 다시 집어가지도 않아 그 편이 영영 사라진다.
+    // script_text/caption_text 를 비워야 재시도 때 문구가 새로 만들어진다
+    // (그대로 두면 같은 대본으로 또 같은 검사에 걸린다).
+    if (policyBlocked) {
+      await db
+        .from("video_items")
+        .update({
+          video_status: "failed",
+          landing_visible: false,
+          error_message: (youtubeError ?? "정책 위반으로 발행 중단").slice(0, 500),
+          script_text: null,
+          caption_text: null,
+          broll_origin: brollOrigin,
+          broll_files: brollFiles,
+          drive_video_url: driveVideoUrl,
+          drive_video_file_id: driveVideoFileId,
+          drive_caption_url: driveCaptionUrl,
+          drive_thumbnail_url: driveThumbnailUrl,
+        })
+        .eq("id", item.id);
+      return;
+    }
 
     // 완료 기록. 이 업데이트가 조용히 실패하면 항목이 generating 에 갇혀
     // 워커가 15분마다 같은 영상을 재렌더·재업로드하는 사고가 난다(실제 발생).
@@ -1005,6 +1049,23 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
       } catch {
         // 무시
       }
+    }
+
+    // 즉시 발행 경로와 같은 이유로, 정책 차단은 completed 가 아니라 failed 다.
+    // rendered 로 되돌리면 15분마다 같은 검사에 다시 걸려 드라이브 재다운로드와
+    // 텔레그램 알림이 무한 반복된다.
+    if (sns.policyBlocked) {
+      await db
+        .from("video_items")
+        .update({
+          video_status: "failed",
+          landing_visible: false,
+          error_message: (sns.youtubeError ?? "정책 위반으로 발행 중단").slice(0, 500),
+          script_text: null,
+          caption_text: null,
+        })
+        .eq("id", row.id);
+      return false;
     }
 
     const { error: completeError } = await db

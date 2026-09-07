@@ -19,6 +19,7 @@ import {
   BANNED_PHRASES,
   DISCLOSURE_LINE,
   POLICY_BANNED_PHRASES,
+  stripBannedFromProductName,
 } from "./policy";
 
 // 대가성 고지 문구의 원래 자리가 여기라 기존 import 경로를 유지한다
@@ -273,7 +274,7 @@ export function fallbackCopy(
 
   copy.captionText = [
     `${copy.hookText} ${copy.empathyLine}.`,
-    `${shortenProductName(product.product_name)}, ${copy.benefit1}. ${copy.benefit2}.`,
+    `${shortenProductName(stripBannedFromProductName(product.product_name))}, ${copy.benefit1}. ${copy.benefit2}.`,
     copy.usageTip,
     "",
     "쿠팡 카테고리 베스트에서 눈에 띈 살림템을 번호로 정리하고 있어요.",

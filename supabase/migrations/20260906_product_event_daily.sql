@@ -63,7 +63,11 @@ alter table product_event_daily enable row level security;
 --   · 허용값 검증을 DB 한 곳에 모아둔다 (앱 코드가 늘어도 규칙이 갈라지지 않음)
 --   · 길이 제한으로 쿼리스트링에 아무 문자열이나 담아 보내도 테이블이 안 더러워짐
 --   · 나중에 anon 에게 이 함수만 열어주는 선택지를 남겨둔다
---     (지금은 service role 로만 부르므로 grant 를 따로 하지 않는다)
+--
+-- 주의: Postgres 는 함수를 만들면 EXECUTE 를 PUBLIC 에 자동으로 준다. 이 함수는
+-- security definer 라 RLS 를 우회하므로, 공개된 anon 키로 아무나 카운터를
+-- 부풀릴 수 있게 된다. 지금은 서버(service role)에서만 부르므로 아래에서
+-- PUBLIC 권한을 회수한다(필요해지면 그때 특정 역할에만 grant 한다).
 create or replace function increment_product_event_daily(
   p_display_number integer,
   p_event_type text,
@@ -141,6 +145,12 @@ begin
     updated_at = now();
 end;
 $$;
+
+-- 함수 생성 시 PUBLIC 에 자동 부여되는 EXECUTE 권한을 거둔다.
+-- (service role 은 슈퍼유저급이라 이 회수와 무관하게 계속 호출할 수 있다)
+revoke all on function increment_product_event_daily(
+  integer, text, text, text, text, text, integer
+) from public;
 
 -- 3. video_items: 어떤 숏폼 템플릿 변형으로 만들었는지 기록
 --

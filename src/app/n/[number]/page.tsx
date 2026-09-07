@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { formatDisplayNumber, shortenProductName } from "@/lib/format";
-import { parseTrackingParams, trackingQuery } from "@/lib/tracking";
+import { parseTrackingParams, shortsVariantOf, trackingQuery } from "@/lib/tracking";
+import { findPolicyIssues } from "@/lib/policy";
 import { APP_VERSION } from "@/lib/appVersion";
 import type { VideoItemWithProduct } from "@/types/db";
 import { ViewBeacon } from "./ViewBeacon";
@@ -36,25 +37,46 @@ async function findByNumber(n: number): Promise<VideoItemWithProduct | null> {
 }
 
 /**
- * 대본에서 "확인할 점" 2~3줄을 뽑는다.
- * 대본 7줄 구조: 후킹 · 공감 · (용도/장점1) · (구조/장점2) · (확인할 점) · … · CTA
- * 실질 정보가 담긴 3·4·5번째 줄만 쓴다. CTA 줄은 링크 안내라 정보가 아니다.
+ * 대본에서 영상이 짚었던 내용 2~3줄을 뽑는다.
+ *
+ * 줄 위치가 변형·대본 버전마다 다르므로 그대로 [2][3][4] 를 쓰면 안 된다
+ * (렌더 워커 buildProps 와 같은 규칙을 여기서도 지켜야 한다):
+ *   · usecase 7줄: 2=용도 3=구조 4=확인할 점 5=맞는 집
+ *   · classic 7줄: 2=장점1 3=장점2 4=사용팁 5=확인할 점
+ *   · 구버전 6줄: 2=장점1 3=장점2 4=옛 후기줄 5=CTA
+ *
+ * 특히 구버전 6줄의 4번째 줄은 이번에 걷어낸 "재구매 후기가 많다" 류 문구다.
+ * 그 줄을 그대로 제휴 버튼 위에 띄우면 근거 없는 사회적 증거를 게시하는 셈이라
+ * 아예 후보에서 뺀다. 남는 줄도 발행 경로와 같은 잣대(findPolicyIssues)로 거른다.
  */
-function checkPoints(item: VideoItemWithProduct): string[] {
+function scriptHighlights(item: VideoItemWithProduct): string[] {
   const lines = (item.script_text ?? "")
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  const picked = [lines[2], lines[3], lines[4]].filter(
-    (l): l is string => Boolean(l) && l.length > 1
-  );
+
+  const usable = (l: string | undefined | null): l is string =>
+    typeof l === "string" && l.trim().length > 1 && findPolicyIssues(l).length === 0;
+
+  let candidates: (string | undefined)[];
+  if (lines.length >= 7) {
+    candidates =
+      shortsVariantOf(item) === "usecase"
+        ? [lines[2], lines[3], lines[4]] // 용도 · 구조 · 확인할 점
+        : [lines[2], lines[3], lines[5]]; // 장점1 · 장점2 · 확인할 점
+  } else {
+    // 구버전 6줄 - 장점 두 줄만 쓴다(4번째 옛 후기줄은 제외)
+    candidates = [lines[2], lines[3]];
+  }
+
+  const picked = candidates.filter(usable);
   if (picked.length > 0) return picked.slice(0, 3);
 
-  // 대본이 없으면 상품 등록 정보로 대체 (그것도 없으면 빈 배열 → 섹션 자체를 숨김)
-  const fallback = [item.products.main_benefit, item.products.pain_point].filter(
-    (l): l is string => Boolean(l)
-  );
-  return fallback.slice(0, 3);
+  // 대본이 없거나 전부 걸러졌으면 상품 등록 정보로 대체
+  // (그것도 없으면 빈 배열 → 섹션 자체가 사라진다)
+  return [item.products.main_benefit, item.products.pain_point]
+    .filter(usable)
+    .slice(0, 3);
 }
 
 /** 제휴처 이름 - 버튼 문구에 어디로 가는지 정직하게 밝힌다 */
@@ -117,7 +139,7 @@ export default async function NumberPage({
   }
 
   const product = item.products;
-  const points = checkPoints(item);
+  const points = scriptHighlights(item);
   const shop = shopName(product.source);
   // 버튼 문구는 "정보를 보러 간다"는 사실만 말한다. 구매 재촉·최저가 단정은 쓰지 않는다.
   const buttonLabel = `${shop}에서 상품 정보 보기`;
@@ -188,7 +210,7 @@ export default async function NumberPage({
 
           {points.length > 0 && (
             <section className="mt-5">
-              <h2 className="font-bold text-sm mb-2">확인해 보면 좋은 점</h2>
+              <h2 className="font-bold text-sm mb-2">영상에서 짚은 내용</h2>
               <ul className="flex flex-col gap-2">
                 {points.map((point, i) => (
                   <li
