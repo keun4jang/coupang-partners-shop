@@ -19,13 +19,20 @@ export const EVENT_SOURCES = [
   "youtube_shorts",
   "instagram_reels",
   "youtube_longform",
+  "facebook_reels",
   "site",
   "unknown",
 ] as const;
 export type EventSource = (typeof EVENT_SOURCES)[number];
 
 /** 유입 채널 */
-export const EVENT_CHANNELS = ["youtube", "instagram", "site", "unknown"] as const;
+export const EVENT_CHANNELS = [
+  "youtube",
+  "instagram",
+  "facebook",
+  "site",
+  "unknown",
+] as const;
 export type EventChannel = (typeof EVENT_CHANNELS)[number];
 
 /** 영상 템플릿 변형 (A/B 비교 축) */
@@ -171,4 +178,43 @@ export function outboundUrl(
   opts: Parameters<typeof trackingQuery>[0]
 ): string {
   return `${publicSiteUrl()}/go/${displayNumber}?${trackingQuery(opts)}`;
+}
+
+/**
+ * 프로필 링크 허브 (링크 클릭률 개선 2차).
+ *
+ * 인스타/유튜브/페이스북 프로필의 "웹사이트" 링크를 사이트 루트가 아니라
+ * 이 페이지들로 바꿔 달게 한다. 프로필로 넘어온 사람이 번호를 직접
+ * 입력하지 않아도 최근 상품을 바로 골라 /n/[번호] 로 갈 수 있게 하기 위함
+ * (기존엔 프로필 → 사이트 루트 → 검색/스크롤이라 마찰이 컸다).
+ */
+export const HUB_PLATFORMS = ["instagram", "youtube_shorts", "facebook"] as const;
+export type HubPlatform = (typeof HUB_PLATFORMS)[number];
+
+/** 허브 플랫폼 → 상품 이동 시 남길 유입경로 태그 */
+export const HUB_TRACKING: Record<HubPlatform, { source: EventSource; channel: EventChannel }> = {
+  instagram: { source: "instagram_reels", channel: "instagram" },
+  youtube_shorts: { source: "youtube_shorts", channel: "youtube" },
+  facebook: { source: "facebook_reels", channel: "facebook" },
+};
+
+export function isHubPlatform(value: string): value is HubPlatform {
+  return (HUB_PLATFORMS as readonly string[]).includes(value);
+}
+
+/**
+ * 허브 페이지 방문 1건 기록 (번호와 무관한 상위 퍼널 지표).
+ * recordProductEvent 와 같은 원칙: 절대 throw 하지 않는다.
+ */
+export async function recordProfileHubView(platform: HubPlatform): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin().rpc("increment_profile_hub_view_daily", {
+      p_platform: platform,
+    });
+    if (error) {
+      console.warn(`허브 방문 집계 실패(무시): ${error.message.slice(0, 200)}`);
+    }
+  } catch (e) {
+    console.warn(`허브 방문 집계 실패(무시): ${(e as Error).message.slice(0, 200)}`);
+  }
 }

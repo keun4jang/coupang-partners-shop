@@ -220,4 +220,7 @@ create index if not exists idx_longform_items_created_at on longform_items (crea
 --   · 20260906_product_event_daily.sql
 --     (product_event_daily 집계 테이블 + increment_product_event_daily 함수
 --      + video_items.template_variant 컬럼)
+--   · 20260913_click_rate_priorities.sql
+--     (product_event_daily 에 페이스북 source/channel 추가
+--      + profile_hub_view_daily 집계 테이블 - 프로필 허브 방문수)
 -- ─────────────────────────────────────────────────────────────────────

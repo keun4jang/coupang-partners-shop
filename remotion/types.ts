@@ -72,7 +72,7 @@ export const defaultShortsProps: ShortsProps = {
   benefit2: "작아서 신랑도 부담 없이 쓸 것 같고요",
   usageTip: "시트 틈새랑 컵홀더까지 구석구석 밀어주면 돼요",
   checkPoint: "시트 사이 폭이 맞는지 먼저 재보면 좋아요",
-  ctaText: "영상 속 제품은 프로필 링크에 정리해 뒀어요",
+  ctaText: "프로필 첫 화면에 최근 번호 정리해 뒀어요",
   productImageUrl: null,
   category: "차량용품",
   brollFile: null,

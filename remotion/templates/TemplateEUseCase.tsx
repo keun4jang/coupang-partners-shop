@@ -488,8 +488,17 @@ const NoteRowView: React.FC<{
  *
  * 클릭 명령("링크 클릭"), 긴급성("품절 전"), 최저가 단정은 쿠팡파트너스
  * 운영정책 위반이라 어떤 문구도 쓰지 않는다. 위치 안내는 정보 제공이다.
+ *
+ * 문구는 ctaText(ai.ts ctaLine, 나레이션과 동일 문장)를 그대로 받는다 - 예전엔
+ * 이 카드만 "살림템 메모장에 정리해 뒀어요"를 하드코딩해 나레이션과 화면
+ * 문장이 어긋났다(CtaScene 등 다른 템플릿은 처음부터 ctaText 를 썼다).
+ * 제품 사진도 함께 둔다(2026-09 클릭률 개선 2차 - TemplateE 와 같은 이유).
  */
-const CtaCard: React.FC<{ displayNumber: number }> = ({ displayNumber }) => {
+const CtaCard: React.FC<{
+  displayNumber: number;
+  ctaText: string;
+  productImageUrl: string | null;
+}> = ({ displayNumber, ctaText, productImageUrl }) => {
   const rise = useRise(0);
   return (
     <div
@@ -499,44 +508,58 @@ const CtaCard: React.FC<{ displayNumber: number }> = ({ displayNumber }) => {
         borderRadius: E.radius,
         background: E.accent,
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: 14,
-        padding: "0 48px",
+        gap: 32,
+        padding: "0 44px",
         boxSizing: "border-box",
         opacity: rise.opacity,
         transform: rise.transform,
       }}
     >
-      <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 30, fontWeight: 600 }}>
-        제품명 · 가격 · 상세 정보
-      </div>
       <div
         style={{
-          color: "#FFFFFF",
-          fontWeight: 800,
-          fontSize: 150,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          whiteSpace: "nowrap",
+          width: 160,
+          height: 160,
+          borderRadius: 24,
+          overflow: "hidden",
+          background: "#FFFFFF",
+          flexShrink: 0,
+          boxShadow: "0 10px 26px rgba(0,0,0,0.25)",
         }}
       >
-        {displayNumber}
-        <span style={{ fontSize: "0.5em" }}>번</span>
+        <ProductImage src={productImageUrl} fallbackSize={90} />
       </div>
-      <div
-        style={{
-          color: "#FFFFFF",
-          fontSize: 34,
-          fontWeight: 600,
-          lineHeight: 1.35,
-          textAlign: "center",
-          wordBreak: "keep-all",
-          textWrap: "balance",
-        }}
-      >
-        살림템 메모장에 정리해 뒀어요
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+        <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 26, fontWeight: 600 }}>
+          제품명 · 가격 · 상세 정보
+        </div>
+        <div
+          style={{
+            color: "#FFFFFF",
+            fontWeight: 800,
+            fontSize: 116,
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {displayNumber}
+          <span style={{ fontSize: "0.5em" }}>번</span>
+        </div>
+        <div
+          style={{
+            color: "#FFFFFF",
+            fontSize: 30,
+            fontWeight: 600,
+            lineHeight: 1.35,
+            wordBreak: "keep-all",
+            textWrap: "balance",
+          }}
+        >
+          {ctaText}
+        </div>
       </div>
     </div>
   );
@@ -710,7 +733,11 @@ export const TemplateEUseCase: React.FC<ShortsProps> = (props) => {
                 />
               </Sequence>
               <Sequence from={f(ctaFrom - bodyFrom)} layout="none">
-                <CtaCard displayNumber={props.displayNumber} />
+                <CtaCard
+                  displayNumber={props.displayNumber}
+                  ctaText={props.ctaText}
+                  productImageUrl={props.productImageUrl}
+                />
               </Sequence>
             </div>
 

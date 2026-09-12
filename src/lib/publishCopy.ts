@@ -42,7 +42,9 @@ export function youtubeShortsDescription(
     `제품명·가격·상세 정보는 살림템 메모장 ${displayNumber}번에 정리했습니다.`,
     url,
     "",
-    "채널 프로필에도 같은 주소를 걸어두었습니다.",
+    // 채널 프로필 링크는 이 번호 하나가 아니라 최근 상품을 모은 허브
+    // (/from/youtube-shorts)를 가리킨다 - "같은 주소"라고 하면 부정확하다.
+    "채널 프로필 첫 화면에서도 최근 번호들을 확인하실 수 있어요.",
     "",
     "#Shorts #살림템 #생활템 #쿠팡추천템",
   ].join("\n");
@@ -62,6 +64,6 @@ export function instagramCaption(
   if (body.includes(DISCLOSURE_LINE)) return body;
 
   // 본문이 통째로 비어 있는 경우(문구 생성 실패)에도 최소한의 안내는 나가야 한다.
-  const fallback = `영상 속 제품은 프로필 링크에 정리해 뒀어요. (${displayNumber}번)`;
+  const fallback = `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`;
   return [DISCLOSURE_LINE, "", body || fallback].join("\n");
 }

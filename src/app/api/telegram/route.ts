@@ -11,6 +11,7 @@ import {
 import { formatDisplayNumber } from "@/lib/format";
 import { getEarnings, formatEarningsMessage } from "@/lib/earnings";
 import { getPayoutStatus, formatPayoutMessage } from "@/lib/payout";
+import { buildCtrReport, formatCtrMessage } from "@/lib/report";
 import { optionalEnv, requireEnv } from "@/lib/env";
 import { triggerRenderWorkflow } from "@/lib/renderTrigger";
 import type { Product, TemplateType, VideoItemWithProduct } from "@/types/db";
@@ -367,6 +368,14 @@ export async function POST(request: NextRequest) {
         );
         break;
       }
+      case "클릭률":
+      case "성과": {
+        // 매일 자동 리포트에는 사장님 요청으로 클릭수를 안 넣는다 - 이건
+        // 물어봤을 때만 보여주는 별도 명령이라 CTR/소스별/템플릿별을 보여준다.
+        const ctr = await buildCtrReport(7);
+        await sendTelegramMessage(formatCtrMessage(ctr), chatId);
+        break;
+      }
       default:
         await sendTelegramMessage(
           [
@@ -375,6 +384,7 @@ export async function POST(request: NextRequest) {
             "업로드 - 새 상품 하나 골라 웹사이트 등록 + 영상 생성·업로드 (즉시)",
             "영상 - 업로드와 같음 (영상D 처럼 템플릿 지정 가능)",
             "수익 - 쿠팡파트너스 커미션 + 출금까지 남은 금액 (출금/정산 도 같음)",
+            "클릭률 - 최근 7일 CTR·유입경로별·템플릿 A/B 성과 (성과 도 같음)",
             "최근영상 - 최근 생성된 영상과 드라이브 링크",
             "상태 - 전체 현황 요약",
             "",

@@ -400,9 +400,9 @@ export const MOTION = {
 
 /** CTA 문구 템플릿 (ctaText 미전달 시 폴백 - 워커는 ai.ts ctaLine 변형을 넘긴다) */
 export const ctaTemplate = (_displayNumber: number): string =>
-  `영상 속 제품은 프로필 링크에 정리해 뒀어요`;
+  `프로필 첫 화면에 최근 번호 정리해 뒀어요`;
 
-export const CTA_SUB_TEXT = "프로필 링크에 제품 정보";
+export const CTA_SUB_TEXT = "프로필 첫 화면에 제품 정보";
 
 /** CTA 화면 신뢰 문구 - 우리가 실제로 하는 일만 말한다 (후기 수·평점은 우리 데이터가 아님) */
 export const TRUST_TEXT = "쿠팡 베스트에서 눈에 띈 살림템을 정리해요";

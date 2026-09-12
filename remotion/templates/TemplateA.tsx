@@ -97,7 +97,11 @@ export const TemplateA: React.FC<ShortsProps> = (props) => {
 
       {/* CTA */}
       <Sequence from={ctaFrom} durationInFrames={durationInFrames - ctaFrom}>
-        <CtaScene displayNumber={props.displayNumber} ctaText={props.ctaText} />
+        <CtaScene
+          displayNumber={props.displayNumber}
+          ctaText={props.ctaText}
+          productImageUrl={props.productImageUrl}
+        />
         <Narration src={props.narration?.[6]} />
       </Sequence>
 

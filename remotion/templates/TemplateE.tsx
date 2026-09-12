@@ -452,11 +452,19 @@ const NoteRowView: React.FC<{
   );
 };
 
-/** CTA 카드 - 사진 창 자리를 이어받는 포인트 카드 (전체 화면 점거 없음) */
-const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
-  displayNumber,
-  ctaText,
-}) => {
+/**
+ * CTA 카드 - 사진 창 자리를 이어받는 포인트 카드 (전체 화면 점거 없음).
+ *
+ * 제품 사진(productImageUrl)을 작은 타일로 함께 둔다(2026-09 클릭률 개선
+ * 2차) - 예전엔 이 화면에서 사진이 완전히 사라졌다. 번호만으로는 나중에
+ * 프로필 허브(/from/[platform]) 목록에서 "이게 그 상품이었나" 확신이 안 서서,
+ * 사진이 있어야 다시 알아보고 실제로 눌러본다.
+ */
+const CtaCard: React.FC<{
+  displayNumber: number;
+  ctaText: string;
+  productImageUrl: string | null;
+}> = ({ displayNumber, ctaText, productImageUrl }) => {
   const rise = useRise(0);
   return (
     <div
@@ -466,45 +474,66 @@ const CtaCard: React.FC<{ displayNumber: number; ctaText: string }> = ({
         borderRadius: E.radius,
         background: E.accent,
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: 18,
-        padding: "0 48px",
+        gap: 32,
+        padding: "0 44px",
         boxSizing: "border-box",
         opacity: rise.opacity,
         transform: rise.transform,
       }}
     >
-      <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 30, fontWeight: 600 }}>
-        영상 속 제품 번호
+      <div
+        style={{
+          width: 160,
+          height: 160,
+          borderRadius: 24,
+          overflow: "hidden",
+          background: "#FFFFFF",
+          flexShrink: 0,
+          boxShadow: "0 10px 26px rgba(0,0,0,0.25)",
+        }}
+      >
+        <ProductImage src={productImageUrl} fallbackSize={90} />
       </div>
       <div
         style={{
-          color: "#FFFFFF",
-          fontWeight: 800,
-          fontSize: 168,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          whiteSpace: "nowrap",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          minWidth: 0,
         }}
       >
-        {displayNumber}
-        <span style={{ fontSize: "0.5em" }}>번</span>
-      </div>
-      {/* 나레이션과 동일한 문장 */}
-      <div
-        style={{
-          color: "#FFFFFF",
-          fontSize: 38,
-          fontWeight: 600,
-          lineHeight: 1.35,
-          textAlign: "center",
-          wordBreak: "keep-all",
-          textWrap: "balance",
-        }}
-      >
-        {ctaText}
+        <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 26, fontWeight: 600 }}>
+          영상 속 제품 번호
+        </div>
+        <div
+          style={{
+            color: "#FFFFFF",
+            fontWeight: 800,
+            fontSize: 128,
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {displayNumber}
+          <span style={{ fontSize: "0.5em" }}>번</span>
+        </div>
+        {/* 나레이션과 동일한 문장 */}
+        <div
+          style={{
+            color: "#FFFFFF",
+            fontSize: 32,
+            fontWeight: 600,
+            lineHeight: 1.35,
+            wordBreak: "keep-all",
+            textWrap: "balance",
+          }}
+        >
+          {ctaText}
+        </div>
       </div>
     </div>
   );
@@ -686,7 +715,11 @@ export const TemplateE: React.FC<ShortsProps> = (props) => {
                 />
               </Sequence>
               <Sequence from={f(ctaFrom - bodyFrom)} layout="none">
-                <CtaCard displayNumber={props.displayNumber} ctaText={props.ctaText} />
+                <CtaCard
+                  displayNumber={props.displayNumber}
+                  ctaText={props.ctaText}
+                  productImageUrl={props.productImageUrl}
+                />
               </Sequence>
             </div>
 
