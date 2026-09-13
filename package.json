@@ -25,6 +25,7 @@
     "remotion:render": "remotion render TemplateA renders/sample.mp4",
     "yt:backfill-disclosure": "tsx scripts/yt-disclosure-backfill.ts",
     "policy:check": "tsx scripts/policy-selftest.ts",
+    "botfilter:check": "tsx scripts/botfilter-selftest.ts",
     "metrics:links": "tsx scripts/metrics-links.ts"
   },
   "dependencies": {

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { withSubId } from "@/lib/coupang";
 import { productTargetUrl } from "@/lib/format";
-import { parseTrackingParams, recordProductEvent } from "@/lib/tracking";
+import {
+  parseTrackingParams,
+  recordBlockedOutbound,
+  recordProductEvent,
+} from "@/lib/tracking";
+import { outboundSkipReason } from "@/lib/requestFilter";
 import type { VideoItemWithProduct } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -59,11 +64,18 @@ export async function GET(
     return NextResponse.redirect(new URL(`/n/${displayNumber}`, request.url), 302);
   }
 
-  await recordProductEvent({
-    displayNumber,
-    eventType: "outbound_click",
-    tracking,
-  });
+  // 크롤러·미리보기·프리페치는 이동만 시켜 주고 집계에서 뺀다.
+  // (걸러도 리다이렉트는 그대로 - 자세한 이유는 lib/requestFilter.ts 머리말)
+  const skipReason = outboundSkipReason(request, displayNumber);
+  if (skipReason) {
+    await recordBlockedOutbound(skipReason);
+  } else {
+    await recordProductEvent({
+      displayNumber,
+      eventType: "outbound_click",
+      tracking,
+    });
+  }
 
   // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚는다.
   // 알리는 subId 개념이 없고 제휴 링크에 쿼리를 덧붙이면 링크가 깨질 수 있어

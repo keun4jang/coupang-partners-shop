@@ -42,6 +42,9 @@ export interface CtrReport {
   byTemplate: Array<{ variant: string; tally: Tally }>;
   /** 랜딩 없이 바로 나가는 소스(롱폼 등)의 이동 건수 - overall 에는 안 섞는다 */
   directOnlyClicks: number;
+  /** 봇·미리보기로 보고 집계에서 뺀 이동 요청 (사유 분류별, 많은 순) */
+  blocked: Array<{ group: string; count: number }>;
+  blockedTotal: number;
 }
 
 interface ProductEventRow {
@@ -81,6 +84,23 @@ const SOURCE_LABEL: Record<string, string> = {
  */
 const DIRECT_ONLY_SOURCES = new Set<string>(["youtube_longform"]);
 
+/**
+ * 제외 사유는 'ua:googlebot' 처럼 세분화돼 쌓인다(수십 종). 텔레그램에서
+ * 한눈에 보려면 앞머리 기준으로 묶는 편이 낫다 - 어떤 봇인지보다 "봇이라
+ * 뺐다"가 알고 싶은 정보이므로.
+ */
+const BLOCK_GROUP_LABEL: Record<string, string> = {
+  ua: "크롤러·봇",
+  prefetch: "브라우저 미리읽기",
+  method: "링크 검사",
+  repeat: "짧은 시간 중복",
+};
+
+function blockGroupOf(reason: string): string {
+  const prefix = reason.split(":")[0];
+  return BLOCK_GROUP_LABEL[prefix] ?? prefix;
+}
+
 /** 최근 windowDays 일의 CTR 리포트. 집계 테이블이 없으면 available:false 로 조용히 비운다. */
 export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
   const since = new Date(Date.now() - windowDays * 86_400_000).toISOString().slice(0, 10);
@@ -94,6 +114,8 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
     bySource: [],
     byTemplate: [],
     directOnlyClicks: 0,
+    blocked: [],
+    blockedTotal: 0,
   };
 
   const { data, error } = await db
@@ -144,6 +166,22 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
     // 마이그레이션 전이면 0으로 둔다
   }
 
+  // 봇 필터가 걸러낸 건수도 별도 테이블 - 마찬가지로 실패해도 리포트는 살린다
+  const blockedByGroup = new Map<string, number>();
+  try {
+    const { data: blockedRows } = await db
+      .from("blocked_outbound_daily")
+      .select("reason, event_count")
+      .gte("event_date", since)
+      .limit(10_000);
+    for (const r of (blockedRows as { reason: string; event_count: number }[] | null) ?? []) {
+      const group = blockGroupOf(r.reason);
+      blockedByGroup.set(group, (blockedByGroup.get(group) ?? 0) + r.event_count);
+    }
+  } catch {
+    // 마이그레이션 전이면 비워 둔다
+  }
+
   return {
     available: true,
     windowDays,
@@ -156,6 +194,10 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
       .map(([variant, tally]) => ({ variant, tally: finalizeTally(tally) }))
       .sort((a, b) => b.tally.clicks - a.tally.clicks),
     directOnlyClicks,
+    blocked: [...blockedByGroup.entries()]
+      .map(([group, count]) => ({ group, count }))
+      .sort((a, b) => b.count - a.count),
+    blockedTotal: [...blockedByGroup.values()].reduce((sum, n) => sum + n, 0),
   };
 }
 
@@ -272,6 +314,14 @@ export function formatCtrMessage(ctr: CtrReport): string {
     lines.push(`롱폼 직행 이동: ${ctr.directOnlyClicks}건 (설명란에서 바로 이동 - 방문 집계 없음)`);
   }
   lines.push(`프로필 허브 방문: ${ctr.hubViews}`);
+
+  // 걸러낸 양을 같이 보여 준다. 이 줄이 없으면 "우리 숫자와 쿠팡 공식
+  // 클릭수가 왜 다른가"를 다시 처음부터 따져 봐야 한다(2026-09-13 에 실제로
+  // 열 배 차이가 나서 원인을 찾느라 한참 걸렸다).
+  if (ctr.blockedTotal > 0) {
+    const detail = ctr.blocked.map((b) => `${b.group} ${b.count}`).join(", ");
+    lines.push(`자동요청 제외: ${ctr.blockedTotal}건 (${detail})`);
+  }
 
   if (ctr.bySource.length > 0) {
     lines.push("", "[유입경로별]");

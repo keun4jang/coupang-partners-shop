@@ -131,6 +131,30 @@ export async function recordProductEvent(input: {
   }
 }
 
+/**
+ * 집계에서 제외한 자동 요청 1건 기록 (사유별 일일 카운터).
+ *
+ * 왜 세는가: 봇 필터는 "얼마나 걸러냈는지"를 볼 수 없으면 과하게 걸렀는지
+ * 덜 걸렀는지 판단할 수가 없다. 걸러낸 건수를 사유별로 남겨 두면 클릭률
+ * 리포트에서 "이동 25건 (자동요청 200건 제외)" 처럼 확인할 수 있다.
+ *
+ * recordProductEvent 와 같은 원칙: 절대 throw 하지 않는다. 마이그레이션
+ * 적용 전이면 함수가 없어 실패하는데, 그때도 조용히 넘어간다(필터 자체는
+ * DB 와 무관하게 이미 동작한다).
+ */
+export async function recordBlockedOutbound(reason: string): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin().rpc("increment_blocked_outbound_daily", {
+      p_reason: reason,
+    });
+    if (error) {
+      console.warn(`제외 집계 실패(무시): ${error.message.slice(0, 200)}`);
+    }
+  } catch (e) {
+    console.warn(`제외 집계 실패(무시): ${(e as Error).message.slice(0, 200)}`);
+  }
+}
+
 /** 숏폼 템플릿 변형 (A/B 비교의 두 갈래) */
 export type ShortsVariant = "classic" | "usecase";
 
