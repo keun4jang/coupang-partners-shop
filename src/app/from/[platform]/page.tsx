@@ -146,8 +146,10 @@ export default async function HubPage({
 
       <header className="pt-8 pb-5 text-center">
         <h1 className="text-2xl font-extrabold tracking-tight">살림템 메모장</h1>
-        <p className="text-sub mt-1.5 text-sm">
-          {PLATFORM_LABEL[platform]}에서 보신 제품, 최근 목록에서 찾아보세요.
+        <p className="text-sub mt-1.5 text-sm break-keep">
+          {PLATFORM_LABEL[platform]}에서 보신 제품,
+          <br />
+          최근 목록에서 찾아보세요.
         </p>
       </header>
 
@@ -167,8 +169,12 @@ export default async function HubPage({
       {/* 번호를 이미 기억하는 방문자를 위한 보조 검색 (주된 동선은 아래 그리드) */}
       {dbReady && (
         <section className="bg-card rounded-2xl p-3.5 shadow-sm border border-accent-soft mb-5">
-          <form method="GET" action={`/from/${rawPlatform}`} className="flex gap-2 items-center">
-            <span className="text-sm font-semibold shrink-0 pl-1">번호로 찾기</span>
+          <span className="text-sm font-semibold pl-1">번호로 찾기</span>
+          <form
+            method="GET"
+            action={`/from/${rawPlatform}`}
+            className="flex gap-2 items-center mt-1.5"
+          >
             <input
               type="text"
               name="q"

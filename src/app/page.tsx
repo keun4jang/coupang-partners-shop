@@ -216,8 +216,8 @@ export default async function Home({
       {/* 번호 검색 - 최상단. 예전 영상 보고 온 분이 자기 번호로 바로 점프 */}
       {dbReady && (
         <section className="bg-card rounded-2xl p-3.5 shadow-sm border border-accent-soft mb-4">
-          <form method="GET" action="/" className="flex gap-2 items-center">
-            <span className="text-sm font-semibold shrink-0 pl-1">번호로 찾기</span>
+          <span className="text-sm font-semibold pl-1">번호로 찾기</span>
+          <form method="GET" action="/" className="flex gap-2 items-center mt-1.5">
             <input
               type="text"
               name="q"
