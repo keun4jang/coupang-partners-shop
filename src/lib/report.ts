@@ -36,9 +36,12 @@ export interface CtrReport {
   available: boolean;
   windowDays: number;
   hubViews: number;
+  /** 랜딩(방문) 단계가 있는 소스만의 합계 - "전체 CTR"의 분모/분자로 의미 있는 값 */
   overall: Tally;
   bySource: Array<{ source: string; tally: Tally }>;
   byTemplate: Array<{ variant: string; tally: Tally }>;
+  /** 랜딩 없이 바로 나가는 소스(롱폼 등)의 이동 건수 - overall 에는 안 섞는다 */
+  directOnlyClicks: number;
 }
 
 interface ProductEventRow {
@@ -70,6 +73,14 @@ const SOURCE_LABEL: Record<string, string> = {
   unknown: "미상",
 };
 
+/**
+ * 랜딩(/n/[번호]) 없이 설명란에서 /go/[번호]로 바로 나가는 소스.
+ * 이 소스는 landing_view 개념이 아예 없어서(방문 집계를 안 한다) outbound_click
+ * 을 "방문 대비 이동" 전체 합계에 섞으면 방문보다 이동이 훨씬 많은 CTR
+ * 1000% 같은 값이 나온다(2026-09-13 실측). overall 에는 넣지 않고 따로 센다.
+ */
+const DIRECT_ONLY_SOURCES = new Set<string>(["youtube_longform"]);
+
 /** 최근 windowDays 일의 CTR 리포트. 집계 테이블이 없으면 available:false 로 조용히 비운다. */
 export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
   const since = new Date(Date.now() - windowDays * 86_400_000).toISOString().slice(0, 10);
@@ -82,6 +93,7 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
     overall: emptyTally(),
     bySource: [],
     byTemplate: [],
+    directOnlyClicks: 0,
   };
 
   const { data, error } = await db
@@ -96,9 +108,14 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
   const overall = emptyTally();
   const bySource = new Map<string, Tally>();
   const byTemplate = new Map<string, Tally>();
+  let directOnlyClicks = 0;
 
   for (const row of rows) {
-    addToTally(overall, row);
+    if (DIRECT_ONLY_SOURCES.has(row.source)) {
+      if (row.event_type === "outbound_click") directOnlyClicks += row.event_count;
+    } else {
+      addToTally(overall, row);
+    }
 
     const sourceTally = bySource.get(row.source) ?? emptyTally();
     addToTally(sourceTally, row);
@@ -138,6 +155,7 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
     byTemplate: [...byTemplate.entries()]
       .map(([variant, tally]) => ({ variant, tally: finalizeTally(tally) }))
       .sort((a, b) => b.tally.clicks - a.tally.clicks),
+    directOnlyClicks,
   };
 }
 
@@ -246,9 +264,14 @@ export function formatCtrMessage(ctr: CtrReport): string {
   const lines = [
     `📈 클릭 성과 (최근 ${ctr.windowDays}일)`,
     "",
-    `전체: ${formatTally(ctr.overall)}`,
-    `프로필 허브 방문: ${ctr.hubViews}`,
+    // 롱폼(설명란 직행 링크)은 방문 단계가 없어 여기 안 섞는다 - 섞으면
+    // "방문 23 · 이동 230" 같은 CTR 1000%짜리 무의미한 숫자가 나온다.
+    `전체(랜딩형): ${formatTally(ctr.overall)}`,
   ];
+  if (ctr.directOnlyClicks > 0) {
+    lines.push(`롱폼 직행 이동: ${ctr.directOnlyClicks}건 (설명란에서 바로 이동 - 방문 집계 없음)`);
+  }
+  lines.push(`프로필 허브 방문: ${ctr.hubViews}`);
 
   if (ctr.bySource.length > 0) {
     lines.push("", "[유입경로별]");
