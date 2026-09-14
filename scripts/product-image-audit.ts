@@ -15,8 +15,10 @@
  * 이미 영상이 나간 상품은 영상 자체를 건드리지 않는다 - 그건 사람이 판단할 일이다.
  */
 import dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
-dotenv.config();
+// quiet: dotenv 17 은 로드할 때마다 홍보성 팁 배너를 찍는다. 그 줄이 진단
+// 로그에 섞이면 결과를 읽는 사람(이나 에이전트)이 오해한다.
+dotenv.config({ path: ".env.local", quiet: true });
+dotenv.config({ quiet: true });
 import { supabaseAdmin } from "../src/lib/supabase";
 import { checkProductImage } from "../src/lib/productImageCheck";
 import type { Product } from "../src/types/db";
@@ -26,8 +28,12 @@ const apply = args.includes("--apply");
 const limitIdx = args.indexOf("--limit");
 const limit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : Infinity;
 
-/** 무료 등급 분당 한도를 넘지 않게 호출 사이에 쉬는 시간 */
-const DELAY_MS = 1_200;
+/**
+ * 호출 사이에 쉬는 시간. 1.2초(=분당 50회)로 돌렸더니 100건 중 6건이 429
+ * (분당 한도 초과)로 날아갔다(2026-09-14 실측). 분당 20회 아래로 낮춘다.
+ * 검사 모듈 자체도 429 면 15초 쉬고 한 번 더 시도한다.
+ */
+const DELAY_MS = 3_500;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -83,7 +89,13 @@ async function main() {
     await sleep(DELAY_MS);
   }
 
+  // 사유를 축별로 나눠 본다. 첫 진단에서 "제품이 안 보임"이 한 번도 안 걸려
+  // 그 축이 죽어 있다는 걸 이 집계가 없었으면 못 알아챘을 것이다.
+  const byCjk = bad.filter((b) => b.reason.includes("중국어")).length;
+  const byNoProduct = bad.filter((b) => b.reason.includes("제품이 안 보임")).length;
+
   console.log(`\n검사 완료: ${checked}개 판정 · ${unchecked}개 검사 불가 · 문제 ${bad.length}건`);
+  console.log(`  사유별: 중국어·일본어 ${byCjk}건 · 제품이 안 보임 ${byNoProduct}건`);
   if (unchecked > 0) {
     console.log("(검사 불가는 GEMINI_API_KEY 미설정이거나 이미지 다운로드/API 실패입니다)");
   }

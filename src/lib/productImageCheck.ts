@@ -12,11 +12,17 @@
  * 그대로 올리는 경우가 많아, 우리가 고를 여지 없이 그런 사진이 들어온다.
  *
  * 그래서 사진을 한 장씩 비전으로 보고 두 가지만 묻는다:
- *   1) 사진 위에 외국어 마케팅 문구가 입혀져 있나
+ *   1) 중국어·일본어가 사진에 박혀 있나
  *   2) 상품명이 가리키는 물건이 사진에 분명히 보이나
+ *
  * 둘 중 하나라도 아니면 그 상품은 영상 후보에서 뺀다. 재고가 1,000개가 넘어서
  * 까다롭게 걸러도 만들 거리는 남는다 - 반대로 나쁜 사진 한 장은 그 영상
  * 전체를 버리게 만든다.
+ *
+ * 1번을 "외국어"가 아니라 "중국어·일본어"로 좁힌 이유: 2026-09-14 첫 진단에서
+ * "외국어"로 물었더니 영어 브랜드명·포장지 문구·한국어까지 싸잡아 걸러
+ * 100개 중 11건이 전부 가짜 양성이었다. 한국 쇼핑몰 상품 사진에 영어가
+ * 들어간 건 정상이다. 사장님이 싫다고 한 것도 콕 집어 중국어였다.
  *
  * 스톡 영상 프레임의 자막·워터마크를 잡는 videoSource.ts 의 비전 검사와
  * 목적이 다르다: 저쪽은 "덮어서 지울 영역"을 찾고, 여기는 "이 상품을 쓸지"를
@@ -29,8 +35,8 @@ export interface ProductImageVerdict {
   ok: boolean;
   /** 사람이 읽을 판정 사유 (로그·리포트용) */
   reason: string;
-  /** 사진 위에 입힌 외국어 마케팅 문구가 있나 */
-  foreignTextOverlay: boolean;
+  /** 중국어·일본어가 사진에 박혀 있나 (근거 문구까지 확인된 것만 true) */
+  cjkTextOverlay: boolean;
   /** 상품명이 가리키는 물건이 사진에 분명히 보이나 */
   showsProduct: boolean;
   /** 사진의 주요 피사체 (디버깅용: "사람", "제품 단독" 등) */
@@ -38,8 +44,8 @@ export interface ProductImageVerdict {
 }
 
 interface VisionAnswer {
-  foreignTextOverlay: boolean;
-  foreignTextSample: string;
+  cjkTextOverlay: boolean;
+  cjkTextSample: string;
   showsProduct: boolean;
   mainSubject: string;
   confidence: number;
@@ -48,16 +54,16 @@ interface VisionAnswer {
 const SCHEMA = {
   type: "OBJECT",
   properties: {
-    foreignTextOverlay: { type: "BOOLEAN" },
-    foreignTextSample: { type: "STRING" },
+    cjkTextOverlay: { type: "BOOLEAN" },
+    cjkTextSample: { type: "STRING" },
     showsProduct: { type: "BOOLEAN" },
     mainSubject: { type: "STRING" },
     confidence: { type: "NUMBER" },
   },
-  required: ["foreignTextOverlay", "showsProduct", "mainSubject", "confidence"],
+  required: ["cjkTextOverlay", "showsProduct", "mainSubject", "confidence"],
   propertyOrdering: [
-    "foreignTextOverlay",
-    "foreignTextSample",
+    "cjkTextOverlay",
+    "cjkTextSample",
     "showsProduct",
     "mainSubject",
     "confidence",
@@ -68,26 +74,66 @@ function buildPrompt(productName: string): string {
   return `이 이미지는 한국 쇼핑몰에 올라온 상품 "${productName}" 의 대표 사진이다.
 한국인 시청자에게 보여줄 숏폼 영상의 첫 화면에 쓸 수 있는 사진인지 판정하라.
 
-foreignTextOverlay — 사진 위에 "입혀진" 외국어 마케팅 문구가 있으면 true:
-- 중국어·일본어 홍보 문구(예: "收纳小巧 轻松提起"), 외국어 자막 스타일 글씨
-- 사진 편집으로 덧붙인 외국어 설명/가격/혜택 문구
-다음은 false 로 둔다(정상적인 상품 사진의 일부다):
-- 제품 몸체·포장에 원래 인쇄된 브랜드명이나 로고 (예: 제품에 박힌 "SONY")
-- 한국어 문구
-foreignTextSample 에는 발견한 문구를 그대로 짧게 적는다(없으면 빈 문자열).
+【판정 1】 cjkTextOverlay — 중국어(간체·번체) 또는 일본어(히라가나·가타카나)
+글자가 사진에 보이면 true. 그 외에는 무조건 false.
 
-showsProduct — 상품명 "${productName}" 이 가리키는 그 물건이 사진에서 무엇인지
-알아볼 수 있으면 true. 다음이면 false:
-- 사람·풍경·분위기만 크게 나오고 정작 그 제품은 안 보이거나 알아볼 수 없다
-- 전혀 다른 물건이 주인공이다
-- 제품이 너무 작거나 가려져서 무엇인지 분간이 안 된다
+  true 로 둘 것:
+  - 中文 홍보 문구 (예: "收纳小巧 轻松提起", "厂家直销")
+  - 일본어 자막·문구 (예: "かんたん収納")
+  - 위치는 상관없다. 사진 위에 얹힌 자막이든 포장지에 인쇄된 것이든 true.
 
-mainSubject — 사진의 주요 피사체를 한국어 한 단어~짧은 구로 (예: "제품 단독", "사람", "풍경", "여러 제품 콜라주").
+  반드시 false 로 둘 것 (여기서 헷갈리면 안 된다):
+  - 한국어는 무슨 내용이든, 어디에 있든 false. ("화이트 블랙 핑크", "눈에 띄는" 등)
+  - 영어는 무슨 내용이든 false. 브랜드명("GREATWALL", "SONY"), 제품명("EGG PANG"),
+    스펙 표기("3.7V Li-ion Cordless Driver"), 포장지 문구("KITCHEN TOWEL"),
+    원산지 표기("MADE IN KOREA") — 전부 false.
+  - 한자가 섞여 있어도 한국식 한자(한국어 문맥)면 false.
+  한국 쇼핑몰 상품 사진에 영어가 들어간 건 지극히 정상이다. 오직 중국어·일본어만 잡는다.
+
+cjkTextSample 에는 발견한 중국어/일본어를 그대로 짧게 적는다(없으면 빈 문자열).
+
+【판정 2】 showsProduct — 상품명 "${productName}" 이 가리키는 그 물건이
+사진의 주인공으로 또렷이 보이면 true.
+
+  false 로 둘 것:
+  - 사람(모델)이 화면 대부분을 차지하고 제품은 안 보이거나 손톱만 하다
+  - 풍경·실내 분위기만 있고 제품을 못 찾겠다
+  - 상품명과 전혀 다른 물건이 주인공이다
+  - 제품이 가려지거나 흐려서 무엇인지 분간이 안 된다
+
+  true 로 둘 것:
+  - 제품 단독 사진 (배경 무관)
+  - 사람이 제품을 쓰고 있지만 제품이 또렷이 보인다
+  - 여러 각도·구성품을 모아둔 콜라주라도 제품이 무엇인지 알 수 있다
+
+mainSubject — 사진의 주요 피사체를 한국어 짧은 구로 (예: "제품 단독", "모델이 입은 옷", "들판 풍경").
 confidence — 위 판정에 대한 확신도 0.0~1.0.`;
 }
 
 /** 이 확신도 미만이면 판정을 믿지 않고 통과시킨다 (멀쩡한 상품을 잘못 버리지 않게) */
 const MIN_CONFIDENCE = 0.6;
+
+const CJK_RE = /[一-鿿぀-ゟ゠-ヿ]/;
+const HANGUL_RE = /[가-힯]/;
+
+/**
+ * 모델이 "중국어가 있다"고 한 주장을 코드로 검증한다.
+ *
+ * 2026-09-14 첫 진단에서 flash-lite 는 영어 브랜드명("GREATWALL"), 포장지 문구
+ * ("KITCHEN TOWEL"), 심지어 한국어("화이트 블랙 핑크")까지 외국어로 신고했다.
+ * 100개 중 11건이 걸렸는데 전부 가짜 양성이었다. 프롬프트를 아무리 조여도
+ * 이런 실수는 또 난다 - 그래서 모델이 근거로 내민 문구에 한자·가나가 실제로
+ * 들어 있는지 여기서 다시 본다. 근거를 못 대면 그 주장은 버린다.
+ */
+export function looksCjk(sample: string): boolean {
+  const s = sample.trim();
+  // 근거(샘플)를 못 대면 믿지 않는다
+  if (!s) return false;
+  if (!CJK_RE.test(s)) return false;
+  // 한글이 섞여 있으면 한자가 낀 한국어 문장이다 (예: "特價 세일")
+  if (HANGUL_RE.test(s)) return false;
+  return true;
+}
 
 /**
  * 대표 사진 한 장 판정.
@@ -105,7 +151,7 @@ export async function checkProductImage(input: {
     return {
       ok: false,
       reason: "대표 사진이 없음",
-      foreignTextOverlay: false,
+      cjkTextOverlay: false,
       showsProduct: false,
       mainSubject: "",
     };
@@ -115,18 +161,34 @@ export async function checkProductImage(input: {
   if (!img) return null;
 
   const { geminiGenerateJson } = await import("./ai");
-  let answer: VisionAnswer | null = null;
-  try {
-    answer = await geminiGenerateJson<VisionAnswer>({
+  const call = () =>
+    geminiGenerateJson<VisionAnswer>({
       prompt: buildPrompt(productName),
       schema: SCHEMA,
       temperature: 0.1,
       model: process.env.GEMINI_VISION_MODEL ?? "gemini-flash-lite-latest",
       image: { base64: img.buffer.toString("base64"), mimeType: img.mimeType },
     });
+
+  let answer: VisionAnswer | null = null;
+  try {
+    answer = await call();
   } catch (e) {
-    console.warn(`사진 검사 실패(통과 처리): ${(e as Error).message.slice(0, 120)}`);
-    return null;
+    const msg = (e as Error).message;
+    // 무료 등급 분당 한도. 첫 진단에서 100건 중 6건이 여기서 날아갔다
+    // (videoSource.detectBoxesGemini 도 같은 이유로 같은 재시도를 한다).
+    if (msg.includes("429")) {
+      await new Promise((r) => setTimeout(r, 15_000));
+      try {
+        answer = await call();
+      } catch {
+        console.warn("사진 검사 실패(통과 처리): 한도 초과 재시도도 실패");
+        return null;
+      }
+    } else {
+      console.warn(`사진 검사 실패(통과 처리): ${msg.slice(0, 120)}`);
+      return null;
+    }
   }
   if (!answer) return null;
 
@@ -136,10 +198,18 @@ export async function checkProductImage(input: {
     return null;
   }
 
+  const sample = (answer.cjkTextSample ?? "").trim();
+  // 모델 주장 그대로 믿지 않고, 근거 문구에 한자·가나가 실제로 있는지 확인한다.
+  const cjkConfirmed = Boolean(answer.cjkTextOverlay) && looksCjk(sample);
+  if (answer.cjkTextOverlay && !cjkConfirmed) {
+    console.log(
+      `사진 검사: 중국어 신고를 근거 부족으로 무시 (근거: "${sample.slice(0, 30)}")`
+    );
+  }
+
   const reasons: string[] = [];
-  if (answer.foreignTextOverlay) {
-    const sample = (answer.foreignTextSample ?? "").trim().slice(0, 40);
-    reasons.push(sample ? `외국어 문구 박힘("${sample}")` : "외국어 문구 박힘");
+  if (cjkConfirmed) {
+    reasons.push(`중국어·일본어 박힘("${sample.slice(0, 40)}")`);
   }
   if (!answer.showsProduct) {
     const subject = (answer.mainSubject ?? "").trim();
@@ -149,7 +219,7 @@ export async function checkProductImage(input: {
   return {
     ok: reasons.length === 0,
     reason: reasons.length > 0 ? reasons.join(" · ") : "정상",
-    foreignTextOverlay: Boolean(answer.foreignTextOverlay),
+    cjkTextOverlay: cjkConfirmed,
     showsProduct: Boolean(answer.showsProduct),
     mainSubject: (answer.mainSubject ?? "").trim(),
   };
