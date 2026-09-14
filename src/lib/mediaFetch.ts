@@ -6,7 +6,17 @@
  */
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-export async function fetchImageAsDataUri(url: string): Promise<string | null> {
+export interface FetchedImage {
+  buffer: Buffer;
+  /** "image/jpeg" 처럼 파라미터를 뗀 형태 */
+  mimeType: string;
+}
+
+/**
+ * 원격 이미지를 버퍼로 받는다. 실패(네트워크·비이미지·용량초과)는 null.
+ * data URI 가 필요하면 fetchImageAsDataUri, 비전 API 에 태우려면 이 함수를 쓴다.
+ */
+export async function fetchImageBuffer(url: string): Promise<FetchedImage | null> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -17,10 +27,16 @@ export async function fetchImageAsDataUri(url: string): Promise<string | null> {
     if (!res.ok) return null;
     const type = res.headers.get("content-type") ?? "";
     if (!type.startsWith("image/")) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0 || buf.length > IMAGE_MAX_BYTES) return null;
-    return `data:${type.split(";")[0]};base64,${buf.toString("base64")}`;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length === 0 || buffer.length > IMAGE_MAX_BYTES) return null;
+    return { buffer, mimeType: type.split(";")[0] };
   } catch {
     return null;
   }
+}
+
+export async function fetchImageAsDataUri(url: string): Promise<string | null> {
+  const img = await fetchImageBuffer(url);
+  if (!img) return null;
+  return `data:${img.mimeType};base64,${img.buffer.toString("base64")}`;
 }

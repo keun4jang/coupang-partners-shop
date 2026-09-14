@@ -66,6 +66,8 @@ export interface ScoutResult {
   skippedFiltered: number;
   /** 키워드 도배 제목이라 아예 후보로 안 받은 수 (필터 조정 근거) */
   skippedSpamTitle: number;
+  /** 대표 사진이 부적합(외국어 문구·제품 안 보임)해 제외한 수 */
+  skippedBadImage: number;
   /** 소스별 집계 (진단용) - 받아온 수 / 후보로 담은 수 / 최종 등록 수 */
   sourceStats: Record<string, { fetched: number; kept: number; registered: number }>;
   /** 이번에 새로 담은 알리 후보 수 */
@@ -194,6 +196,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       skippedDuplicate: 0,
       skippedFiltered: 0,
       skippedSpamTitle: 0,
+      skippedBadImage: 0,
       sourceStats: {},
       aliCandidates: 0,
       errors: [msg],
@@ -214,6 +217,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       skippedDuplicate: 0,
       skippedFiltered: 0,
       skippedSpamTitle: 0,
+      skippedBadImage: 0,
       sourceStats: {},
       aliCandidates: 0,
       errors: [msg],
@@ -484,7 +488,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   buckets.unshift(...listingBuckets);
 
   // 라운드로빈으로 카테고리를 번갈아 뽑아 다양성 확보 + 중복 제거.
-  const registered: ScoutCandidate[] = [];
+  let registered: ScoutCandidate[] = [];
   const pickedIds = new Set<number>();
   let skippedDuplicate = 0;
   let skippedFiltered = 0;
@@ -544,6 +548,62 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
       } catch (e) {
         errors.push(`알리 '${kw.query}': ${(e as Error).message.slice(0, 80)}`);
       }
+    }
+  }
+
+  // ── 대표 사진 품질 검사 ───────────────────────────────────────────────
+  //
+  // 쿠팡·알리 후보가 다 모인 뒤 한 곳에서 본다. 수입 생활용품은 판매자가 중국
+  // 공급사 마케팅 이미지를 그대로 올리는 일이 잦아, 사진에 중국어가 박혀 있거나
+  // 정작 제품은 안 보이고 모델만 크게 나오는 경우가 있다(247번 영상 실측).
+  // 그런 사진은 영상 첫 화면에 그대로 떠서 그 한 편을 통째로 버리게 만든다.
+  // 재고가 1,000개 넘게 쌓여 있으니 까다롭게 걸러도 만들 거리는 남는다.
+  // 검사는 후보당 비전 API 1회다. 이 함수는 Vercel 크론에서 38초 마감으로
+  // 돌고(deadlineAt) 같은 실행이 영상 큐잉까지 해야 하므로, 순차로 30개를
+  // 돌리면 마감을 넘겨 큐잉이 통째로 날아간다. 동시 3개로 돌리고, 마감이
+  // 닥치면 남은 후보는 검사 없이 통과시킨다 - 이건 품질 게이트지 안전
+  // 장치가 아니라서, 못 걸러 한 편 아쉬운 것보다 발행이 멈추는 게 더 나쁘다.
+  const IMAGE_CHECK_CONCURRENCY = 3;
+  const imageRejects: Array<{ name: string; reason: string }> = [];
+  let imageUnchecked = 0;
+  if (registered.length > 0) {
+    const { checkProductImage } = await import("./productImageCheck");
+    const rejectedIdx = new Set<number>();
+    let next = 0;
+    const worker = async () => {
+      for (;;) {
+        const i = next++;
+        if (i >= registered.length) return;
+        if (outOfTime()) {
+          imageUnchecked++;
+          continue;
+        }
+        const c = registered[i];
+        // 검사 불가(키 없음·네트워크 실패)는 통과 처리한다.
+        const verdict = await checkProductImage({
+          imageUrl: c.image_url,
+          productName: c.product_name,
+        });
+        if (!verdict) {
+          imageUnchecked++;
+        } else if (!verdict.ok) {
+          rejectedIdx.add(i);
+          imageRejects.push({ name: c.product_name, reason: verdict.reason });
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(IMAGE_CHECK_CONCURRENCY, registered.length) }, worker)
+    );
+    registered = registered.filter((_, i) => !rejectedIdx.has(i));
+  }
+  if (imageUnchecked > 0) {
+    console.log(`대표 사진 미검사 ${imageUnchecked}건 (마감 임박 또는 검사 실패 - 통과 처리)`);
+  }
+  if (imageRejects.length > 0) {
+    console.log(`대표 사진 부적합 ${imageRejects.length}건 제외`);
+    for (const r of imageRejects.slice(0, 10)) {
+      console.log(`  · ${r.name.slice(0, 40)} — ${r.reason}`);
     }
   }
 
@@ -612,6 +672,7 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
     skippedDuplicate,
     skippedFiltered,
     skippedSpamTitle,
+    skippedBadImage: imageRejects.length,
     sourceStats,
     aliCandidates,
     errors,

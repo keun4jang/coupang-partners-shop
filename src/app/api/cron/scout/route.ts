@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
         skippedDuplicate: 0,
         skippedFiltered: 0,
         skippedSpamTitle: 0,
+        skippedBadImage: 0,
         sourceStats: {},
         aliCandidates: 0,
         errors: [`스카우트 전체 실패: ${msg}`],

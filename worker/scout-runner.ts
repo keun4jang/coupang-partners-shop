@@ -46,7 +46,8 @@ async function main() {
     console.log(`  · [${c.category}] ${c.product_name} · ${c.price_text} (cpid:${c.productId})`);
   }
   console.log(
-    `\n중복 제외: ${result.skippedDuplicate} · 기타 제외: ${result.skippedFiltered}`
+    `\n중복 제외: ${result.skippedDuplicate} · 기타 제외: ${result.skippedFiltered}` +
+      ` · 사진 부적합 제외: ${result.skippedBadImage}`
   );
   if (result.errors.length) console.log("오류:", result.errors.join(" | "));
 

@@ -26,6 +26,7 @@
     "yt:backfill-disclosure": "tsx scripts/yt-disclosure-backfill.ts",
     "policy:check": "tsx scripts/policy-selftest.ts",
     "botfilter:check": "tsx scripts/botfilter-selftest.ts",
+    "images:audit": "tsx scripts/product-image-audit.ts",
     "metrics:links": "tsx scripts/metrics-links.ts"
   },
   "dependencies": {
