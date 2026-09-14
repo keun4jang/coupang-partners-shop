@@ -563,10 +563,16 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 돌리면 마감을 넘겨 큐잉이 통째로 날아간다. 동시 3개로 돌리고, 마감이
   // 닥치면 남은 후보는 검사 없이 통과시킨다 - 이건 품질 게이트지 안전
   // 장치가 아니라서, 못 걸러 한 편 아쉬운 것보다 발행이 멈추는 게 더 나쁘다.
+  //
+  // 스위치(SCOUT_IMAGE_CHECK=on)로 켠다. 기본은 꺼짐 - 판정 프롬프트가 과하면
+  // 멀쩡한 상품까지 걸러 유입이 마르는데, 그건 로그를 들여다보기 전엔 티가
+  // 안 난다. 먼저 scripts/product-image-audit.ts 로 기존 재고를 진단해
+  // 걸러내는 비율이 납득되는지 확인한 뒤 켜는 순서로 간다.
   const IMAGE_CHECK_CONCURRENCY = 3;
+  const imageCheckOn = process.env.SCOUT_IMAGE_CHECK === "on";
   const imageRejects: Array<{ name: string; reason: string }> = [];
   let imageUnchecked = 0;
-  if (registered.length > 0) {
+  if (imageCheckOn && registered.length > 0) {
     const { checkProductImage } = await import("./productImageCheck");
     const rejectedIdx = new Set<number>();
     let next = 0;

@@ -1,0 +1,113 @@
+# 기존 상품 대표 사진 일괄 점검 (비전 검사).
+#
+# 왜 필요한가: products.image_url 은 쿠팡파트너스 API 가 주는 대표 썸네일을
+# 그대로 쓴다. 수입 생활용품은 판매자가 중국 공급사 마케팅 이미지를 그대로
+# 올리는 일이 잦아, 사진에 중국어가 박혀 있거나 정작 제품은 안 보이고 모델만
+# 크게 나오는 경우가 있다(247번 영상 실측). 그런 사진이 영상 첫 화면에 떠서
+# 그 한 편을 통째로 버리게 만든다.
+#
+# 스카우트는 이제 새로 담는 상품을 검사하지만, 그 전에 쌓인 재고에는 검사가
+# 안 걸려 있다. 이 워크플로로 한 번 훑는다.
+#
+# 실행: Actions 탭 → product-image-audit → Run workflow
+#   · 기본(apply=false)은 진단만 한다. 아무것도 바꾸지 않는다.
+#   · apply=true 면 문제 상품의 status 를 paused 로 바꾼다(삭제 아님, 되돌릴 수
+#     있고 paused 는 영상 생성 대상에서 빠진다).
+#
+# 결과는 실행 페이지의 Summary 에 그대로 뜬다(따로 내려받을 필요 없음).
+
+name: product-image-audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "이번에 점검할 상품 수 (비워두면 전체). 처음엔 100 권장"
+        required: false
+        default: "100"
+      apply:
+        description: "문제 상품을 paused 로 바꿀지 (false = 진단만)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+# 같은 상품을 두 실행이 동시에 건드리지 않게
+concurrency:
+  group: product-image-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: 워커 환경변수 확인
+        id: check
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then
+            echo "WORKER_ENV 시크릿이 없어 점검을 건너뜁니다." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - name: node_modules 캐시
+        if: steps.check.outputs.ready == 'true'
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true' && steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: 대표 사진 점검
+        if: steps.check.outputs.ready == 'true'
+        env:
+          AUDIT_LIMIT: ${{ github.event.inputs.limit }}
+          AUDIT_APPLY: ${{ github.event.inputs.apply }}
+        run: |
+          ARGS=""
+          if [ -n "$AUDIT_LIMIT" ]; then ARGS="$ARGS --limit $AUDIT_LIMIT"; fi
+          if [ "$AUDIT_APPLY" = "true" ]; then ARGS="$ARGS --apply"; fi
+          echo "실행: npx tsx scripts/product-image-audit.ts$ARGS"
+          # 결과를 화면과 파일에 동시에 남긴다(아래 Summary 단계에서 읽는다).
+          set -o pipefail
+          npx tsx scripts/product-image-audit.ts $ARGS 2>&1 | tee audit.log
+
+      - name: 결과를 실행 페이지에 표시
+        # 실패해도 지금까지 나온 결과는 보여준다
+        if: steps.check.outputs.ready == 'true' && always()
+        run: |
+          {
+            echo "## 대표 사진 점검 결과"
+            echo ""
+            echo "- 점검 수: \`${{ github.event.inputs.limit || '전체' }}\`"
+            echo "- 변경 적용: \`${{ github.event.inputs.apply || 'false' }}\`"
+            echo ""
+            echo '```'
+            # 로그가 길 수 있어 뒤쪽 400줄만 (요약과 문제 목록이 여기 있다)
+            tail -n 400 audit.log 2>/dev/null || echo "(로그 없음)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
