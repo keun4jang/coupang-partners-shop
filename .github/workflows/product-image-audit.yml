@@ -21,6 +21,10 @@ name: product-image-audit
 on:
   workflow_dispatch:
     inputs:
+      numbers:
+        description: "특정 영상 번호만 판정 (쉼표로 구분, 예: 247,265). 넣으면 limit/apply 는 무시됨"
+        required: false
+        default: ""
       limit:
         description: "이번에 점검할 상품 수 (비워두면 전체). 처음엔 100 권장"
         required: false
@@ -87,10 +91,16 @@ jobs:
         env:
           AUDIT_LIMIT: ${{ github.event.inputs.limit }}
           AUDIT_APPLY: ${{ github.event.inputs.apply }}
+          AUDIT_NUMBERS: ${{ github.event.inputs.numbers }}
         run: |
           ARGS=""
-          if [ -n "$AUDIT_LIMIT" ]; then ARGS="$ARGS --limit $AUDIT_LIMIT"; fi
-          if [ "$AUDIT_APPLY" = "true" ]; then ARGS="$ARGS --apply"; fi
+          if [ -n "$AUDIT_NUMBERS" ]; then
+            # 번호 지정 모드는 판정만 찍어 보는 용도다. 아무것도 바꾸지 않는다.
+            ARGS="--numbers $AUDIT_NUMBERS"
+          else
+            if [ -n "$AUDIT_LIMIT" ]; then ARGS="$ARGS --limit $AUDIT_LIMIT"; fi
+            if [ "$AUDIT_APPLY" = "true" ]; then ARGS="$ARGS --apply"; fi
+          fi
           echo "실행: npx tsx scripts/product-image-audit.ts$ARGS"
           # 결과를 화면과 파일에 동시에 남긴다(아래 Summary 단계에서 읽는다).
           set -o pipefail
@@ -103,7 +113,11 @@ jobs:
           {
             echo "## 대표 사진 점검 결과"
             echo ""
-            echo "- 점검 수: \`${{ github.event.inputs.limit || '전체' }}\`"
+            if [ -n "${{ github.event.inputs.numbers }}" ]; then
+              echo "- 지정 번호: \`${{ github.event.inputs.numbers }}\`"
+            else
+              echo "- 점검 수: \`${{ github.event.inputs.limit || '전체' }}\`"
+            fi
             echo "- 변경 적용: \`${{ github.event.inputs.apply || 'false' }}\`"
             echo ""
             echo '```'

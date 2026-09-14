@@ -8,7 +8,14 @@
  *   npx tsx scripts/product-image-audit.ts               # 진단만 (아무것도 안 바꿈)
  *   npx tsx scripts/product-image-audit.ts --limit 100   # 100개만
  *   npx tsx scripts/product-image-audit.ts --apply       # 문제 상품을 paused 로
+ *   npx tsx scripts/product-image-audit.ts --numbers 247,265  # 특정 영상 번호만
  *   npm run images:audit
+ *
+ * --numbers 는 영상 번호(display_number)로 그 상품만 콕 집어 판정을 전부 찍는다.
+ * 판정 축이 실제로 작동하는지 확인할 때 쓴다 - 2026-09-14 진단에서 "제품이
+ * 안 보임"이 두 회차 연속 0건이었는데, 표본에 그런 사진이 없어서인지 모델이
+ * 그 판단을 못 해서인지 구분이 안 됐다. 문제를 실제로 본 번호(247)를 직접
+ * 찔러보면 그 자리에서 답이 나온다.
  *
  * --apply 는 products.status 를 'paused' 로 바꾼다. 삭제가 아니라서
  * 언제든 되돌릴 수 있고, paused 는 영상 생성 대상에서 빠진다(productSelector).
@@ -27,6 +34,14 @@ const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const limitIdx = args.indexOf("--limit");
 const limit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : Infinity;
+const numbersIdx = args.indexOf("--numbers");
+const numbers =
+  numbersIdx >= 0
+    ? (args[numbersIdx + 1] ?? "")
+        .split(",")
+        .map((n) => Number.parseInt(n.trim(), 10))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    : [];
 
 /**
  * 호출 사이에 쉬는 시간. 1.2초(=분당 50회)로 돌렸더니 100건 중 6건이 429
@@ -56,7 +71,55 @@ async function loadCandidates(): Promise<Product[]> {
   return all;
 }
 
+/** 영상 번호로 상품을 찾아 판정을 전부 찍는다 (축이 작동하는지 보는 용도) */
+async function inspectNumbers(nums: number[]): Promise<void> {
+  const { data, error } = await supabaseAdmin()
+    .from("video_items")
+    .select("display_number, products(*)")
+    .in("display_number", nums);
+  if (error) throw new Error(`영상 조회 실패: ${error.message}`);
+  // supabase-js 는 조인 결과를 배열로 타이핑하지만 실제로는 단일 객체다
+  // (다른 곳도 같은 방식으로 단언한다 - src/lib/report.ts 참고).
+  const rows = (data ?? []) as unknown as Array<{
+    display_number: number;
+    products: Product | null;
+  }>;
+  if (rows.length === 0) {
+    console.log(`해당 번호를 찾지 못했습니다: ${nums.join(", ")}`);
+    return;
+  }
+  for (const row of rows.sort((a, b) => a.display_number - b.display_number)) {
+    const p = row.products;
+    console.log(`\n── ${row.display_number}번 ──`);
+    if (!p) {
+      console.log("  상품이 연결돼 있지 않습니다.");
+      continue;
+    }
+    console.log(`  상품명: ${p.product_name}`);
+    console.log(`  사진: ${p.image_url ?? "(없음)"}`);
+    const verdict = await checkProductImage({
+      imageUrl: p.image_url,
+      productName: p.product_name,
+    });
+    if (!verdict) {
+      console.log("  판정: 검사 불가 (키 없음·다운로드 실패·API 오류)");
+      continue;
+    }
+    console.log(`  판정: ${verdict.ok ? "통과" : "부적합"} — ${verdict.reason}`);
+    console.log(`    중국어·일본어: ${verdict.cjkTextOverlay}`);
+    console.log(`    제품이 보이나: ${verdict.showsProduct}`);
+    console.log(`    주요 피사체: ${verdict.mainSubject || "(응답 없음)"}`);
+    await sleep(DELAY_MS);
+  }
+}
+
 async function main() {
+  if (numbers.length > 0) {
+    console.log(`영상 번호 ${numbers.join(", ")} 의 대표 사진을 판정합니다 (변경 없음).`);
+    await inspectNumbers(numbers);
+    return;
+  }
+
   const products = await loadCandidates();
   const targets = products.slice(0, Number.isFinite(limit) ? limit : undefined);
   console.log(
