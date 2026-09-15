@@ -26,9 +26,13 @@ on:
         required: false
         default: ""
       limit:
-        description: "이번에 점검할 상품 수 (비워두면 전체 — 1,200개면 약 95분)"
+        # 주의: GitHub 은 빈 입력을 default 값으로 대체한다. default 를 "100" 으로
+        # 두면 "비워두면 전체"가 성립하지 않는다(실측 2026-09-15 - 전체로 돌린다고
+        # 비워 넣었는데 100개만 돌았고, 로그의 AUDIT_LIMIT 에 100 이 찍혀 있었다).
+        # 그래서 default 를 비워 둔다.
+        description: "점검할 상품 수. 비워두면 전체(약 1,300개·2시간 반). 맛보기는 100"
         required: false
-        default: "100"
+        default: ""
       skip:
         description: "앞에서부터 건너뛸 개수 (끊긴 실행을 이어서 돌릴 때)"
         required: false
