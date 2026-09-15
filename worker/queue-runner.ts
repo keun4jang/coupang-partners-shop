@@ -69,7 +69,9 @@ async function warnIfLowStock(perDay: number): Promise<void> {
 async function main() {
   const want = await target();
   console.log(`하루치 영상 큐잉 (목표 ${want}편, 멱등)`);
-  const queued = await queueDailyVideos(want);
+  // 워커는 Actions 에서 도는 배치라 시간 제한이 빡빡하지 않다. 대표 사진 검사에
+  // 넉넉히 시간을 줘서, 앞 후보가 떨어져도 그날 편수를 다 채우게 한다.
+  const queued = await queueDailyVideos(want, { imageCheckBudgetMs: 180_000 });
   if (queued.length === 0) {
     console.log("추가 큐잉 없음 (오늘 목표치를 이미 채웠거나 후보 없음)");
   } else {

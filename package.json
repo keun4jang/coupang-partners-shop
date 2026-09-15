@@ -28,6 +28,7 @@
     "botfilter:check": "tsx scripts/botfilter-selftest.ts",
     "images:audit": "tsx scripts/product-image-audit.ts",
     "imagecheck:check": "tsx scripts/imagecheck-selftest.ts",
+    "selector:check": "tsx scripts/selector-selftest.ts",
     "metrics:links": "tsx scripts/metrics-links.ts"
   },
   "dependencies": {

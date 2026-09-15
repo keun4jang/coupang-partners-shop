@@ -54,7 +54,13 @@ export async function GET(request: NextRequest) {
     let queuedNumbers: number[] = [];
     let queueError: string | null = null;
     try {
-      const queued = await queueDailyVideos(await dailyVideoTarget());
+      // 대표 사진 검사에 쓸 시간 상한. 여기는 Vercel 함수(maxDuration 60초)이고
+      // 아래 수집은 startedAt + 38초로 절대 마감이라, 큐잉이 늘어지면 수집 몫이
+      // 그만큼 줄어든다. 12초면 4~6장은 본다. 넘으면 남은 자리는 검사 없이
+      // 채워지고(발행이 우선), 못 본 상품은 다음 선정에서 다시 걸린다.
+      const queued = await queueDailyVideos(await dailyVideoTarget(), {
+        imageCheckBudgetMs: 12_000,
+      });
       queuedNumbers = queued.map((v) => v.display_number);
     } catch (e) {
       queueError = e instanceof Error ? e.message : String(e);

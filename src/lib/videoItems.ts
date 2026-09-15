@@ -106,7 +106,10 @@ export async function createVideoItem(
  *
  * @returns 이번에 새로 만든 video_item 목록 (없으면 빈 배열)
  */
-export async function queueDailyVideos(target = 3): Promise<VideoItem[]> {
+export async function queueDailyVideos(
+  target = 3,
+  opts?: { imageCheckBudgetMs?: number }
+): Promise<VideoItem[]> {
   const db = supabaseAdmin();
 
   // 오늘(KST) 이미 만든 "자동" 영상 수 → 남은 만큼만 채운다(중복 생성 방지)
@@ -132,7 +135,7 @@ export async function queueDailyVideos(target = 3): Promise<VideoItem[]> {
   const remaining = target - (createdToday ?? 0);
   if (remaining <= 0) return [];
 
-  const products = await selectProductsForVideos(remaining);
+  const products = await selectProductsForVideos(remaining, opts);
   const created: VideoItem[] = [];
   for (const product of products) {
     // template_type 은 A/B/C 로 저장되지만, 렌더 시 FORCE_TEMPLATE=D 로 포맷 D 로 뽑힌다.
