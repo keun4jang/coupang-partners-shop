@@ -564,12 +564,23 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 닥치면 남은 후보는 검사 없이 통과시킨다 - 이건 품질 게이트지 안전
   // 장치가 아니라서, 못 걸러 한 편 아쉬운 것보다 발행이 멈추는 게 더 나쁘다.
   //
-  // 스위치(SCOUT_IMAGE_CHECK=on)로 켠다. 기본은 꺼짐 - 판정 프롬프트가 과하면
-  // 멀쩡한 상품까지 걸러 유입이 마르는데, 그건 로그를 들여다보기 전엔 티가
-  // 안 난다. 먼저 scripts/product-image-audit.ts 로 기존 재고를 진단해
-  // 걸러내는 비율이 납득되는지 확인한 뒤 켜는 순서로 간다.
+  // 기본으로 켜져 있다. 끄려면 SCOUT_IMAGE_CHECK=off.
+  //
+  // 처음엔 반대(기본 꺼짐)였다. 판정 프롬프트를 한 번도 돌려보지 않은 상태라
+  // 과하게 걸러도 티가 안 날 위험이 컸기 때문이다. 실제로 1차 진단에서 100개
+  // 중 11건이 걸렸는데 전부 가짜 양성이었다(영어 브랜드명·포장지 문구·한국어).
+  // 판정 기준을 중국어·일본어로 좁히고 근거 검증층(looksCjk)을 붙인 뒤
+  // 2차 진단은 가짜 양성 0건, 거르는 비율 1.0%. 문제를 실제로 본 247번을
+  // 직접 판정시켜 두 축 모두 정답을 내는 것도 확인했다. 이제 기본값으로
+  // 둘 근거가 섰다.
+  //
+  // 기본값을 뒤집은 또 다른 이유: 켜는 쪽을 환경변수에 맡기면 스카우트가 도는
+  // 두 경로(GitHub Actions 의 WORKER_ENV 시크릿, Vercel 크론의 환경변수)에
+  // 똑같이 넣어야 하는데, GitHub 은 기존 시크릿 값을 보여주지 않아 한 줄
+  // 추가하려면 전체를 다시 입력해야 한다. 한쪽만 넣으면 그쪽 경로만 걸러지는
+  // 조용한 반쪽 적용이 된다.
   const IMAGE_CHECK_CONCURRENCY = 3;
-  const imageCheckOn = process.env.SCOUT_IMAGE_CHECK === "on";
+  const imageCheckOn = process.env.SCOUT_IMAGE_CHECK !== "off";
   const imageRejects: Array<{ name: string; reason: string }> = [];
   let imageUnchecked = 0;
   if (imageCheckOn && registered.length > 0) {
