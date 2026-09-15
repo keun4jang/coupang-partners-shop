@@ -22,6 +22,15 @@
  * 언제든 되돌릴 수 있고, paused 는 영상 생성 대상에서 빠진다(productSelector).
  * 이미 영상이 나간 상품은 영상 자체를 건드리지 않는다 - 그건 사람이 판단할 일이다.
  *
+ * 무료 등급 일일 한도에 주의. 2026-09-15 에 1,298개를 한 번에 돌렸다가 초반에
+ * 한도가 소진돼, 그 뒤 1,100여 개가 전부 "검사 실패 → 통과 처리"로 넘어갔다.
+ * 그런데 진행 로그는 "문제 0건"만 찍어서 겉보기엔 재고가 깨끗한 것처럼 보였다.
+ * 검사기가 죽은 것과 재고가 멀쩡한 것이 구분이 안 되는 게 진짜 위험이라,
+ * 이제 연속으로 MAX_CONSECUTIVE_UNCHECKED 건이 검사 불가면 그 자리에서 멈춘다.
+ * (스카우트 쪽 fail-open 은 그대로 둔다 - 한 번에 30개라 한도를 안 건드리고,
+ *  거기서 멈추면 상품 유입 자체가 끊기기 때문이다. 여기는 반대로, 안 멈추면
+ *  "점검했다"는 잘못된 확신만 남는다.)
+ *
  * 전체(1,271개)를 돌리면 90분이 넘는다. 그래서 --apply 는 끝에 한 번에 쓰지 않고
  * APPLY_CHUNK 건씩 그때그때 반영한다 - 중간에 타임아웃이나 오류로 끊겨도 거기까지는
  * 남는다. paused 가 된 상품은 다음 실행의 조회 대상(status=candidate)에서 빠지므로
@@ -61,6 +70,13 @@ const DELAY_MS = 3_500;
 
 /** --apply 를 이 건수마다 중간 저장한다 (끊겨도 거기까지는 남게) */
 const APPLY_CHUNK = 20;
+
+/**
+ * 연속으로 이 횟수만큼 검사 불가면 멈춘다. 한 건씩 실패하는 건(이미지 깨짐 등)
+ * 정상이지만, 연속으로 쭉 실패하면 API 한도 소진이나 키 문제다. 그때 계속
+ * 돌면 "전부 통과"라는 거짓 결과만 쌓인다.
+ */
+const MAX_CONSECUTIVE_UNCHECKED = 15;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -146,6 +162,8 @@ async function main() {
   let unchecked = 0;
   let pendingIds: string[] = [];
   let appliedTotal = 0;
+  let consecutiveUnchecked = 0;
+  let abortedAt = 0;
 
   // 모아둔 것을 paused 로 반영하고 비운다. 실패해도 점검은 계속한다
   // (한 번 못 썼다고 남은 1,000여 개 검사를 버릴 이유가 없다).
@@ -173,7 +191,20 @@ async function main() {
     if (!verdict) {
       // 검사 불가(키 없음·네트워크·API 오류). 판정을 내리지 않는다.
       unchecked++;
+      consecutiveUnchecked++;
+      if (consecutiveUnchecked >= MAX_CONSECUTIVE_UNCHECKED) {
+        abortedAt = checked + unchecked;
+        console.error(
+          `\n검사 불가가 ${MAX_CONSECUTIVE_UNCHECKED}건 연속이라 중단합니다 ` +
+            `(${abortedAt}/${targets.length} 지점). API 일일 한도 소진이거나 키 문제입니다.`
+        );
+        console.error(
+          "여기서 계속 돌면 나머지가 전부 '통과'로 찍혀 점검한 것처럼 보이지만 실제로는 아무것도 못 봅니다."
+        );
+        break;
+      }
     } else {
+      consecutiveUnchecked = 0;
       checked++;
       if (!verdict.ok) {
         bad.push({ p, reason: verdict.reason });
@@ -193,6 +224,20 @@ async function main() {
   const byCjk = bad.filter((b) => b.reason.includes("중국어")).length;
   const byNoProduct = bad.filter((b) => b.reason.includes("제품이 안 보임")).length;
 
+  await flushApply();
+
+  if (abortedAt > 0) {
+    console.log(
+      `\n중단됨: ${abortedAt}/${targets.length} 지점까지만 진행 · ${checked}개 판정 · 문제 ${bad.length}건`
+    );
+    console.log(`  사유별: 중국어·일본어 ${byCjk}건 · 제품이 안 보임 ${byNoProduct}건`);
+    console.log(`  paused 반영: ${appliedTotal}개`);
+    console.log(
+      `\n한도가 풀린 뒤(보통 다음 날) --skip ${skip + abortedAt - 1} 로 이어서 돌리세요.`
+    );
+    return;
+  }
+
   console.log(`\n검사 완료: ${checked}개 판정 · ${unchecked}개 검사 불가 · 문제 ${bad.length}건`);
   console.log(`  사유별: 중국어·일본어 ${byCjk}건 · 제품이 안 보임 ${byNoProduct}건`);
   if (unchecked > 0) {
@@ -209,7 +254,6 @@ async function main() {
     return;
   }
 
-  await flushApply();
   console.log(`\n총 ${appliedTotal}개를 paused 로 바꿨습니다 (삭제 아님 - 되돌릴 수 있습니다).`);
 }
 
