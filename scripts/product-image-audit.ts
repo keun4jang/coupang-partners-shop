@@ -9,6 +9,7 @@
  *   npx tsx scripts/product-image-audit.ts --limit 100   # 100개만
  *   npx tsx scripts/product-image-audit.ts --apply       # 문제 상품을 paused 로
  *   npx tsx scripts/product-image-audit.ts --numbers 247,265  # 특정 영상 번호만
+ *   npx tsx scripts/product-image-audit.ts --apply --skip 400  # 400개 건너뛰고 이어서
  *   npm run images:audit
  *
  * --numbers 는 영상 번호(display_number)로 그 상품만 콕 집어 판정을 전부 찍는다.
@@ -20,6 +21,12 @@
  * --apply 는 products.status 를 'paused' 로 바꾼다. 삭제가 아니라서
  * 언제든 되돌릴 수 있고, paused 는 영상 생성 대상에서 빠진다(productSelector).
  * 이미 영상이 나간 상품은 영상 자체를 건드리지 않는다 - 그건 사람이 판단할 일이다.
+ *
+ * 전체(1,271개)를 돌리면 90분이 넘는다. 그래서 --apply 는 끝에 한 번에 쓰지 않고
+ * APPLY_CHUNK 건씩 그때그때 반영한다 - 중간에 타임아웃이나 오류로 끊겨도 거기까지는
+ * 남는다. paused 가 된 상품은 다음 실행의 조회 대상(status=candidate)에서 빠지므로
+ * 그냥 다시 돌리면 이어서 진행되고, 이미 통과한 상품까지 다시 보기 싫으면
+ * --skip 으로 앞부분을 건너뛴다(진행 로그의 "N/전체" 숫자를 그대로 주면 된다).
  */
 import dotenv from "dotenv";
 // quiet: dotenv 17 은 로드할 때마다 홍보성 팁 배너를 찍는다. 그 줄이 진단
@@ -34,6 +41,8 @@ const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const limitIdx = args.indexOf("--limit");
 const limit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : Infinity;
+const skipIdx = args.indexOf("--skip");
+const skip = skipIdx >= 0 ? Math.max(0, Number(args[skipIdx + 1]) || 0) : 0;
 const numbersIdx = args.indexOf("--numbers");
 const numbers =
   numbersIdx >= 0
@@ -49,6 +58,9 @@ const numbers =
  * 검사 모듈 자체도 429 면 15초 쉬고 한 번 더 시도한다.
  */
 const DELAY_MS = 3_500;
+
+/** --apply 를 이 건수마다 중간 저장한다 (끊겨도 거기까지는 남게) */
+const APPLY_CHUNK = 20;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -121,15 +133,37 @@ async function main() {
   }
 
   const products = await loadCandidates();
-  const targets = products.slice(0, Number.isFinite(limit) ? limit : undefined);
+  const afterSkip = products.slice(skip);
+  const targets = afterSkip.slice(0, Number.isFinite(limit) ? limit : undefined);
   console.log(
-    `점검 대상 ${targets.length}개 (전체 candidate ${products.length}개)` +
+    `점검 대상 ${targets.length}개 (전체 candidate ${products.length}개` +
+      `${skip > 0 ? `, 앞 ${skip}개 건너뜀` : ""})` +
       `${apply ? " · --apply: 문제 상품을 paused 로 바꿉니다" : " · 진단만 (변경 없음)"}`
   );
 
   const bad: Array<{ p: Product; reason: string }> = [];
   let checked = 0;
   let unchecked = 0;
+  let pendingIds: string[] = [];
+  let appliedTotal = 0;
+
+  // 모아둔 것을 paused 로 반영하고 비운다. 실패해도 점검은 계속한다
+  // (한 번 못 썼다고 남은 1,000여 개 검사를 버릴 이유가 없다).
+  async function flushApply(): Promise<void> {
+    if (!apply || pendingIds.length === 0) return;
+    const ids = pendingIds;
+    pendingIds = [];
+    const { error } = await supabaseAdmin()
+      .from("products")
+      .update({ status: "paused" })
+      .in("id", ids);
+    if (error) {
+      console.warn(`  상태 변경 실패 ${ids.length}건(계속 진행): ${error.message.slice(0, 120)}`);
+      return;
+    }
+    appliedTotal += ids.length;
+    console.log(`  → ${ids.length}개 paused 반영 (누적 ${appliedTotal}개)`);
+  }
 
   for (const p of targets) {
     const verdict = await checkProductImage({
@@ -144,6 +178,8 @@ async function main() {
       if (!verdict.ok) {
         bad.push({ p, reason: verdict.reason });
         console.log(`  ✗ ${p.product_name.slice(0, 45)} — ${verdict.reason}`);
+        pendingIds.push(p.id);
+        if (pendingIds.length >= APPLY_CHUNK) await flushApply();
       }
     }
     if ((checked + unchecked) % 25 === 0) {
@@ -173,13 +209,8 @@ async function main() {
     return;
   }
 
-  const ids = bad.map((b) => b.p.id);
-  const { error } = await supabaseAdmin()
-    .from("products")
-    .update({ status: "paused" })
-    .in("id", ids);
-  if (error) throw new Error(`상태 변경 실패: ${error.message}`);
-  console.log(`\n${ids.length}개를 paused 로 바꿨습니다 (삭제 아님 - 되돌릴 수 있습니다).`);
+  await flushApply();
+  console.log(`\n총 ${appliedTotal}개를 paused 로 바꿨습니다 (삭제 아님 - 되돌릴 수 있습니다).`);
 }
 
 main().catch((e) => {

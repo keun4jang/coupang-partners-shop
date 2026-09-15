@@ -26,9 +26,13 @@ on:
         required: false
         default: ""
       limit:
-        description: "이번에 점검할 상품 수 (비워두면 전체). 처음엔 100 권장"
+        description: "이번에 점검할 상품 수 (비워두면 전체 — 1,200개면 약 95분)"
         required: false
         default: "100"
+      skip:
+        description: "앞에서부터 건너뛸 개수 (끊긴 실행을 이어서 돌릴 때)"
+        required: false
+        default: ""
       apply:
         description: "문제 상품을 paused 로 바꿀지 (false = 진단만)"
         required: false
@@ -46,7 +50,7 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 340
     steps:
       - name: 워커 환경변수 확인
         id: check
@@ -92,6 +96,7 @@ jobs:
           AUDIT_LIMIT: ${{ github.event.inputs.limit }}
           AUDIT_APPLY: ${{ github.event.inputs.apply }}
           AUDIT_NUMBERS: ${{ github.event.inputs.numbers }}
+          AUDIT_SKIP: ${{ github.event.inputs.skip }}
         run: |
           ARGS=""
           if [ -n "$AUDIT_NUMBERS" ]; then
@@ -99,6 +104,7 @@ jobs:
             ARGS="--numbers $AUDIT_NUMBERS"
           else
             if [ -n "$AUDIT_LIMIT" ]; then ARGS="$ARGS --limit $AUDIT_LIMIT"; fi
+            if [ -n "$AUDIT_SKIP" ]; then ARGS="$ARGS --skip $AUDIT_SKIP"; fi
             if [ "$AUDIT_APPLY" = "true" ]; then ARGS="$ARGS --apply"; fi
           fi
           echo "실행: npx tsx scripts/product-image-audit.ts$ARGS"
@@ -121,7 +127,8 @@ jobs:
             echo "- 변경 적용: \`${{ github.event.inputs.apply || 'false' }}\`"
             echo ""
             echo '```'
-            # 로그가 길 수 있어 뒤쪽 400줄만 (요약과 문제 목록이 여기 있다)
+            # 로그가 길 수 있어 뒤쪽 400줄만 (요약과 문제 목록이 여기 있다).
+            # 중간에 끊겨도 "→ N개 paused 반영" 줄로 어디까지 됐는지 알 수 있다.
             tail -n 400 audit.log 2>/dev/null || echo "(로그 없음)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
