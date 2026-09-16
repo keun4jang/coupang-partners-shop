@@ -155,6 +155,22 @@ export async function recordBlockedOutbound(reason: string): Promise<void> {
   }
 }
 
+/**
+ * 집계에 "센" 이동 1건의 정체를 굵게 기록한다. (진단 전용)
+ *
+ * blocked_outbound_daily 를 같이 쓰되 사유 앞에 'seen:' 을 붙인다. 저 테이블은
+ * (날짜, 사유, 건수)뿐인 범용 일일 카운터라 새 테이블 없이 얹을 수 있고,
+ * 마이그레이션을 사람이 손으로 적용해야 하는 단계를 하루 더 기다리지 않아도
+ * 된다. 대신 report.ts 가 'seen:' 행을 "제외 건수" 합계에서 반드시 뺀다
+ * (안 빼면 텔레그램 "자동요청 제외" 숫자가 통째로 거짓말이 된다).
+ *
+ * 남기는 값은 clientFingerprint 가 만드는 굵은 분류뿐이다. UA 전문도 IP 도
+ * 남기지 않는다.
+ */
+export async function recordSeenOutbound(fingerprint: string): Promise<void> {
+  await recordBlockedOutbound(`seen:${fingerprint}`);
+}
+
 /** 숏폼 템플릿 변형 (A/B 비교의 두 갈래) */
 export type ShortsVariant = "classic" | "usecase";
 

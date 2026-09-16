@@ -163,6 +163,81 @@ export function automatedRequestReason(request: FilterableRequest): string | nul
 }
 
 /**
+ * 집계에 "센" 요청의 정체를 굵게 분류한 꼬리표. (진단 전용)
+ *
+ * 왜 필요한가 (2026-09-16 실측): 봇 필터를 켠 뒤 사흘이 지났는데 롱폼 직행
+ * 이동은 하루 37~40건으로 전혀 줄지 않았고, 필터에 걸린 건 배포일 테스트 2건이
+ * 전부였다. 그런데 그 트래픽은 사람일 수가 없다 - 번호 85개가 거의 똑같이
+ * 4건씩, TOP10 1위부터 10위까지 29~33건으로 균일하다. 사람이라면 1위와 10위가
+ * 저렇게 같을 수 없다. 즉 UA 목록에 안 걸리는 무언가가 매일 링크 전체를
+ * 한 바퀴 훑고 있다.
+ *
+ * 여기서 막다른 길이었던 이유는 "센 요청"에 대해 남긴 정보가 숫자뿐이라
+ * 누구인지 물어볼 데가 없었기 때문이다. 그래서 센 요청도 굵은 분류만
+ * 남긴다 - UA 전문도 IP 도 남기지 않는다(개인정보를 쌓을 이유가 없고,
+ * 알고 싶은 건 "크롬인가 스크립트인가, 유튜브에서 왔나" 수준이다).
+ *
+ * 값 예: "chrome-android/youtube", "other-desktop/none"
+ */
+export function clientFingerprint(request: FilterableRequest): string {
+  const ua = (request.headers.get("user-agent") ?? "").toLowerCase();
+  const referer = (request.headers.get("referer") ?? "").toLowerCase();
+
+  // 인앱 브라우저를 먼저 본다. 카카오·인스타 인앱은 UA 에 크롬 문자열도
+  // 같이 들어 있어서, 크롬을 먼저 보면 전부 크롬으로 뭉개진다.
+  const app =
+    ua === ""
+      ? "empty"
+      : ua.includes("kakaotalk")
+        ? "kakao"
+        : ua.includes("instagram")
+          ? "instagram"
+          : ua.includes("fban") || ua.includes("fbav")
+            ? "facebook"
+            : ua.includes("naver")
+              ? "naver"
+              : ua.includes("line/")
+                ? "line"
+                : ua.includes("whale")
+                  ? "whale"
+                  : ua.includes("samsungbrowser")
+                    ? "samsung"
+                    : ua.includes("edg/")
+                      ? "edge"
+                      : ua.includes("firefox")
+                        ? "firefox"
+                        : ua.includes("chrome") || ua.includes("crios")
+                          ? "chrome"
+                          : ua.includes("safari")
+                            ? "safari"
+                            : "other";
+
+  const platform = ua.includes("android")
+    ? "android"
+    : /iphone|ipad|ipod/.test(ua)
+      ? "ios"
+      : ua === ""
+        ? "none"
+        : "desktop";
+
+  // 유입처는 호스트만 본다. 유튜브 설명란에서 눌렀다면 youtube 가 찍힌다.
+  // 크롤러는 보통 referer 를 안 보낸다 - 그 자체가 판정 재료다.
+  const from = referer === ""
+    ? "none"
+    : referer.includes("youtube.com") || referer.includes("youtu.be")
+      ? "youtube"
+      : referer.includes("instagram.com")
+        ? "instagram"
+        : referer.includes("facebook.com")
+          ? "facebook"
+          : referer.includes("google.")
+            ? "google"
+            : "other";
+
+  return `${app}-${platform}/${from}`;
+}
+
+/**
  * 짧은 시간 안에 되풀이되는 같은 요청을 1건으로 합치기 위한 최근 기록.
  *
  * 서버리스라 인스턴스마다 따로 갖는 "있으면 좋은" 수준의 방어다(인스턴스가

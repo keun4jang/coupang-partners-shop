@@ -12,6 +12,7 @@
  */
 import {
   automatedRequestReason,
+  clientFingerprint,
   outboundSkipReason,
   resetRepeatCache,
 } from "../src/lib/requestFilter";
@@ -171,6 +172,49 @@ expectHuman("일반 탐색 (Sec-Fetch-Mode)", CHROME, { "sec-fetch-mode": "navig
     console.error("✗ [중복] 2분 뒤 재방문까지 계속 제외하고 있다");
   }
   resetRepeatCache();
+}
+
+// ── 센 요청의 정체 꼬리표 (진단용 clientFingerprint) ──────────────
+//
+// 인앱 브라우저 UA 에는 크롬 문자열이 같이 들어 있어, 순서를 잘못 보면 전부
+// "chrome" 으로 뭉개진다. 그러면 "유튜브 앱에서 온 사람"과 "데스크톱 크롬을
+// 자칭하는 스크립트"를 구분하지 못해 이 진단 자체가 쓸모없어진다.
+{
+  const cases: Array<[string, string, string, Record<string, string>?]> = [
+    [
+      "카카오 인앱(크롬 문자열 포함)",
+      "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 KAKAOTALK 10.4.5",
+      "kakao-android/none",
+    ],
+    [
+      "인스타 인앱",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Instagram 300.0",
+      "instagram-ios/none",
+    ],
+    [
+      "데스크톱 크롬 + 유튜브에서 옴",
+      CHROME,
+      "chrome-desktop/youtube",
+      { referer: "https://www.youtube.com/" },
+    ],
+    [
+      "데스크톱 크롬 + 유입처 없음(크롤러 의심)",
+      CHROME,
+      "chrome-desktop/none",
+    ],
+    [
+      "UA 없음",
+      "",
+      "empty-none/none",
+    ],
+  ];
+  for (const [label, ua, expected, extra] of cases) {
+    const got = clientFingerprint(req(ua, extra));
+    if (got !== expected) {
+      failures++;
+      console.error(`✗ [정체] ${label}\n   기대: ${expected}\n   실제: ${got}`);
+    }
+  }
 }
 
 if (failures > 0) {

@@ -6,8 +6,9 @@ import {
   parseTrackingParams,
   recordBlockedOutbound,
   recordProductEvent,
+  recordSeenOutbound,
 } from "@/lib/tracking";
-import { outboundSkipReason } from "@/lib/requestFilter";
+import { clientFingerprint, outboundSkipReason } from "@/lib/requestFilter";
 import type { VideoItemWithProduct } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -70,11 +71,18 @@ export async function GET(
   if (skipReason) {
     await recordBlockedOutbound(skipReason);
   } else {
-    await recordProductEvent({
-      displayNumber,
-      eventType: "outbound_click",
-      tracking,
-    });
+    // 센 요청은 "누가 눌렀는지" 굵은 분류도 같이 남긴다(진단용). 이게 없으면
+    // 필터에 안 걸리는 트래픽이 들어왔을 때 물어볼 데가 없다 - 실제로
+    // 2026-09-16 확인이 거기서 막혔다. 둘을 나란히 보내 왕복 지연을 늘리지
+    // 않는다(여기는 사람이 기다리는 리다이렉트 경로다).
+    await Promise.all([
+      recordProductEvent({
+        displayNumber,
+        eventType: "outbound_click",
+        tracking,
+      }),
+      recordSeenOutbound(clientFingerprint(request)),
+    ]);
   }
 
   // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚는다.

@@ -197,19 +197,44 @@ async function printBlockedByDate(since: string): Promise<void> {
     console.log("  없음 (필터에 걸린 요청이 아직 없습니다)");
     return;
   }
-  const byDate = new Map<string, number>();
-  const byReason = new Map<string, number>();
-  for (const r of rows) {
-    byDate.set(r.event_date, (byDate.get(r.event_date) ?? 0) + r.event_count);
-    byReason.set(r.reason, (byReason.get(r.reason) ?? 0) + r.event_count);
+  // 'seen:' 행은 제외된 게 아니라 "센 요청의 정체" 진단 기록이다. 섞으면 안 된다.
+  const blocked = rows.filter((r) => !r.reason.startsWith("seen:"));
+  const seen = rows.filter((r) => r.reason.startsWith("seen:"));
+
+  if (blocked.length === 0) {
+    console.log("  없음 (필터에 걸린 요청이 아직 없습니다)");
+  } else {
+    const byDate = new Map<string, number>();
+    const byReason = new Map<string, number>();
+    for (const r of blocked) {
+      byDate.set(r.event_date, (byDate.get(r.event_date) ?? 0) + r.event_count);
+      byReason.set(r.reason, (byReason.get(r.reason) ?? 0) + r.event_count);
+    }
+    for (const [date, n] of [...byDate.entries()].sort()) {
+      console.log(`  ${date}  ${String(n).padStart(6)}`);
+    }
+    console.log("  사유별:");
+    for (const [reason, n] of [...byReason.entries()].sort((a, b) => b[1] - a[1])) {
+      console.log(`    ${reason.padEnd(26)} ${String(n).padStart(6)}`);
+    }
   }
-  for (const [date, n] of [...byDate.entries()].sort()) {
-    console.log(`  ${date}  ${String(n).padStart(6)}`);
+
+  // 센 요청의 정체. 필터에 안 걸리는 트래픽이 누구인지 여기서만 알 수 있다.
+  console.log("\n── 집계된 이동의 정체 (진단) ──");
+  if (seen.length === 0) {
+    console.log("  아직 기록 없음 (2026-09-16 배포 이후의 이동부터 쌓입니다)");
+    return;
   }
-  console.log("  사유별:");
-  for (const [reason, n] of [...byReason.entries()].sort((a, b) => b[1] - a[1])) {
-    console.log(`    ${reason.padEnd(24)} ${String(n).padStart(6)}`);
+  const byFingerprint = new Map<string, number>();
+  for (const r of seen) {
+    const key = r.reason.slice("seen:".length);
+    byFingerprint.set(key, (byFingerprint.get(key) ?? 0) + r.event_count);
   }
+  console.log(`  ${"브라우저-기기/유입처".padEnd(26)} ${"건수".padStart(6)}`);
+  for (const [key, n] of [...byFingerprint.entries()].sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${key.padEnd(26)} ${String(n).padStart(6)}`);
+  }
+  console.log("  (유입처 none = referer 없음. 크롤러는 보통 안 보낸다)");
 }
 
 main().catch((e) => {

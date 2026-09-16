@@ -175,6 +175,10 @@ export async function buildCtrReport(windowDays: number): Promise<CtrReport> {
       .gte("event_date", since)
       .limit(10_000);
     for (const r of (blockedRows as { reason: string; event_count: number }[] | null) ?? []) {
+      // 'seen:' 은 "제외한 것"이 아니라 "센 것"의 진단 기록이다(tracking.ts
+      // recordSeenOutbound). 같은 테이블에 얹혀 있으므로 여기서 반드시 뺀다 -
+      // 안 빼면 제외 건수가 센 건수만큼 부풀어 리포트가 통째로 거짓말이 된다.
+      if (r.reason.startsWith("seen:")) continue;
       const group = blockGroupOf(r.reason);
       blockedByGroup.set(group, (blockedByGroup.get(group) ?? 0) + r.event_count);
     }
