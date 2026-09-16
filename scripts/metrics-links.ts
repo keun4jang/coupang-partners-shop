@@ -11,8 +11,10 @@
  * 주의: 시크릿 값은 출력하지 않는다. 숫자만 본다.
  */
 import dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
-dotenv.config();
+// quiet: dotenv v17 은 기본으로 홍보 배너를 찍는다. 로그를 그대로 Actions
+// Summary 에 붙이는데 거기 섞이면 읽는 사람이 헷갈린다.
+dotenv.config({ path: ".env.local", quiet: true });
+dotenv.config({ quiet: true });
 
 import { supabaseAdmin } from "../src/lib/supabase";
 
@@ -82,6 +84,12 @@ async function main(): Promise<void> {
 
   console.log(`=== 링크 성과 리포트 (최근 ${windowDays}일, ${since} 이후) ===`);
 
+  // 사장님이 텔레그램에서 "클릭률"을 쳤을 때 보는 것과 같은 문구를 먼저 찍는다.
+  // 여기 숫자와 텔레그램 숫자가 다르면 그 자체가 문제 신호다.
+  const { buildCtrReport, formatCtrMessage } = await import("../src/lib/report");
+  console.log("\n── 텔레그램 '클릭률' 과 같은 요약 ──");
+  console.log(formatCtrMessage(await buildCtrReport(windowDays)));
+
   const { data, error } = await supabaseAdmin()
     .from("product_event_daily")
     .select("*")
@@ -138,6 +146,70 @@ async function main(): Promise<void> {
   console.log(
     "\n※ CTR = 링크 클릭 ÷ N번 페이지 방문. 영상 조회수 대비 비율이 아닙니다."
   );
+
+  // 날짜별 추이. 합계만 보면 "봇이 매일 오는지, 하루 몰아쳤는지"를 구분할 수
+  // 없다 - 2026-09-13 에 롱폼 직행 이동이 7일 합 230건인데 쿠팡 공식은 한 달
+  // 25클릭이라 열 배가 벌어졌고, 그게 매일 오는 트래픽인지 며칠 전 한 번의
+  // 몰아치기인지가 판단을 갈랐다. 그래서 날짜를 쪼개 본다.
+  printLongformByDate(rows);
+  await printBlockedByDate(since);
+}
+
+/** 롱폼 직행 이동(랜딩 없이 /go 로 바로) 날짜별 추이 */
+function printLongformByDate(rows: EventRow[]): void {
+  const byDate = new Map<string, number>();
+  for (const r of rows) {
+    if (r.source !== "youtube_longform" || r.event_type !== "outbound_click") continue;
+    byDate.set(r.event_date, (byDate.get(r.event_date) ?? 0) + r.event_count);
+  }
+  console.log("\n── 롱폼 직행 이동 (날짜별) ──");
+  if (byDate.size === 0) {
+    console.log("  없음");
+    return;
+  }
+  let total = 0;
+  for (const [date, n] of [...byDate.entries()].sort()) {
+    total += n;
+    console.log(`  ${date}  ${String(n).padStart(6)}`);
+  }
+  console.log(`  합계    ${String(total).padStart(6)}`);
+}
+
+/** 봇 필터가 빼낸 요청의 날짜별·사유별 추이 (blocked_outbound_daily) */
+async function printBlockedByDate(since: string): Promise<void> {
+  console.log("\n── 자동요청 제외 (날짜별) ──");
+  const { data, error } = await supabaseAdmin()
+    .from("blocked_outbound_daily")
+    .select("event_date, reason, event_count")
+    .gte("event_date", since)
+    .limit(10_000);
+  if (error) {
+    // 2026-09-14 마이그레이션 전이면 테이블이 없다. 리포트를 죽이지는 않는다.
+    console.log(`  읽지 못했습니다: ${error.message.slice(0, 120)}`);
+    return;
+  }
+  const rows = (data ?? []) as Array<{
+    event_date: string;
+    reason: string;
+    event_count: number;
+  }>;
+  if (rows.length === 0) {
+    console.log("  없음 (필터에 걸린 요청이 아직 없습니다)");
+    return;
+  }
+  const byDate = new Map<string, number>();
+  const byReason = new Map<string, number>();
+  for (const r of rows) {
+    byDate.set(r.event_date, (byDate.get(r.event_date) ?? 0) + r.event_count);
+    byReason.set(r.reason, (byReason.get(r.reason) ?? 0) + r.event_count);
+  }
+  for (const [date, n] of [...byDate.entries()].sort()) {
+    console.log(`  ${date}  ${String(n).padStart(6)}`);
+  }
+  console.log("  사유별:");
+  for (const [reason, n] of [...byReason.entries()].sort((a, b) => b[1] - a[1])) {
+    console.log(`    ${reason.padEnd(24)} ${String(n).padStart(6)}`);
+  }
 }
 
 main().catch((e) => {
