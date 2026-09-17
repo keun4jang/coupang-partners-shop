@@ -18,6 +18,14 @@ on:
         description: "집계 기간(일). 기본 7"
         required: false
         default: "7"
+      views:
+        description: "유튜브 조회수도 같이 볼지 (true/false)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   metrics:
@@ -69,6 +77,15 @@ jobs:
         run: |
           set -o pipefail
           npx tsx scripts/metrics-links.ts "${DAYS:-7}" 2>&1 | tee metrics.log
+
+      - name: 유튜브 조회수 (선택)
+        if: steps.check.outputs.ready == 'true' && github.event.inputs.views == 'true'
+        # 조회수를 봐야 "안 본다"와 "보는데 안 누른다"가 갈린다. 링크 리포트만
+        # 보면 둘이 똑같이 "클릭 0"으로 보인다.
+        # videos.list 는 50개당 1유닛이라 하루 10,000 유닛 중 티도 안 난다.
+        run: |
+          set -o pipefail
+          npx tsx scripts/measure-views.ts 2>&1 | tee -a metrics.log
 
       - name: 결과를 실행 페이지에 표시
         if: steps.check.outputs.ready == 'true' && always()
