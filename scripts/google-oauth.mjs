@@ -27,7 +27,10 @@ import fs from "node:fs";
 //   유튜브만:           SCOPE=youtube node scripts/google-oauth.mjs url
 const SCOPE_PRESETS = {
   drive: "https://www.googleapis.com/auth/drive",
-  youtube: "https://www.googleapis.com/auth/youtube.upload",
+  // yt-analytics.readonly: 시청 지속률(평균 조회율) 조회용. 업로드 권한만으로는
+  // 분석 API 가 403 이라, 그 숫자를 보려면 이 스코프로 다시 인증해야 한다.
+  youtube:
+    "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/yt-analytics.readonly",
 };
 const SCOPE =
   SCOPE_PRESETS[process.env.SCOPE] ??
