@@ -234,7 +234,49 @@ export function clientFingerprint(request: FilterableRequest): string {
             ? "google"
             : "other";
 
-  return `${app}-${platform}/${from}`;
+  // 브라우저 주버전을 붙인다. 2026-09-17 실측에서 센 이동 38건이 전부
+  // referer 없는 chrome-desktop / chrome-android / other-desktop 이었는데,
+  // 거기서 더 좁히려면 "같은 크롬이라도 같은 버전인가"가 필요하다. 사람이면
+  // 버전이 흩어지고, 한 대가 도는 거면 한 값에 몰린다.
+  const version = majorVersionOf(ua, app);
+  return `${app}${version}-${platform}/${from}`;
+}
+
+/** UA 에서 그 브라우저의 주버전 숫자만 (없으면 빈 문자열) */
+function majorVersionOf(ua: string, app: string): string {
+  const token =
+    app === "chrome"
+      ? /(?:chrome|crios)\/(\d{1,3})/
+      : app === "firefox"
+        ? /firefox\/(\d{1,3})/
+        : app === "edge"
+          ? /edg\/(\d{1,3})/
+          : app === "samsung"
+            ? /samsungbrowser\/(\d{1,3})/
+            : app === "safari"
+              ? /version\/(\d{1,3})/
+              : null;
+  if (!token) return "";
+  return ua.match(token)?.[1] ?? "";
+}
+
+/**
+ * 알 수 없는 UA(위 분류에서 "other" 로 떨어진 것)를 짧게 남긴다. (진단 전용)
+ *
+ * 굵은 분류만으로는 "other-desktop" 에서 더 못 좁힌다. 그런데 거기가 가장
+ * 수상한 칸이다 - 알려진 브라우저도 아니고 봇 UA 목록에도 없다는 뜻이라서다.
+ * 하루 10건 안팎이라 이 칸만 UA 를 조금 더 남겨 정체를 확인한다.
+ *
+ * 남기는 건 영문·숫자만 남긴 앞 28자다(집계 함수가 40자에서 자른다).
+ * 버전 숫자까지 포함한 UA 앞부분이면 무엇이 도는지 알아보기에 충분하고,
+ * 개인을 식별할 수 있는 정보는 UA 에 들어 있지 않다.
+ */
+export function unknownUaTag(request: FilterableRequest): string | null {
+  const ua = (request.headers.get("user-agent") ?? "").toLowerCase();
+  if (ua === "") return null;
+  if (!clientFingerprint(request).startsWith("other")) return null;
+  const slug = ua.replace(/[^a-z0-9]/g, "").slice(0, 28);
+  return slug === "" ? null : `ua/${slug}`;
 }
 
 /**

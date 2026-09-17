@@ -8,7 +8,11 @@ import {
   recordProductEvent,
   recordSeenOutbound,
 } from "@/lib/tracking";
-import { clientFingerprint, outboundSkipReason } from "@/lib/requestFilter";
+import {
+  clientFingerprint,
+  outboundSkipReason,
+  unknownUaTag,
+} from "@/lib/requestFilter";
 import type { VideoItemWithProduct } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +79,7 @@ export async function GET(
     // 필터에 안 걸리는 트래픽이 들어왔을 때 물어볼 데가 없다 - 실제로
     // 2026-09-16 확인이 거기서 막혔다. 둘을 나란히 보내 왕복 지연을 늘리지
     // 않는다(여기는 사람이 기다리는 리다이렉트 경로다).
+    const unknownUa = unknownUaTag(request);
     await Promise.all([
       recordProductEvent({
         displayNumber,
@@ -82,6 +87,8 @@ export async function GET(
         tracking,
       }),
       recordSeenOutbound(clientFingerprint(request)),
+      // 알려진 브라우저가 아닌 칸만 UA 를 조금 더 남긴다 (하루 10건 안팎)
+      ...(unknownUa ? [recordSeenOutbound(unknownUa)] : []),
     ]);
   }
 

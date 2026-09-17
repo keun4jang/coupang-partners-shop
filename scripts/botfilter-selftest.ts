@@ -15,6 +15,7 @@ import {
   clientFingerprint,
   outboundSkipReason,
   resetRepeatCache,
+  unknownUaTag,
 } from "../src/lib/requestFilter";
 
 let failures = 0;
@@ -194,13 +195,13 @@ expectHuman("일반 탐색 (Sec-Fetch-Mode)", CHROME, { "sec-fetch-mode": "navig
     [
       "데스크톱 크롬 + 유튜브에서 옴",
       CHROME,
-      "chrome-desktop/youtube",
+      "chrome126-desktop/youtube",
       { referer: "https://www.youtube.com/" },
     ],
     [
       "데스크톱 크롬 + 유입처 없음(크롤러 의심)",
       CHROME,
-      "chrome-desktop/none",
+      "chrome126-desktop/none",
     ],
     [
       "UA 없음",
@@ -214,6 +215,29 @@ expectHuman("일반 탐색 (Sec-Fetch-Mode)", CHROME, { "sec-fetch-mode": "navig
       failures++;
       console.error(`✗ [정체] ${label}\n   기대: ${expected}\n   실제: ${got}`);
     }
+  }
+
+  // 같은 크롬이라도 버전이 다르면 다른 칸이어야 한다. 사람이면 버전이
+  // 흩어지고 한 대가 도는 거면 한 값에 몰리는데, 버전을 안 남기면 그 구분이
+  // 통째로 사라진다.
+  const old = clientFingerprint(
+    req("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/90.0.4430.212 Safari/537.36")
+  );
+  if (old !== "chrome90-desktop/none") {
+    failures++;
+    console.error(`✗ [정체] 크롬 버전이 꼬리표에 안 붙었다: ${old}`);
+  }
+
+  // 알 수 없는 UA 칸만 조금 더 남긴다 (여기가 가장 수상한 칸이라서)
+  const unknown = unknownUaTag(req("SomeScanner/2.1 (+http://example.com)"));
+  if (unknown !== "ua/somescanner21httpexamplecom") {
+    failures++;
+    console.error(`✗ [정체] 알 수 없는 UA 꼬리표가 틀렸다: ${unknown}`);
+  }
+  // 알려진 브라우저는 UA 를 더 남기지 않는다
+  if (unknownUaTag(req(CHROME)) !== null) {
+    failures++;
+    console.error("✗ [정체] 크롬인데 UA 를 더 남기고 있다");
   }
 }
 
