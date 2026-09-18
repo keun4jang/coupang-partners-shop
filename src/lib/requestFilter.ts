@@ -99,6 +99,10 @@ const BOT_UA_MARKERS: readonly string[] = [
   "puppeteer",
   "selenium",
   // ── 모니터링·링크 검사 ──
+  // google-safety: 구글 세이프브라우징의 URL 검사기. 2026-09-18 진단에서
+  // UA 가 통째로 "Google-Safety" 인 요청이 하루 10건 잡혔다. 이름에 bot 도
+  // crawler 도 안 들어가서 기존 조각에 하나도 안 걸렸다.
+  "google-safety",
   "uptimerobot",
   "pingdom",
   "statuscake",
@@ -159,7 +163,29 @@ export function automatedRequestReason(request: FilterableRequest): string | nul
   if (ua === "") return "ua:empty";
 
   const marker = BOT_UA_MARKERS.find((m) => ua.includes(m));
-  return marker ? `ua:${marker}` : null;
+  if (marker) return `ua:${marker}`;
+
+  return ancientChromeReason(ua);
+}
+
+/**
+ * 10년도 더 된 크롬 버전을 자칭하는 요청.
+ *
+ * 2026-09-18 진단에서 "chrome41-android" 가 하루 10건 잡혔다. 크롬 41 은
+ * 2015년 버전이다. 그 브라우저로는 요즘 웹사이트가 열리지도 않는다 - 사람이
+ * 아니라 스크래퍼·SEO 도구가 흔히 쓰는 위장 UA 다(구글의 옛 렌더러가 쓰던
+ * 버전이라 "차단당하지 않는 UA"로 퍼졌다).
+ *
+ * 경계값을 60 으로 잡은 이유: 크롬 60 은 2017년이다. 이보다 낮은 버전을
+ * 진짜로 쓰는 사람은 실질적으로 없고, 있어도 우리 랜딩이 안 열린다.
+ * 위장 봇만 걸리고 사람은 안 걸리는 선이다.
+ */
+const MIN_REAL_CHROME_MAJOR = 60;
+
+function ancientChromeReason(ua: string): string | null {
+  const major = Number(ua.match(/(?:chrome|crios)\/(\d{1,3})/)?.[1] ?? "");
+  if (!Number.isFinite(major) || major === 0) return null;
+  return major < MIN_REAL_CHROME_MAJOR ? "ua:chrome-ancient" : null;
 }
 
 /**

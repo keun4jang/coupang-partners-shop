@@ -175,6 +175,45 @@ expectHuman("일반 탐색 (Sec-Fetch-Mode)", CHROME, { "sec-fetch-mode": "navig
   resetRepeatCache();
 }
 
+// ── 2026-09-18 진단이 이름을 뱉은 두 종류 ──────────────────────
+{
+  // UA 가 통째로 "Google-Safety" 다. bot 도 crawler 도 안 들어가서 기존
+  // 조각에 하나도 안 걸렸고, 하루 10건이 사람 클릭으로 세어지고 있었다.
+  const safety = automatedRequestReason(req("Google-Safety"));
+  if (safety !== "ua:google-safety") {
+    failures++;
+    console.error(`✗ [구글 세이프브라우징] 안 걸렸다: ${safety}`);
+  }
+
+  // 크롬 41(2015년)을 자칭하는 안드로이드. 사람이 아니다.
+  const ancient = automatedRequestReason(
+    req("Mozilla/5.0 (Linux; Android 6.0.1) AppleWebKit/537.36 Chrome/41.0.2272.96 Mobile Safari/537.36")
+  );
+  if (ancient !== "ua:chrome-ancient") {
+    failures++;
+    console.error(`✗ [구버전 크롬 위장] 안 걸렸다: ${ancient}`);
+  }
+
+  // 여기서 과하게 걸면 진짜 사람이 날아간다. 요즘 쓰는 것들은 전부 통과해야 한다.
+  expectHuman("요즘 데스크톱 크롬", CHROME);
+  expectHuman(
+    "크롬 60 (경계값 - 통과해야 한다)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/60.0.3112.113 Safari/537.36"
+  );
+  expectHuman(
+    "요즘 카카오 인앱",
+    "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 KAKAOTALK 10.4.5"
+  );
+  expectHuman(
+    "아이폰 사파리 (크롬 버전 표기가 아예 없다)",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1"
+  );
+  expectHuman(
+    "삼성 브라우저",
+    "Mozilla/5.0 (Linux; Android 14; SM-S928N) AppleWebKit/537.36 Chrome/125.0.0.0 SamsungBrowser/25.0 Mobile Safari/537.36"
+  );
+}
+
 // ── 센 요청의 정체 꼬리표 (진단용 clientFingerprint) ──────────────
 //
 // 인앱 브라우저 UA 에는 크롬 문자열이 같이 들어 있어, 순서를 잘못 보면 전부
