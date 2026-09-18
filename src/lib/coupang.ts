@@ -231,6 +231,13 @@ export async function createDeeplink(coupangUrls: string[]): Promise<string[]> {
  * 카테고리 ID(bestcategories)는 매핑이 불투명해 엉뚱한 상품이 섞이므로,
  * 주제가 명확한 키워드 검색을 쓴다. appCategory 는 이 서비스의 카테고리
  * (자막 톤/브롤/폴백문구에 쓰임)로 매핑.
+ *
+ * (2026-09-18 확장) 그때까지는 살림템 쪽(주방·청소·수납·생활)에 쏠려 있었다.
+ * 매번 비슷한 소재만 도는 문제라 테크가젯·뷰티헬스·펫용품 세 카테고리를
+ * 더했다 - "혹하는 아이디어 상품"이라는 선정 기준 자체는 그대로 두고
+ * 소재만 넓힌 것. scout.ts 가 이 신규 카테고리들에 하루 예산 일부를
+ * 항상 배정해서(로테이션에만 맡기면 커버까지 며칠 걸린다), appCategory 를
+ * 하나 늘리면 여기 새 그룹으로 묶기만 하면 자동으로 매일 섞여 들어간다.
  */
 export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
   // 신기/신박/아이디어 (남녀 공통 - 호기심 훅 잘 먹힘)
@@ -459,7 +466,55 @@ export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
   { keyword: "자취 미니 냉장고", appCategory: "자취템" },
   { keyword: "접이식 테이블 좌식", appCategory: "자취템" },
   { keyword: "빨래 건조대 소형", appCategory: "자취템" },
+
+  // ── 2026-09-18 카테고리 확장 (신기한 물품·신제품 우선) ──────────────────
+  // 왜: 재고 197개 중 78%가 주방·청소·수납템 세 카테고리에 몰려 있다. 사장님
+  // 지적대로 "매번 비슷한 살림템"만 도는 구조라, 스카우트 단계에서 아예 다른
+  // 카테고리를 더한다(테크가젯·뷰티헬스·펫용품). 커미션 구조·클릭 훅 논리는
+  // 기존과 같다 - "혹하는 아이디어 상품"이라는 기준만 유지한 채 소재를 넓힌다.
+  // "신제품/신상" 문구를 키워드에 직접 넣어 최신 등록 상품이 먼저 걸리게 했고,
+  // appeal.ts 에도 같은 신호를 채점 규칙으로 추가했다(scout.ts 가 하루 예산
+  // 일부를 이 카테고리들에 always 배정하므로 몇 달 뒤 로테이션을 기다릴
+  // 필요 없이 내일부터 바로 섞여 들어온다).
+  { keyword: "신박한 전자기기", appCategory: "테크가젯" },
+  { keyword: "신제품 블루투스 이어폰", appCategory: "테크가젯" },
+  { keyword: "휴대용 미니 프린터", appCategory: "테크가젯" },
+  { keyword: "스마트워치 가성비", appCategory: "테크가젯" },
+  { keyword: "무선 마우스 키보드", appCategory: "테크가젯" },
+  { keyword: "휴대용 모니터", appCategory: "테크가젯" },
+  { keyword: "미니 게이밍 기기", appCategory: "테크가젯" },
+  { keyword: "전자책 리더기", appCategory: "테크가젯" },
+  { keyword: "스마트 플러그", appCategory: "테크가젯" },
+  { keyword: "신상 무선 이어폰 케이스", appCategory: "테크가젯" },
+
+  { keyword: "신상 뷰티 기기", appCategory: "뷰티헬스" },
+  { keyword: "휴대용 마사지건", appCategory: "뷰티헬스" },
+  { keyword: "각질 제거기", appCategory: "뷰티헬스" },
+  { keyword: "탈모 방지 기기", appCategory: "뷰티헬스" },
+  { keyword: "피부 관리기 가정용", appCategory: "뷰티헬스" },
+  { keyword: "전동 클렌징 브러쉬", appCategory: "뷰티헬스" },
+  { keyword: "체지방 측정기", appCategory: "뷰티헬스" },
+  { keyword: "휴대용 넥밴드 마사지기", appCategory: "뷰티헬스" },
+  { keyword: "신제품 눈마사지기", appCategory: "뷰티헬스" },
+
+  { keyword: "강아지 자동 급식기", appCategory: "펫용품" },
+  { keyword: "고양이 자동 화장실", appCategory: "펫용품" },
+  { keyword: "반려동물 신박템", appCategory: "펫용품" },
+  { keyword: "강아지 산책 용품", appCategory: "펫용품" },
+  { keyword: "고양이 장난감 신상", appCategory: "펫용품" },
+  { keyword: "펫 급수기 정수", appCategory: "펫용품" },
+  { keyword: "강아지 이동가방", appCategory: "펫용품" },
+  { keyword: "신제품 강아지 옷", appCategory: "펫용품" },
 ];
+
+/**
+ * 2026-09-18 에 새로 넓힌 카테고리 (테크가젯·뷰티헬스·펫용품).
+ * scout.ts 가 이 카테고리들에 하루 검색 예산 일부를 항상 떼어 준다 -
+ * 위치 기반 로테이션(rotateForToday)에만 맡기면 224개 중 뒤쪽에 있는
+ * 이 키워드들이 며칠 지나야 한 번 걸린다. "당장 다양하게" 요청에 맞추려면
+ * 매일 조금씩이라도 섞여 들어가야 한다.
+ */
+export const EMERGING_CATEGORIES = new Set(["테크가젯", "뷰티헬스", "펫용품"]);
 
 /** 가격을 "21,990원" 형태로 */
 export function priceText(price: number): string {

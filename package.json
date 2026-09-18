@@ -29,6 +29,7 @@
     "images:audit": "tsx scripts/product-image-audit.ts",
     "imagecheck:check": "tsx scripts/imagecheck-selftest.ts",
     "selector:check": "tsx scripts/selector-selftest.ts",
+    "scout-keywords:check": "tsx scripts/scout-keywords-selftest.ts",
     "metrics:links": "tsx scripts/metrics-links.ts"
   },
   "dependencies": {

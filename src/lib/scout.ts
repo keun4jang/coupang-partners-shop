@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase";
 import {
   CoupangProduct,
+  EMERGING_CATEGORIES,
   SCOUT_KEYWORDS,
   searchProducts,
   priceText,
@@ -159,6 +160,32 @@ function rotateForToday<T>(items: T[], take: number): T[] {
 }
 
 /**
+ * 신규 카테고리(테크가젯·뷰티헬스·펫용품)에 하루 예산 일부를 항상 떼어 준다.
+ *
+ * 왜 필요한가: rotateForToday 는 배열 위치로만 회전한다. 새 카테고리 27개를
+ * SCOUT_KEYWORDS 맨 뒤에 붙였을 뿐이라, 순수 로테이션에만 맡기면 224개 중
+ * 뒤쪽인 이 키워드들은 며칠(전체 한 바퀴)이 지나야 한 번 걸린다. "카테고리를
+ * 다양하게, 지금부터" 라는 요청과 안 맞는다. 그래서 전체 예산에서 일부를
+ * 신규 카테고리 전용으로 떼어 매일 섞고, 나머지로 기존 197개를 그대로
+ * 회전시킨다 - 기존 카테고리의 회전 주기(약 5일)는 거의 그대로 유지된다.
+ */
+const EMERGING_RESERVE = 8;
+
+/** 테스트용 export. 운영 코드에서는 위 pickTodayKeywords(budget) 만 부른다. */
+export function pickTodayKeywords(budget: number): typeof SCOUT_KEYWORDS {
+  const emerging = SCOUT_KEYWORDS.filter((k) => EMERGING_CATEGORIES.has(k.appCategory));
+  const established = SCOUT_KEYWORDS.filter((k) => !EMERGING_CATEGORIES.has(k.appCategory));
+  if (emerging.length === 0 || budget <= EMERGING_RESERVE) {
+    return rotateForToday(SCOUT_KEYWORDS, budget);
+  }
+  const reserve = Math.min(EMERGING_RESERVE, emerging.length);
+  return [
+    ...rotateForToday(emerging, reserve),
+    ...rotateForToday(established, budget - reserve),
+  ];
+}
+
+/**
  * 카테고리 베스트셀러를 볼 쿠팡 대분류.
  *
  * id 와 실제 카테고리가 어긋나도 안전하다 - 담기 전에 상품명으로 살림템 여부를
@@ -268,7 +295,8 @@ export async function runScout(opts: ScoutOptions = {}): Promise<ScoutResult> {
   // 그래서 날짜로 회전시켜 하루에 KEYWORDS_PER_RUN 개씩만 검색한다.
   // 며칠이면 전체를 한 바퀴 돌고, 총 키워드 수는 마음껏 늘려도 된다.
   // (검색 API 는 키워드당 10개 고정이라 "키워드 수 = 신규 재고량" 이다)
-  const rotated = rotateForToday(SCOUT_KEYWORDS, opts.keywordsPerRun ?? KEYWORDS_PER_RUN);
+  const budget = opts.keywordsPerRun ?? KEYWORDS_PER_RUN;
+  const rotated = pickTodayKeywords(budget);
   console.log(
     `키워드 ${rotated.length}/${SCOUT_KEYWORDS.length}개 검색 (날짜별 회전)`
   );
