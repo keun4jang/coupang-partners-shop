@@ -71,7 +71,7 @@ export async function GET(
 
   // 크롤러·미리보기·프리페치는 이동만 시켜 주고 집계에서 뺀다.
   // (걸러도 리다이렉트는 그대로 - 자세한 이유는 lib/requestFilter.ts 머리말)
-  const skipReason = outboundSkipReason(request, displayNumber);
+  const skipReason = outboundSkipReason(request, displayNumber, Date.now(), tracking.source);
   if (skipReason) {
     await recordBlockedOutbound(skipReason);
   } else {

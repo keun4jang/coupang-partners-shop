@@ -362,9 +362,42 @@ function repeatKey(request: FilterableRequest, displayNumber: number): string {
 export function outboundSkipReason(
   request: FilterableRequest,
   displayNumber: number,
-  now: number = Date.now()
+  now: number = Date.now(),
+  source?: string
 ): string | null {
   const automated = automatedRequestReason(request);
   if (automated) return automated;
+  const longform = longformNoRefererReason(request, source);
+  if (longform) return longform;
   return isRepeatRequest(repeatKey(request, displayNumber), now) ? "repeat" : null;
+}
+
+/**
+ * 롱폼 설명란 링크인데 데스크톱이면서 referer 가 없는 요청.
+ *
+ * 왜 막나 (2026-09-27 실측): google-safety 를 막은 뒤에도 롱폼 직행 이동이 하루
+ * 20건 안팎 남았는데, 그 수가 같은 날 google-safety 차단 건수와 날짜별로 1:1
+ * 로 맞았다(9/20 14:14 · 9/21 2:2 · 9/22 20:21 · 9/23 20:20 · 9/24 16:16 ·
+ * 9/25 0:0 · 9/26 20:20). 남은 요청은 전부 referer 없는 데스크톱 크롬 최신판
+ * (chrome151/152 등)이었다 - 구글 검사기가 "Google-Safety" 로 한 번 오고,
+ * 같은 링크를 일반 크롬 UA 로 다시 열어 보는 두 번째 요청으로 보인다.
+ *
+ * 사람은 왜 안 걸리나: 데스크톱에서 유튜브 설명란 링크를 누르면 유튜브의
+ * 리다이렉트 페이지를 거쳐 youtube.com 이 referer 로 붙는다. referer 가 비는
+ * 건 앱 인앱 브라우저 쪽인데, 그건 UA 에 android/iphone 이 들어 있어 여기서
+ * 걸리지 않는다. 롱폼이 아닌 경로(쇼츠 랜딩 등)도 건드리지 않는다.
+ *
+ * 과하게 걸렀는지는 blocked_outbound_daily 의 "longform:desktop-noref" 행과
+ * 쿠팡 공식 클릭수를 대조해 보면 된다. 걸려도 리다이렉트는 그대로 해 준다.
+ */
+export function longformNoRefererReason(
+  request: FilterableRequest,
+  source?: string
+): string | null {
+  if (source !== "youtube_longform") return null;
+  const referer = (request.headers.get("referer") ?? "").trim();
+  if (referer !== "") return null;
+  const ua = (request.headers.get("user-agent") ?? "").toLowerCase();
+  if (/android|iphone|ipad|ipod|mobile/.test(ua)) return null;
+  return "longform:desktop-noref";
 }

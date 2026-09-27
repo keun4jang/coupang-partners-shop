@@ -94,6 +94,7 @@ const BLOCK_GROUP_LABEL: Record<string, string> = {
   prefetch: "브라우저 미리읽기",
   method: "링크 검사",
   repeat: "짧은 시간 중복",
+  longform: "롱폼 검사기 재방문",
 };
 
 function blockGroupOf(reason: string): string {

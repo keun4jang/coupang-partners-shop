@@ -214,6 +214,73 @@ expectHuman("일반 탐색 (Sec-Fetch-Mode)", CHROME, { "sec-fetch-mode": "navig
   );
 }
 
+// ── 롱폼 검사기 재방문 (데스크톱 + referer 없음, 롱폼 경로만) ──────
+//
+// 2026-09-27: google-safety 차단 뒤에도 남은 롱폼 이동이 같은 날 google-safety
+// 건수와 날짜별로 1:1 이었다. 남은 요청은 referer 없는 데스크톱 최신 크롬.
+// 사람의 데스크톱 클릭은 유튜브 리다이렉트를 거쳐 referer 가 붙고, referer 가
+// 비는 앱 클릭은 모바일 UA 라서 여기 안 걸려야 한다.
+{
+  resetRepeatCache();
+  const t0 = 1_800_000_000_000;
+  const desktop = (extra: Record<string, string> = {}) =>
+    req(CHROME, { "x-forwarded-for": "9.9.9.9", ...extra });
+
+  const bot = outboundSkipReason(desktop(), 70, t0, "youtube_longform");
+  if (bot !== "longform:desktop-noref") {
+    failures++;
+    console.error(`✗ [롱폼 재방문] referer 없는 데스크톱이 안 걸렸다: ${bot}`);
+  }
+
+  // 사람: 데스크톱인데 유튜브에서 넘어옴
+  const human = outboundSkipReason(
+    desktop({ referer: "https://www.youtube.com/" }),
+    71,
+    t0,
+    "youtube_longform"
+  );
+  if (human !== null) {
+    failures++;
+    console.error(`✗ [롱폼 재방문] 유튜브에서 온 데스크톱 클릭까지 막았다: ${human}`);
+  }
+
+  // 사람: 유튜브 앱(안드로이드) - referer 가 없어도 통과해야 한다
+  const app = outboundSkipReason(
+    req(
+      "Mozilla/5.0 (Linux; Android 14; SM-S928N) AppleWebKit/537.36 Chrome/125.0.0.0 Mobile Safari/537.36",
+      { "x-forwarded-for": "8.8.4.4" }
+    ),
+    72,
+    t0,
+    "youtube_longform"
+  );
+  if (app !== null) {
+    failures++;
+    console.error(`✗ [롱폼 재방문] 모바일 앱 클릭까지 막았다: ${app}`);
+  }
+
+  // 롱폼이 아닌 경로는 건드리지 않는다 (쇼츠 랜딩에서 온 데스크톱 등)
+  const shorts = outboundSkipReason(
+    req(CHROME, { "x-forwarded-for": "7.7.7.7" }),
+    73,
+    t0,
+    "youtube_shorts"
+  );
+  if (shorts !== null) {
+    failures++;
+    console.error(`✗ [롱폼 재방문] 롱폼 아닌 경로까지 막았다: ${shorts}`);
+  }
+
+  // Google-Safety 자신은 원래 사유(ua:google-safety)로 남아야 한다 - 롱폼
+  // 사유로 덮어쓰면 "검사기가 몇 번 왔나" 집계가 흐려진다.
+  const safety = outboundSkipReason(req("Google-Safety"), 74, t0, "youtube_longform");
+  if (safety !== "ua:google-safety") {
+    failures++;
+    console.error(`✗ [롱폼 재방문] Google-Safety 사유가 덮어써졌다: ${safety}`);
+  }
+  resetRepeatCache();
+}
+
 // ── 센 요청의 정체 꼬리표 (진단용 clientFingerprint) ──────────────
 //
 // 인앱 브라우저 UA 에는 크롬 문자열이 같이 들어 있어, 순서를 잘못 보면 전부

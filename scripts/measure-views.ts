@@ -111,7 +111,52 @@ async function main() {
   console.log("공개상태별 편수:");
   for (const [k, n] of byPrivacy) console.log(`  ${k}: ${n}개`);
 
+  showWeekly(afterDetail);
+
   await showRetention(yt);
+}
+
+/**
+ * 게시 주차별 조회수 (중앙값 중심).
+ *
+ * 왜 필요한가 (2026-09-27): 조회수 상위 8편이 전부 8월 초(43~106번)였고, 그 뒤로
+ * 1,200회를 넘긴 영상이 없다. 8/18 에 포맷이 D(실사용 영상 배경)에서 E(크림색
+ * 정적 포스터)로 바뀌었고 다음 날 발행량을 늘렸다. 합계·평균만 보면 "언제부터
+ * 꺾였나"가 안 보여서, 주 단위로 쪼개 D/E 전환 전후와 D 재전환 효과를 읽는다.
+ *
+ * 평균 대신 중앙값을 같이 찍는 이유: 쇼츠는 한두 편이 터지면 평균이 확 뛴다.
+ * "보통 영상이 얼마나 나오나"는 중앙값이 더 정직하다.
+ * 최근 주는 아직 조회가 쌓이는 중이라 낮게 나오는 게 정상이다(표시해 둔다).
+ */
+function showWeekly(rows: { v: number; pub: string }[]): void {
+  const weekStart = (day: string): string => {
+    const d = new Date(`${day}T00:00:00Z`);
+    const dow = (d.getUTCDay() + 6) % 7; // 월요일 = 0
+    d.setUTCDate(d.getUTCDate() - dow);
+    return d.toISOString().slice(0, 10);
+  };
+  const byWeek = new Map<string, number[]>();
+  for (const r of rows) {
+    if (!r.pub) continue;
+    const w = weekStart(r.pub);
+    byWeek.set(w, [...(byWeek.get(w) ?? []), r.v]);
+  }
+  const median = (a: number[]): number => {
+    const s = [...a].sort((x, y) => x - y);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+  };
+  const fresh = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  console.log("\n게시 주차별 (월요일 시작) - 편수 · 중앙값 · 평균 · 최고");
+  for (const [w, views] of [...byWeek.entries()].sort()) {
+    const sum = views.reduce((t, v) => t + v, 0);
+    const note = w >= weekStart(fresh) ? "  (조회 쌓이는 중)" : "";
+    console.log(
+      `  ${w}  ${String(views.length).padStart(3)}편 · 중앙값 ${String(median(views)).padStart(5)}` +
+        ` · 평균 ${String(Math.round(sum / views.length)).padStart(5)} · 최고 ${String(Math.max(...views)).padStart(5)}${note}`
+    );
+  }
+  console.log("  (8/18 포맷 D→E 전환 · 8/19 발행량 증가 · 9/27 포맷 D 재전환)");
 }
 /**
  * 시청 지속률 (YouTube Analytics API).
