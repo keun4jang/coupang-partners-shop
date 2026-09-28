@@ -143,11 +143,16 @@ export async function fetchGoldbox(): Promise<CoupangProduct[]> {
 /** 키워드 검색 */
 export async function searchProducts(
   keyword: string,
-  limit = 10
+  limit = 10,
+  subId?: string
 ): Promise<CoupangProduct[]> {
   // 검색 API 는 limit 최대 10 (초과 시 400 "limit is out of range")
   const safe = Math.max(1, Math.min(limit, 10));
-  const query = `keyword=${encodeURIComponent(keyword)}&limit=${safe}`;
+  // subId 를 주면 쿠팡이 돌려주는 productUrl 자체에 채널 아이디가 박혀 나온다
+  // (scripts/subid-probe.ts 로 확인하는 용도. 스카우트는 아직 안 쓴다).
+  const query =
+    `keyword=${encodeURIComponent(keyword)}&limit=${safe}` +
+    (subId ? `&subId=${encodeURIComponent(subId)}` : "");
   const data = await request<{ productData?: CoupangProduct[] }>(
     "GET",
     `${BASE}/products/search`,
@@ -212,13 +217,26 @@ export function withSubId(partnerUrl: string, subId: string): string {
 
 /** 일반 쿠팡 상품 URL → 제휴 딥링크 (수동으로 URL 붙여넣을 때 사용) */
 export async function createDeeplink(coupangUrls: string[]): Promise<string[]> {
+  const rows = await createDeeplinkUrls(coupangUrls);
+  return rows.map((d) => d.shortenUrl ?? d.landingUrl ?? "").filter(Boolean);
+}
+
+/**
+ * 딥링크 API 원본 응답 (landingUrl·shortenUrl 둘 다).
+ * subId 를 주면 그 채널 아이디로 귀속되는 링크가 나온다 - 커미션 리포트의
+ * subId 로 "어느 영상이 팔았는지"를 되짚으려면 이렇게 발급받아야 한다.
+ */
+export async function createDeeplinkUrls(
+  coupangUrls: string[],
+  subId?: string
+): Promise<Array<{ landingUrl?: string; shortenUrl?: string }>> {
   const data = await request<Array<{ landingUrl?: string; shortenUrl?: string }>>(
     "POST",
     `${BASE}/deeplink`,
     "",
-    { coupangUrls }
+    subId ? { coupangUrls, subId } : { coupangUrls }
   );
-  return (data ?? []).map((d) => d.shortenUrl ?? d.landingUrl ?? "").filter(Boolean);
+  return data ?? [];
 }
 
 /**
