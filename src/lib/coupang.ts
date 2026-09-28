@@ -199,15 +199,24 @@ export async function fetchCommissionReport(
 }
 
 /**
- * 쿠팡파트너스 링크에 subId 를 붙인다 (이미 있으면 건드리지 않음).
- * subId 는 커미션 리포트에 그대로 실려 오므로 "어느 영상이 구매를 만들었는지"를
- * 되짚는 유일한 수단이다. 없으면 수익이 한 덩어리로만 보인다.
+ * 쿠팡파트너스 링크에 채널 아이디(subid)를 붙인다 (이미 값이 있으면 건드리지 않음).
+ * subid 는 커미션 리포트의 subId 로 그대로 실려 오므로 "어느 영상이 구매를
+ * 만들었는지"를 되짚는 유일한 수단이다. 없으면 수익이 한 덩어리로만 보인다.
+ *
+ * 파라미터 이름은 반드시 소문자 "subid" 다. 2026-08 도입 때는 "subId" 로 붙였는데
+ * 쿠팡이 그 이름을 읽지 않아, 9월 커미션 리포트의 26클릭이 전부 subId 빈 값이었다
+ * (2026-09-28 scripts/subid-probe.ts 실측). 같은 진단에서 쿠팡 딥링크 API 에
+ * subId 를 주면 돌려주는 링크가 ".../re/AFFSDP?lptag=..&subid=<값>&pageKey=.."
+ * 이었다 - 서명(token) 없이 subid 만 붙은 모양이라, 저장된 링크에 subid 를
+ * 붙이면 쿠팡이 직접 발급한 것과 같은 형태가 된다.
  */
 export function withSubId(partnerUrl: string, subId: string): string {
   try {
     const u = new URL(partnerUrl);
-    if (u.searchParams.has("subId")) return partnerUrl;
-    u.searchParams.set("subId", subId);
+    if ((u.searchParams.get("subid") ?? "").trim() !== "") return partnerUrl;
+    // 예전 방식으로 붙은 대문자 이름이 섞여 있으면 걷어낸다(쿠팡이 무시하는 값).
+    u.searchParams.delete("subId");
+    u.searchParams.set("subid", subId);
     return u.toString();
   } catch {
     // URL 파싱이 안 되면 원본 그대로 (리다이렉트를 막지 않는다)
