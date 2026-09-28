@@ -269,11 +269,17 @@ export async function currentToken(app: AliApp): Promise<string | null> {
  * 마지막 갱신 후 12시간 지났고 토큰이 있을 때만 refresh 를 시도한다.
  */
 const REFRESH_EVERY_MS = 12 * 3600_000;
+// 갱신이 실패하면 refreshedAt 이 안 바뀌어 워커가 감시 주기(60초)마다 다시 시도했다
+// (2026-09-28: refresh_token 만료로 실행당 약 170번, 하루 1,400번 넘게 실패 호출).
+// 같은 프로세스 안에서는 실패 뒤 12시간 동안 다시 시도하지 않는다.
+const lastFailedAt = new Map<string, number>();
 export async function maybeRefresh(app: AliApp): Promise<void> {
   if (!hasAppEnv(app)) return;
   const token = await getSetting(app.tokenKey);
   if (!token) return; // 아직 미인증
   const refreshedAt = await getSetting(app.refreshedAtKey);
   if (refreshedAt && Date.now() - Date.parse(refreshedAt) < REFRESH_EVERY_MS) return;
-  await refreshToken(app);
+  const failedAt = lastFailedAt.get(app.label);
+  if (failedAt && Date.now() - failedAt < REFRESH_EVERY_MS) return;
+  if (!(await refreshToken(app))) lastFailedAt.set(app.label, Date.now());
 }
