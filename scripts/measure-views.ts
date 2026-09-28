@@ -19,7 +19,8 @@ async function main() {
 
   const { data: rows } = await supabaseAdmin()
     .from("video_items")
-    .select("display_number, youtube_url, created_at")
+    // 상품 카테고리·이름은 영상별 표에서 "어떤 상품이 붙잡나"를 보려고 같이 읽는다.
+    .select("display_number, youtube_url, created_at, products(category, product_name)")
     .not("youtube_url", "is", null)
     .order("display_number");
 
@@ -27,7 +28,12 @@ async function main() {
   const idOf = (url: string): string | null =>
     url.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/)([A-Za-z0-9_-]{6,})/)?.[1] ?? null;
 
-  const items = ((rows ?? []) as { display_number: number; youtube_url: string; created_at: string }[])
+  const items = ((rows ?? []) as unknown as {
+    display_number: number;
+    youtube_url: string;
+    created_at: string;
+    products: { category: string | null; product_name: string | null } | null;
+  }[])
     .map((r) => ({ ...r, youtube_video_id: idOf(r.youtube_url) }))
     .filter((r): r is typeof r & { youtube_video_id: string } => Boolean(r.youtube_video_id));
   console.log(`유튜브 ID 보유 영상: ${items.length}개`);
@@ -115,7 +121,15 @@ async function main() {
 
   await showRetention(
     yt,
-    new Map(items.map((it) => [it.youtube_video_id, it.display_number]))
+    new Map(
+      items.map((it) => [
+        it.youtube_video_id,
+        {
+          n: it.display_number,
+          label: `${it.products?.category ?? "?"} · ${(it.products?.product_name ?? "").slice(0, 24)}`,
+        },
+      ])
+    )
   );
 }
 
@@ -175,7 +189,7 @@ function showWeekly(rows: { v: number; pub: string }[]): void {
  */
 async function showRetention(
   yt: ReturnType<typeof google.youtube>,
-  numberByVideoId: Map<string, number>
+  numberByVideoId: Map<string, { n: number; label: string }>
 ): Promise<void> {
   void yt;
   const oauth2 = new google.auth.OAuth2(
@@ -231,14 +245,17 @@ async function showRetention(
       maxResults: 20,
     });
     const rows = (res.data.rows ?? []) as (string | number)[][];
-    console.log(`\n  영상별 (최근 14일 조회 상위 ${rows.length}편) - 번호 · 조회 · 유효 비율 · 평균 조회율`);
+    // 같은 포맷 안에서도 영상마다 유효 비율이 4배씩 벌어진다(9/28: E 영상 4.7%~19.3%).
+    // 포맷만이 아니라 상품·훅이 크게 작용한다는 뜻이라, 카테고리·상품명을 같이 찍는다.
+    console.log(`\n  영상별 (최근 14일 조회 상위 ${rows.length}편) - 번호 · 조회 · 유효 비율 · 카테고리 · 상품`);
     for (const r of rows) {
       const [vid, v, ev, pct] = r;
-      const n = numberByVideoId.get(String(vid));
+      void pct; // 평균 조회율은 반복 재생 때문에 100%를 넘기도 해서 영상별 비교엔 쓰지 않는다
+      const meta = numberByVideoId.get(String(vid));
       const views = Number(v);
       const ratio = views ? ((Number(ev) / views) * 100).toFixed(1) : "-";
       console.log(
-        `    ${n ? `${n}번`.padEnd(6) : String(vid).padEnd(6)} 조회 ${String(views).padStart(5)} · 유효 ${String(ratio).padStart(5)}% · 평균 조회율 ${Number(pct).toFixed(1)}%`
+        `    ${meta ? `${meta.n}번`.padEnd(6) : String(vid).padEnd(6)} 조회 ${String(views).padStart(5)} · 유효 ${String(ratio).padStart(5)}% · ${meta?.label ?? ""}`
       );
     }
     console.log("  (9/28 이후 올라간 번호가 포맷 D. 유효 비율 기준선: D 약 22% / E 약 8%)");
