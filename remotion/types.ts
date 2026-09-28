@@ -61,6 +61,12 @@ export type ShortsProps = {
   narration?: (string | null)[] | null;
   /** 나레이션 길이에 맞춘 장면 컷 타이밍. 없으면 고정 TIMING 사용 */
   timing?: SceneTiming | null;
+  /**
+   * 포맷 D 전용: 제품 카드를 첫 장면부터 띄운다(기본은 장점1부터, 약 4.6초).
+   * 쇼츠는 첫 1~2초에 87%가 넘겨서, 글자만 보이는 인트로 동안 무슨 상품인지
+   * 모른 채 떠난다는 가설을 검증하려는 스위치. app_settings.d_product_first=on.
+   */
+  productFirst?: boolean | null;
 };
 
 export const defaultShortsProps: ShortsProps = {

@@ -27,6 +27,11 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const T = resolveTiming(props.timing);
   const ctaFrom = f(T.cta.from);
+  // 제품 먼저 모드: 카드가 커버 프레임 바로 뒤에 뜨고, 후킹·공감 문구는 카드 위
+  // 빈 자리(장점 자막과 같은 줄)에 한 줄씩 바뀌어 나온다. 기본 모드의 문구 위치
+  // (0.26·0.40)는 카드(0.25~약 0.77)와 겹치기 때문.
+  const productFirst = !!props.productFirst;
+  const productFrom = productFirst ? COVER_FRAME_COUNT : f(T.product.from);
 
   return (
     <AbsoluteFill>
@@ -56,12 +61,12 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
       />
 
       {/* 인트로: 후킹(타겟 호명)+공감 두 문장이 한 화면에 순서대로 쌓임 */}
-      <Sequence durationInFrames={f(T.empathy.to)}>
+      <Sequence durationInFrames={f(productFirst ? T.hook.to : T.empathy.to)}>
         <Subtitle
           text={props.hookLine}
           size={hookFontSize(props.hookLine)}
           variant="bubble"
-          y={0.26}
+          y={productFirst ? 0.1 : 0.26}
           strong
         />
       </Sequence>
@@ -72,17 +77,18 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
         from={f(T.empathy.from)}
         durationInFrames={f(T.empathy.to - T.empathy.from)}
       >
-        <Subtitle text={props.empathyLine} variant="bubble" y={0.4} />
+        <Subtitle
+          text={props.empathyLine}
+          variant="bubble"
+          y={productFirst ? 0.13 : 0.4}
+        />
         <Narration src={props.narration?.[1]} />
       </Sequence>
 
       {/* 제품 노출: 장점1에서 한 번 등장한 뒤 CTA 직전까지 화면 전환 없이 쭉 유지.
           (같은 상품 사진이 장면마다 다시 팝인되면 3번 전환되는 것처럼 보여서
            하나의 연속 노출로 합침 - 자막만 장점1→장점2→확인할 점으로 바뀐다) */}
-      <Sequence
-        from={f(T.product.from)}
-        durationInFrames={ctaFrom - f(T.product.from)}
-      >
+      <Sequence from={productFrom} durationInFrames={ctaFrom - productFrom}>
         <ProductOverlay
           productName={props.productName}
           productImageUrl={props.productImageUrl}

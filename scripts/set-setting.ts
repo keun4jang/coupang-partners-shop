@@ -28,6 +28,8 @@ const ALLOWED: Record<string, { check: (v: string) => boolean; hint: string }> =
     check: (v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 12,
     hint: "1~12 사이 정수",
   },
+  // 포맷 D 에서 제품 카드를 첫 장면부터 띄울지. worker/render-worker.ts 가 읽는다.
+  d_product_first: { check: (v) => v === "on" || v === "off", hint: "on 또는 off" },
 };
 
 async function main(): Promise<void> {

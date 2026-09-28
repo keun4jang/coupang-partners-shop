@@ -255,6 +255,10 @@ async function renderVideo(
     (designSetting && /^[A-E]$/.test(designSetting) ? designSetting : null) ??
     optionalEnv("FORCE_TEMPLATE") ??
     item.template_type;
+  // 포맷 D "제품 먼저" 실험 스위치 (remotion/types.ts productFirst 참고)
+  if (effectiveTemplate === "D" && (await getSetting("d_product_first"))?.trim() === "on") {
+    inputProps.productFirst = true;
+  }
 
   // 포맷 D/E 배경 우선순위:
   // ⓪ 직접 업로드 소재(스튜디오) → ① 상품 영상 자동 소싱 → ② 스톡 → ③ 폴백
@@ -433,7 +437,9 @@ async function renderVideo(
   const videoPath = path.join(outDir, driveFileName(item.display_number, product.product_name, "video"));
   const thumbnailPath = path.join(outDir, driveFileName(item.display_number, product.product_name, "thumbnail"));
 
-  console.log(`렌더링 시작: ${compositionId} → ${videoPath}`);
+  console.log(
+    `렌더링 시작: ${compositionId}${inputProps.productFirst ? " (제품 먼저)" : ""} → ${videoPath}`
+  );
   await renderMedia({
     composition,
     serveUrl,
