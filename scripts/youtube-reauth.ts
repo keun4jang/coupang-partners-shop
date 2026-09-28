@@ -11,9 +11,11 @@
  *   3) step=exchange, code=<복사한 값> → 토큰 교환 → 권한 검사 → app_settings 저장
  *
  * 안전장치:
- *  - 새 토큰에 force-ssl(자막 억제·설명란 수정에 필요)과 분석 권한이 모두 있어야만
- *    저장한다. 하나라도 빠지면 기존 토큰을 그대로 두고 실패로 끝낸다. 권한이
- *    모자란 토큰으로 덮어쓰면 발행 파이프라인의 자막·설명란 기능이 깨진다.
+ *  - 새 토큰에 force-ssl(자막 억제·설명란 수정에 필요)과 분석 권한이 모두 있고,
+ *    지금 발행 중인 채널과 같은 채널일 때만 저장한다. 아니면 기존 토큰을 그대로 둔다.
+ *    (권한이 모자라거나 다른 채널 토큰으로 덮어쓰면 발행이 깨진다.)
+ *  - 분석 API 호출이 실패해도(예: 콘솔에서 API 가 꺼져 있음) 채널이 맞으면 저장하고
+ *    원인을 찍는다 - 새 토큰은 지금 토큰의 상위 호환이라 잃는 게 없다.
  *  - 토큰 값은 로그에 절대 찍지 않는다.
  *  - 리프레시 토큰은 발급한 클라이언트에 묶이므로, 워커가 쓰는 것과 같은
  *    YOUTUBE_OAUTH_CLIENT_ID/SECRET 으로 발급한다(드라이브 클라이언트 아님).
@@ -45,6 +47,42 @@ async function clientCreds(): Promise<{ id: string; secret: string }> {
     throw new Error("YOUTUBE_OAUTH_CLIENT_ID / SECRET 을 app_settings·환경변수 어디에서도 찾지 못했습니다.");
   }
   return { id, secret };
+}
+
+interface Channel {
+  id: string;
+  title: string;
+}
+
+/** 액세스 토큰이 가리키는 내 채널 (youtube.force-ssl·upload 로 읽을 수 있다) */
+async function myChannel(accessToken: string): Promise<Channel | null> {
+  const res = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { items?: { id: string; snippet?: { title?: string } }[] };
+  const item = data.items?.[0];
+  return item ? { id: item.id, title: item.snippet?.title ?? "" } : null;
+}
+
+/** 지금 app_settings 에 저장된 토큰의 채널 - 새 토큰이 같은 채널인지 비교용 */
+async function currentTokenChannel(id: string, secret: string): Promise<Channel | null> {
+  const s = await getSettings(["YOUTUBE_OAUTH_REFRESH_TOKEN"]);
+  const refresh = s.YOUTUBE_OAUTH_REFRESH_TOKEN ?? process.env.YOUTUBE_OAUTH_REFRESH_TOKEN;
+  if (!refresh) return null;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: id,
+      client_secret: secret,
+      refresh_token: refresh,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as { access_token?: string };
+  return json.access_token ? myChannel(json.access_token) : null;
 }
 
 async function printUrl(): Promise<void> {
@@ -107,19 +145,46 @@ async function exchange(raw: string): Promise<void> {
     );
   }
 
-  // 저장 전에 실제로 분석 API 가 열리는지 확인한다(채널 계정이 맞는지도 여기서 걸러진다).
+  // ① 어느 채널로 동의했나 - 지금 발행에 쓰는 토큰과 같은 채널이어야 한다.
+  //    (2026-09-28 첫 시도: 권한 3개는 다 받았는데 분석 API 가 403 이었고, 오류
+  //     내용을 안 찍어서 "API 꺼짐"인지 "다른 계정"인지 가릴 수 없었다.)
+  const newChannel = await myChannel(json.access_token);
+  console.log(`새 토큰의 채널: ${newChannel ? `${newChannel.title} (${newChannel.id})` : "(채널 없음)"}`);
+  const currentChannel = await currentTokenChannel(id, secret);
+  console.log(`지금 쓰는 토큰의 채널: ${currentChannel ? `${currentChannel.title} (${currentChannel.id})` : "(확인 불가)"}`);
+  if (!newChannel) {
+    throw new Error("새 토큰에 연결된 유튜브 채널이 없습니다 - 동의할 때 채널 계정(브랜드 계정이면 그 채널)을 골라야 합니다. 저장하지 않았습니다.");
+  }
+  if (currentChannel && currentChannel.id !== newChannel.id) {
+    throw new Error("지금 발행 중인 채널과 다른 채널로 동의했습니다 - 저장하지 않았습니다(잘못 저장하면 다른 채널에 업로드된다).");
+  }
+
+  // ② 분석 API 확인. 채널이 맞으면 여기서 실패해도 저장한다 - 새 토큰은 지금
+  //    토큰의 권한에 분석을 더한 것이라 잃는 게 없고, API 를 켜는 건 토큰과 무관하게
+  //    나중에 콘솔에서 할 수 있다(다시 동의할 필요 없음).
   const end = new Date().toISOString().slice(0, 10);
   const start = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
   const probe = await fetch(
     `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&startDate=${start}&endDate=${end}&metrics=views,averageViewPercentage`,
     { headers: { Authorization: `Bearer ${json.access_token}` } }
   );
-  if (!probe.ok) {
-    throw new Error(`분석 API 확인 실패(${probe.status}) - 저장하지 않았습니다. 채널 소유 계정으로 동의했는지 확인하세요.`);
+  if (probe.ok) {
+    const report = (await probe.json()) as { rows?: number[][] };
+    const row = report.rows?.[0];
+    console.log(`분석 API 확인: 최근 28일 조회 ${row?.[0] ?? "?"} · 평균 조회율 ${row?.[1] ?? "?"}%`);
+  } else {
+    const body = (await probe.json().catch(() => ({}))) as {
+      error?: { message?: string; errors?: { reason?: string }[]; details?: { reason?: string }[] };
+    };
+    const reason =
+      body.error?.details?.find((d) => d.reason)?.reason ??
+      body.error?.errors?.[0]?.reason ??
+      "";
+    console.log(`분석 API 확인 실패(${probe.status}) ${reason}: ${(body.error?.message ?? "").slice(0, 200)}`);
+    if (/SERVICE_DISABLED|accessNotConfigured/i.test(`${reason} ${body.error?.message ?? ""}`)) {
+      console.log("→ 구글 클라우드 콘솔에서 이 프로젝트의 'YouTube Analytics API' 를 사용 설정해야 합니다(토큰은 그대로 쓰면 됨).");
+    }
   }
-  const report = (await probe.json()) as { rows?: number[][] };
-  const row = report.rows?.[0];
-  console.log(`분석 API 확인: 최근 28일 조회 ${row?.[0] ?? "?"} · 평균 조회율 ${row?.[1] ?? "?"}%`);
 
   const ok = await setSetting("YOUTUBE_OAUTH_REFRESH_TOKEN", json.refresh_token);
   if (!ok) throw new Error("app_settings 저장 실패");
