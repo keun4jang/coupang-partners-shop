@@ -17,6 +17,7 @@ on:
         type: choice
         options:
           - subid-probe
+          - google-keys-probe
 
 concurrency:
   group: diag
