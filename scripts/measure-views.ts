@@ -113,7 +113,10 @@ async function main() {
 
   showWeekly(afterDetail);
 
-  await showRetention(yt);
+  await showRetention(
+    yt,
+    new Map(items.map((it) => [it.youtube_video_id, it.display_number]))
+  );
 }
 
 /**
@@ -170,7 +173,10 @@ function showWeekly(rows: { v: number; pub: string }[]): void {
  * 업로드 토큰(youtube.upload)에는 이 권한이 없을 수 있다. 그때는 무엇을 해야
  * 하는지 찍어주고 조용히 넘어간다 - 조회수 실측까지 같이 죽일 이유가 없다.
  */
-async function showRetention(yt: ReturnType<typeof google.youtube>): Promise<void> {
+async function showRetention(
+  yt: ReturnType<typeof google.youtube>,
+  numberByVideoId: Map<string, number>
+): Promise<void> {
   void yt;
   const oauth2 = new google.auth.OAuth2(
     process.env.YOUTUBE_OAUTH_CLIENT_ID!,
@@ -179,31 +185,65 @@ async function showRetention(yt: ReturnType<typeof google.youtube>): Promise<voi
   oauth2.setCredentials({ refresh_token: process.env.YOUTUBE_OAUTH_REFRESH_TOKEN! });
   const analytics = google.youtubeAnalytics({ version: "v2", auth: oauth2 });
 
-  const end = new Date().toISOString().slice(0, 10);
-  const start = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
-  console.log(`\n── 시청 지속률 (최근 30일, ${start} ~ ${end}) ──`);
+  const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+  const end = day(0);
+  console.log(`\n── 시청 지속률 (최근 30일, ${day(30)} ~ ${end}) ──`);
+
+  // "유효 조회 비율"(engagedViews ÷ views)을 첫 1~2초 생존율의 대용으로 쓴다.
+  //
+  // 평균 조회율(averageViewPercentage)은 넘기지 않고 본 사람 기준이라 높게 나온다 -
+  // 2026-09-28 채널 30일 평균 조회율은 65.8%였는데, 스튜디오의 "계속 시청함"은
+  // 12.6%(87.4%가 바로 넘김)였다. 평균 조회율만 보면 "잘 보는데 안 누른다"로 잘못
+  // 읽힌다. 스튜디오 같은 기간 유효 조회수/조회수가 1.5천/1.1만 ≈ 13.6% 로 계속 시청
+  // 비율과 거의 같아서, API 로 읽을 수 있는 이 비율을 핵심 지표로 쓴다.
   try {
     const res = await analytics.reports.query({
       ids: "channel==MINE",
-      startDate: start,
+      startDate: day(30),
       endDate: end,
-      metrics: "views,averageViewDuration,averageViewPercentage",
+      metrics: "views,engagedViews,averageViewDuration,averageViewPercentage",
     });
     const row = (res.data.rows ?? [])[0] as number[] | undefined;
     if (!row) {
       console.log("  데이터가 비어 있습니다.");
       return;
     }
-    const [views, avgSec, avgPct] = row;
-    console.log(`  조회 ${Number(views).toLocaleString()}`);
-    console.log(`  평균 시청 시간 ${avgSec}초`);
-    console.log(`  평균 조회율 ${Number(avgPct).toFixed(1)}%`);
-    console.log("  (30% 미만이면 첫 2초 후킹 문제. 50% 이상인데 클릭이 없으면 링크 안내·랜딩 문제)");
+    const [views, engaged, avgSec, avgPct] = row.map(Number);
+    console.log(`  조회 ${views.toLocaleString()} · 유효 조회 ${engaged.toLocaleString()}`);
+    console.log(`  유효 조회 비율 ${views ? ((engaged / views) * 100).toFixed(1) : "-"}%  ← 핵심 (첫 1~2초 생존율 대용)`);
+    console.log(`  평균 시청 시간 ${avgSec}초 · 평균 조회율 ${avgPct.toFixed(1)}% (넘기지 않은 사람 기준이라 높게 나온다)`);
   } catch (e) {
     const msg = (e as Error).message;
     console.log(`  읽지 못했습니다: ${msg.slice(0, 160)}`);
-    console.log("  지금 토큰에는 분석 권한이 없습니다. youtube-reauth 워크플로로 재발급하세요");
-    console.log("  (step=url → 동의 → step=exchange). force-ssl 권한까지 확인한 뒤에만 저장합니다.");
+    console.log("  권한 문제면 youtube-reauth 워크플로로 재발급하세요(step=url → 동의 → step=exchange).");
+    return;
+  }
+
+  // 영상별 비교 (최근 14일 조회 상위 20편). 포맷 D/E 판정(X-003)에 쓴다.
+  try {
+    const res = await analytics.reports.query({
+      ids: "channel==MINE",
+      startDate: day(14),
+      endDate: end,
+      dimensions: "video",
+      metrics: "views,engagedViews,averageViewPercentage",
+      sort: "-views",
+      maxResults: 20,
+    });
+    const rows = (res.data.rows ?? []) as (string | number)[][];
+    console.log(`\n  영상별 (최근 14일 조회 상위 ${rows.length}편) - 번호 · 조회 · 유효 비율 · 평균 조회율`);
+    for (const r of rows) {
+      const [vid, v, ev, pct] = r;
+      const n = numberByVideoId.get(String(vid));
+      const views = Number(v);
+      const ratio = views ? ((Number(ev) / views) * 100).toFixed(1) : "-";
+      console.log(
+        `    ${n ? `${n}번`.padEnd(6) : String(vid).padEnd(6)} 조회 ${String(views).padStart(5)} · 유효 ${String(ratio).padStart(5)}% · 평균 조회율 ${Number(pct).toFixed(1)}%`
+      );
+    }
+    console.log("  (9/28 이후 올라간 번호가 포맷 D. 유효 비율 기준선: D 약 22% / E 약 8%)");
+  } catch (e) {
+    console.log(`  영상별 조회 실패: ${(e as Error).message.slice(0, 160)}`);
   }
 }
 
