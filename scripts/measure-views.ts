@@ -202,9 +202,8 @@ async function showRetention(yt: ReturnType<typeof google.youtube>): Promise<voi
   } catch (e) {
     const msg = (e as Error).message;
     console.log(`  읽지 못했습니다: ${msg.slice(0, 160)}`);
-    console.log("  업로드 전용 토큰에는 분석 권한이 없습니다. 보려면 스코프에");
-    console.log("  yt-analytics.readonly 를 넣어 다시 인증해야 합니다:");
-    console.log("    SCOPE=youtube node scripts/google-oauth.mjs url");
+    console.log("  지금 토큰에는 분석 권한이 없습니다. youtube-reauth 워크플로로 재발급하세요");
+    console.log("  (step=url → 동의 → step=exchange). force-ssl 권한까지 확인한 뒤에만 저장합니다.");
   }
 }
 

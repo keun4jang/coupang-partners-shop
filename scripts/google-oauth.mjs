@@ -27,10 +27,13 @@ import fs from "node:fs";
 //   유튜브만:           SCOPE=youtube node scripts/google-oauth.mjs url
 const SCOPE_PRESETS = {
   drive: "https://www.googleapis.com/auth/drive",
-  // yt-analytics.readonly: 시청 지속률(평균 조회율) 조회용. 업로드 권한만으로는
-  // 분석 API 가 403 이라, 그 숫자를 보려면 이 스코프로 다시 인증해야 한다.
+  // youtube.force-ssl: 자막 억제·설명란 수정에 필요 (지금 쓰는 토큰에 들어 있다 -
+  //   빠진 토큰으로 바꾸면 그 기능이 깨진다. 2026-09-28 에 빠진 채로 적혀 있던 걸 바로잡음).
+  // yt-analytics.readonly: 시청 지속률(평균 조회율) 조회용.
+  // 재발급은 youtube-reauth 워크플로(scripts/youtube-reauth.ts)를 쓰는 편이 안전하다 -
+  // 필수 권한이 다 있을 때만 저장하고, 워커와 같은 유튜브 클라이언트로 발급한다.
   youtube:
-    "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/yt-analytics.readonly",
 };
 const SCOPE =
   SCOPE_PRESETS[process.env.SCOPE] ??
@@ -55,8 +58,13 @@ function parseEnv(path) {
 }
 
 const env = { ...parseEnv(".env.local"), ...parseEnv(".env"), ...process.env };
-const clientId = env.GOOGLE_OAUTH_CLIENT_ID;
-const clientSecret = env.GOOGLE_OAUTH_CLIENT_SECRET;
+// 리프레시 토큰은 발급한 클라이언트에 묶인다. 유튜브 토큰은 워커가 쓰는
+// YOUTUBE_OAUTH_CLIENT_* 로 발급해야 하므로 SCOPE=youtube 면 그쪽을 먼저 쓴다.
+const useYoutubeClient = process.env.SCOPE === "youtube";
+const clientId =
+  (useYoutubeClient && env.YOUTUBE_OAUTH_CLIENT_ID) || env.GOOGLE_OAUTH_CLIENT_ID;
+const clientSecret =
+  (useYoutubeClient && env.YOUTUBE_OAUTH_CLIENT_SECRET) || env.GOOGLE_OAUTH_CLIENT_SECRET;
 
 if (!clientId || !clientSecret) {
   console.error(
