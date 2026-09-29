@@ -14,7 +14,7 @@ import {
   findPolicyIssues,
   stripBannedFromProductName,
 } from "../src/lib/policy";
-import { ctaLine, fallbackCopy, composeScriptText } from "../src/lib/ai";
+import { ctaLine, fallbackCopy, composeScriptText, DISCLOSURE_LINE } from "../src/lib/ai";
 import { youtubeShortsDescription, instagramCaption } from "../src/lib/publishCopy";
 import { youtubeTitle } from "../src/lib/youtube";
 import { longformDescription, longformTitle } from "../src/lib/longform";
@@ -78,6 +78,15 @@ for (const category of Object.keys(CATEGORY_VARIANTS)) {
     const title = youtubeTitle(n, "펜로리스 이동식 선반");
     const caption = instagramCaption(copy.captionText, n);
     const description = youtubeShortsDescription(n, "펜로리스 이동식 선반", "usecase");
+
+    // 고지: 한 번만, 첫 줄은 아니고, 본문 바로 뒤 (2026-09-29 위치 변경)
+    for (const [field, text] of [["캡션", caption], ["설명", description]] as const) {
+      const count = text.split(DISCLOSURE_LINE).length - 1;
+      if (count !== 1 || text.startsWith(DISCLOSURE_LINE)) {
+        failures++;
+        console.error(`✗ [고지 위치] ${field} ${category} ${n}번: ${count}회, 첫 줄=${text.startsWith(DISCLOSURE_LINE)}`);
+      }
+    }
 
     const issues = checkPublishTexts({ title, script, caption, description });
     if (issues.length > 0) {

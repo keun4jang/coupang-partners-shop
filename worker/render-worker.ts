@@ -609,8 +609,8 @@ async function publishToSns(
     if (error) console.warn("채널 URL 즉시 기록 실패(무시):", error.message.slice(0, 100));
   };
 
-  // 캡션 맨 위에 대가성 고지를 붙인다. 발행 직전에 붙이므로 이미 문구가
-  // 만들어져 큐에 들어가 있던 항목에도 그대로 적용된다.
+  // 캡션에 대가성 고지를 붙인다(본문 바로 뒤 - publishCopy.ts 주석). 발행 직전에
+  // 붙이므로 이미 문구가 만들어져 큐에 들어가 있던 항목에도 그대로 적용된다.
   const snsCaption = instagramCaption(captionText, item.display_number);
   // 판매자 상품명에 붙은 마케팅 문구는 지우고 내보낸다(차단이 아니라 정화 -
   // policy.ts stripBannedFromProductName 주석 참고). 이게 없으면 "쿠팡특가 …"
