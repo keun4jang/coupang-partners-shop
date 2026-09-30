@@ -217,6 +217,15 @@ async function printBlockedByDate(since: string): Promise<void> {
     for (const [reason, n] of [...byReason.entries()].sort((a, b) => b[1] - a[1])) {
       console.log(`    ${reason.padEnd(26)} ${String(n).padStart(6)}`);
     }
+    // 날짜 × 사유. 필터 하나를 바꾼 날 전후로 어느 사유가 늘고 줄었는지는 합계만으론
+    // 안 보인다(2026-09-30 월말 대조: longform:desktop-noref 가 한 건도 없는 게
+    // "걸러낼 게 없었다"인지 "규칙이 안 돌았다"인지 가르려면 날짜별 사유가 필요했다).
+    console.log("  날짜 × 사유:");
+    for (const r of [...blocked].sort(
+      (a, b) => a.event_date.localeCompare(b.event_date) || b.event_count - a.event_count
+    )) {
+      console.log(`    ${r.event_date}  ${r.reason.padEnd(26)} ${String(r.event_count).padStart(6)}`);
+    }
   }
 
   // 센 요청의 정체. 필터에 안 걸리는 트래픽이 누구인지 여기서만 알 수 있다.
