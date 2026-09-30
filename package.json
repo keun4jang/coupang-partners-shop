@@ -31,6 +31,8 @@
     "selector:check": "tsx scripts/selector-selftest.ts",
     "scout-keywords:check": "tsx scripts/scout-keywords-selftest.ts",
     "subid:check": "tsx scripts/subid-selftest.ts",
+    "guard:check": "tsx scripts/guardrails-selftest.ts",
+    "marketer:gate": "tsc --noEmit && tsx scripts/guardrails-selftest.ts && tsx scripts/policy-selftest.ts && tsx scripts/botfilter-selftest.ts && tsx scripts/subid-selftest.ts && tsx scripts/selector-selftest.ts && tsx scripts/scout-keywords-selftest.ts && tsx scripts/imagecheck-selftest.ts && tsx scripts/broll-filter-check.ts",
     "metrics:links": "tsx scripts/metrics-links.ts"
   },
   "dependencies": {
