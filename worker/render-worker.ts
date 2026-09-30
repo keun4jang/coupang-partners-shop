@@ -43,6 +43,7 @@ import {
 } from "../src/lib/drive";
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
+import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
 import {
   checkPublishTexts,
@@ -611,6 +612,9 @@ async function publishToSns(
 
   // 캡션에 대가성 고지를 붙인다(본문 바로 뒤 - publishCopy.ts 주석). 발행 직전에
   // 붙이므로 이미 문구가 만들어져 큐에 들어가 있던 항목에도 그대로 적용된다.
+  // 이 영상 번호가 쿠팡 서버에 묶인 짧은 링크를 발행 전에 받아 둔다(쿠팡 호출 1번).
+  // 실패해도 발행은 계속되고, 링크 이동은 예전 방식으로 폴백된다.
+  await ensureSubLink(item.id);
   const snsCaption = instagramCaption(captionText, item.display_number);
   // 판매자 상품명에 붙은 마케팅 문구는 지우고 내보낸다(차단이 아니라 정화 -
   // policy.ts stripBannedFromProductName 주석 참고). 이게 없으면 "쿠팡특가 …"
@@ -1339,6 +1343,8 @@ async function processPending(): Promise<number> {
   // 토큰도 따로다 - 둘 다 갱신한다(미설정이면 각자 조용히 넘어간다).
   await maybeRefreshAliToken();
   await maybeRefreshAffiliateToken();
+  // 예전 영상의 쿠팡 짧은 링크(v번호) 채우기 - 시간당 10개까지 (src/lib/subLinks.ts)
+  await backfillSubLinks();
 
   const db = supabaseAdmin();
   const { data, error } = await db

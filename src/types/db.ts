@@ -82,6 +82,12 @@ export interface VideoItem {
   manual: boolean;
   /** 스튜디오(직접 업로드 소재) - Storage 'footage' 버킷 영상 경로 목록. 있으면 이 영상을 배경으로 렌더 */
   footage_paths: string[] | null;
+  /**
+   * 쿠팡 딥링크 API 에 subId=v{번호} 를 줘서 받은 짧은 링크 (src/lib/subLinks.ts).
+   * 있으면 /go·/api/click 이 이 링크로 보낸다. 마이그레이션
+   * (20260930_video_sub_link.sql) 전이거나 아직 발급 전이면 비어 있다.
+   */
+  coupang_sub_url?: string | null;
   error_message: string | null;
   created_at: string;
   updated_at: string;

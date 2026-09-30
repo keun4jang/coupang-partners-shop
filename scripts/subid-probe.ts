@@ -13,7 +13,7 @@
  *   3) 딥링크 API 에 subId 를 줬을 때 나오는 링크
  *   4) 커미션 리포트에 subId 가 한 번이라도 찍힌 적 있나
  *
- * 쿠팡 API 호출은 딱 4번이다(시간당 한도 보호 - 스카우트 시각을 피해서 돌린다).
+ * 쿠팡 API 호출은 딱 4번이다(⑤는 DB 만 본다)(시간당 한도 보호 - 스카우트 시각을 피해서 돌린다).
  * 추적 코드(lptag)·토큰 같은 값은 로그에 남기지 않고 이름과 "비었나/우리 값인가"만 찍는다.
  */
 import dotenv from "dotenv";
@@ -126,6 +126,19 @@ async function main(): Promise<void> {
   for (const r of rows) subs.set(r.subId || "(빈 값)", (subs.get(r.subId || "(빈 값)") ?? 0) + r.click);
   if (subs.size === 0) console.log("  리포트 행 없음");
   for (const [k, v] of subs) console.log(`  ${k}: 클릭 ${v}`);
+
+  // ⑤ 영상별 짧은 링크 채움 현황 (쿠팡 호출 없음 - DB 만 본다, 2026-09-30 추가)
+  console.log("\n⑤ 영상별 쿠팡 짧은 링크 (video_items.coupang_sub_url)");
+  const db = supabaseAdmin();
+  const head = { count: "exact" as const, head: true };
+  const filled = await db.from("video_items").select("id", head).like("coupang_sub_url", "https://%");
+  if (filled.error) {
+    console.log(`  읽지 못함 (마이그레이션 전?): ${filled.error.message.slice(0, 100)}`);
+    return;
+  }
+  const empty = await db.from("video_items").select("id", head).eq("coupang_sub_url", "");
+  const pending = await db.from("video_items").select("id", head).is("coupang_sub_url", null);
+  console.log(`  발급됨 ${filled.count ?? 0} · 발급 불가(예전 방식) ${empty.count ?? 0} · 대기 ${pending.count ?? 0}`);
 }
 
 main().catch((e) => {

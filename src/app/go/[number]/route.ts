@@ -93,12 +93,14 @@ export async function GET(
   }
 
   // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚는다.
+  // 쿠팡이 v번호를 서버에 묶어 발급한 짧은 링크가 있으면 그걸 쓴다(가장 확실 -
+  // lib/subLinks.ts). 아직 없으면 쿼리로 덧붙이는 예전 방식.
   // 알리는 subId 개념이 없고 제휴 링크에 쿼리를 덧붙이면 링크가 깨질 수 있어
   // 쿠팡일 때만 붙인다 (/api/click 과 같은 규칙).
   const finalUrl =
     item.products.source === "aliexpress"
       ? target
-      : withSubId(target, `v${displayNumber}`);
+      : item.coupang_sub_url || withSubId(target, `v${displayNumber}`);
 
   return NextResponse.redirect(finalUrl, 302);
 }
