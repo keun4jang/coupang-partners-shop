@@ -63,6 +63,20 @@ function describe(label: string, raw: string | undefined): Map<string, string> {
   return out;
 }
 
+/** 원문·URL 디코딩·base64(url) 디코딩 결과 - 인코딩된 파라미터 안을 들여다보기 위함 */
+function decodings(v: string): string[] {
+  const out = [v];
+  try {
+    out.push(decodeURIComponent(v));
+  } catch {}
+  for (const x of [...out]) {
+    try {
+      out.push(Buffer.from(x.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    } catch {}
+  }
+  return out;
+}
+
 async function main(): Promise<void> {
   await loadCoupangCredsFromSettings();
 
@@ -86,6 +100,14 @@ async function main(): Promise<void> {
   const changed = [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k));
   console.log(`  → 달라진 파라미터: ${changed.length ? changed.join(", ") : "(없음)"}`);
   console.log(`  → 같은 상품인가: ${plain && withSub && plain.productId === withSub.productId ? "예" : "아니오/확인불가"}`);
+  // subid 말고 다른 파라미터 안에도 우리가 준 값이 숨어 있나 (2026-09-30 추가).
+  // clickBeacon 처럼 인코딩된 값에 채널 아이디가 들어 있다면, 쿠팡은 그쪽으로 귀속하고
+  // 우리가 쿼리로 덧붙이는 subid 는 무시될 수 있다. 값 자체는 찍지 않고 "들어 있나"만 본다.
+  const hidden = [...b.entries()]
+    .filter(([k]) => k.toLowerCase() !== "subid")
+    .filter(([, v]) => decodings(v).some((d) => d.includes(PROBE_SUB)))
+    .map(([k]) => k);
+  console.log(`  → subid 외에 우리 값이 들어 있는 파라미터: ${hidden.length ? hidden.join(", ") : "(없음)"}`);
 
   console.log("\n③ 딥링크 API 에 subId 를 줬을 때");
   const pageUrl = stored.map(productPageUrlFromPartnerUrl).find(Boolean) ?? null;
