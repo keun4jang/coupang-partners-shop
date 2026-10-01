@@ -150,6 +150,24 @@ export async function makeFilePublic(fileId: string): Promise<void> {
   });
 }
 
+/**
+ * 드라이브 파일 삭제 (2026-10-01 사장님 요청: 만든 영상을 드라이브에 쌓지 않는다).
+ * 인스타·페북 릴스는 공개 URL 로만 올릴 수 있어 발행 직전 잠깐 올렸다가, 발행이
+ * 끝나면 지운다. 이미 없으면(404) 조용히 넘어간다. 실패해도 throw 하지 않는다 -
+ * 지우기 실패 때문에 발행 기록이 틀어지면 안 된다.
+ */
+export async function deleteDriveFile(fileId: string): Promise<boolean> {
+  try {
+    await driveClient().files.delete({ fileId, supportsAllDrives: true });
+    return true;
+  } catch (e) {
+    const status = (e as { code?: number }).code;
+    if (status === 404) return true;
+    console.warn(`드라이브 파일 삭제 실패(무시): ${(e as Error).message.slice(0, 150)}`);
+    return false;
+  }
+}
+
 /** 로그인 없이 바이너리를 직접 내려받을 수 있는 링크 (makeFilePublic 후에만 유효) */
 export function driveDirectDownloadUrl(fileId: string): string {
   return `https://drive.google.com/uc?export=download&id=${fileId}`;

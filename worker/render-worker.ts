@@ -13,8 +13,8 @@
  *   → generating 표시
  *   → (문구가 없으면) AI 문구 생성
  *   → Remotion 렌더 (mp4 + 썸네일 png)
- *   → 캡션 txt 생성
- *   → 구글드라이브 업로드 (coupang-shorts/YYYY-MM-DD/)
+ *   → (인스타·페북·예약 발행일 때만) 구글드라이브 임시 업로드 → 발행 후 삭제
+ *   → 유튜브·인스타·페북 업로드
  *   → video_items 갱신 (completed)
  *   → 텔레그램 완료 알림
  */
@@ -36,7 +36,7 @@ import { sendTelegramMessage } from "../src/lib/telegram";
 import {
   ensureDateFolder,
   uploadFileToDrive,
-  uploadTextToDrive,
+  deleteDriveFile,
   makeFilePublic,
   driveDirectDownloadUrl,
   downloadDriveFile,
@@ -792,15 +792,24 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
 
     let driveVideoUrl: string | null = null;
     let driveVideoFileId: string | null = null;
-    let driveCaptionUrl: string | null = null;
-    let driveThumbnailUrl: string | null = null;
+    // 썸네일·캡션은 더 이상 드라이브에 올리지 않는다 - DB 칸은 비워 둔다
+    const driveCaptionUrl: string | null = null;
+    const driveThumbnailUrl: string | null = null;
     let driveNote: string | null = null;
 
-    if (hasDriveEnv()) {
+    // 드라이브는 이제 "보관"이 아니라 "잠깐 쓰는 다리"다 (2026-10-01 사장님 요청:
+    // 만든 영상을 드라이브에 저장하지 않는다). 인스타·페북 릴스 API 는 공개 URL 로만
+    // 영상을 받아 가고, 예약 발행은 다음 러너가 영상을 다시 받아야 해서 그때만
+    // 올린다. 즉시 발행은 SNS 업로드가 끝나면 바로 지운다(아래). 썸네일·캡션 파일은
+    // 더 이상 올리지 않는다(쓰는 곳이 없었다).
+    const needsPublicUrl =
+      ((await getSetting("instagram_paused")) !== "1" && hasInstagramEnv()) ||
+      (await facebookConfigured());
+    const needsDrive = item.publish_mode === "scheduled" || needsPublicUrl;
+    if (hasDriveEnv() && needsDrive) {
       // 렌더는 이미 성공했으므로, 업로드가 실패해도 영상 자체는 완료로 남긴다.
-      // (드라이브 설정 문제로 렌더 결과가 통째로 실패 처리되면 안 됨)
       try {
-        console.log("구글드라이브 업로드 중...");
+        console.log("구글드라이브 임시 업로드 중... (발행 후 삭제)");
         const folderId = await ensureDateFolder(dateFolderName());
         const video = await uploadFileToDrive(
           folderId,
@@ -810,28 +819,13 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         );
         driveVideoUrl = video.url;
         driveVideoFileId = video.id;
-        driveThumbnailUrl = (
-          await uploadFileToDrive(
-            folderId,
-            driveFileName(item.display_number, product.product_name, "thumbnail"),
-            "image/png",
-            thumbnailPath
-          )
-        ).url;
-        driveCaptionUrl = (
-          await uploadTextToDrive(
-            folderId,
-            driveFileName(item.display_number, product.product_name, "caption"),
-            captionText
-          )
-        ).url;
       } catch (uploadError) {
         const msg =
           uploadError instanceof Error ? uploadError.message : String(uploadError);
         driveNote = `드라이브 업로드 실패(로컬 보관): ${msg.slice(0, 200)}`;
         console.error(driveNote);
       }
-    } else {
+    } else if (!hasDriveEnv()) {
       console.log("[드라이브 미설정] 로컬 파일로 유지:", videoPath);
     }
 
@@ -886,6 +880,14 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       facebookError,
       policyBlocked,
     } = await publishToSns(item, product, videoPath, driveVideoFileId, captionText, thumbnailPath);
+
+    // SNS 업로드가 끝났으니 드라이브 임시 파일을 지운다(성공·실패 무관 - 실패한
+    // 채널을 다시 올리는 경로는 없다). DB 에도 드라이브 링크를 남기지 않는다.
+    if (driveVideoFileId) {
+      if (await deleteDriveFile(driveVideoFileId)) console.log("드라이브 임시 영상 삭제 완료");
+      driveVideoUrl = null;
+      driveVideoFileId = null;
+    }
 
     // 정책 검사에 걸려 한 채널도 못 올렸으면 completed 로 마감하지 않는다.
     // completed + landing_visible 로 두면 영상 없는 번호가 랜딩에 뜨고,
@@ -970,7 +972,6 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
         `후킹: ${item.hook_text ?? "-"}`,
         `링크페이지: ${siteUrl()}/?q=${item.display_number}`,
         `배경 소스: ${brollOrigin}`,
-        `구글드라이브: ${driveVideoUrl ?? `(로컬) ${videoPath}`}`,
         ...(driveNote ? [`※ ${driveNote}`] : []),
         `유튜브: ${youtubeUrl ?? (youtubeError ? `실패 - ${youtubeError.slice(0, 100)}` : "미설정")}`,
         `인스타: ${instagramUrl ?? (instagramError ? `실패 - ${instagramError.slice(0, 100)}` : "미설정")}`,
@@ -1065,10 +1066,14 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
     // rendered 로 되돌리면 15분마다 같은 검사에 다시 걸려 드라이브 재다운로드와
     // 텔레그램 알림이 무한 반복된다.
     if (sns.policyBlocked) {
+      // 실패 처리되면 문구부터 다시 만들어 재렌더하므로 이 영상 파일은 다시 안 쓴다
+      await deleteDriveFile(row.drive_video_file_id);
       await db
         .from("video_items")
         .update({
           video_status: "failed",
+          drive_video_url: null,
+          drive_video_file_id: null,
           landing_visible: false,
           error_message: (sns.youtubeError ?? "정책 위반으로 발행 중단").slice(0, 500),
           script_text: null,
@@ -1078,11 +1083,18 @@ async function publishRendered(row: VideoItemWithProduct): Promise<boolean> {
       return false;
     }
 
+    // 발행이 끝났으니 드라이브 임시 영상을 지운다(2026-10-01, 드라이브에 보관하지 않음)
+    await deleteDriveFile(row.drive_video_file_id);
+
     const { error: completeError } = await db
       .from("video_items")
       .update({
         video_status: "completed",
         published_at: new Date().toISOString(),
+        drive_video_url: null,
+        drive_video_file_id: null,
+        drive_thumbnail_url: null,
+        drive_caption_url: null,
         youtube_url: sns.youtubeUrl,
         youtube_error: sns.youtubeError,
         instagram_url: sns.instagramUrl,
