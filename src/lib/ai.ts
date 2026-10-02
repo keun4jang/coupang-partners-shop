@@ -19,6 +19,7 @@ import {
   BANNED_PHRASES,
   DISCLOSURE_LINE,
   POLICY_BANNED_PHRASES,
+  HEALTH_CLAIM_PHRASES,
   stripBannedFromProductName,
 } from "./policy";
 
@@ -169,7 +170,7 @@ export function findPolicyViolations(copy: VideoCopy): string[] {
     copy.checkPoint,
     (copy.captionText ?? "").replace(DISCLOSURE_LINE, ""),
   ].join("\n");
-  return POLICY_BANNED_PHRASES.filter((p) => body.includes(p));
+  return [...POLICY_BANNED_PHRASES, ...HEALTH_CLAIM_PHRASES].filter((p) => body.includes(p));
 }
 
 /**
@@ -282,10 +283,10 @@ export function fallbackCopy(
     `${shortenProductName(stripBannedFromProductName(product.product_name))}, ${copy.benefit1}. ${copy.benefit2}.`,
     copy.usageTip,
     "",
-    "쿠팡 카테고리 베스트에서 눈에 띈 살림템을 번호로 정리하고 있어요.",
+    "쿠팡에서 찾은 살림템을 번호로 정리하고 있어요.",
     `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`,
     "",
-    "#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템",
+    "#살림템 #생활템 #쿠팡추천템 #추천템",
   ].join("\n");
 
   return copy;
@@ -434,12 +435,13 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
 캡션 규칙:
 - 본문은 후킹+공감+장점을 자연스럽게 2~3문장으로.
 - 첫 문장이 접힌 캡션에서 유일하게 보이는 줄이다 - 훅의 궁금증을 이어받아 더보기를 누르게 쓴다.
-- "쿠팡 카테고리 베스트에서 눈에 띈 살림템을 번호로 정리하고 있어요." 처럼
+- "쿠팡에서 찾은 살림템을 번호로 정리하고 있어요." 처럼
   우리가 실제로 하는 일만 적는다. 후기 수·평점·판매량은 우리가 가진 데이터가
   아니므로 언급하지 않는다(직접 사용해봤다는 표현도 금지).
 - 반드시 "프로필 첫 화면에 최근 번호 정리해 뒀어요. ({번호}번)" 문장 포함 (번호는 "17번"처럼 앞자리 0 없이).
 - 캡션에도 클릭 유도·긴급성·과장 표현을 쓰지 않는다(영상 본문과 같은 규정 적용).
-- 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #아이엄마살림 #추천템 등).`;
+- 살균·항균·99.9%·숙면·면역·통증 완화 같은 효능·의학적 표현은 쓰지 않는다(검증하지 않은 효능 광고).
+- 마지막 줄에 해시태그 5개 내외 (#살림템 #생활템 #쿠팡추천템 #추천템 등).`;
 
 /** Gemini responseSchema 는 OpenAPI 서브셋(타입 대문자, additionalProperties 미지원) */
 const GEMINI_COPY_SCHEMA = {

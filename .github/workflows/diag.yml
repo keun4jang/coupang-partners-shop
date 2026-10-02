@@ -18,6 +18,7 @@ on:
         options:
           - subid-probe
           - google-keys-probe
+          - longform-report
 
 concurrency:
   group: diag

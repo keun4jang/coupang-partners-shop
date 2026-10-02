@@ -116,6 +116,33 @@ export const BANNED_PHRASES = [
 ];
 
 /**
+ * 효능·의학적 표현 (2026-10-03 전략 재점검 추가).
+ * 겨울 가전·생활용품 판매자 제목에 흔한 살균·항균·99.9% 같은 표현을 영상·캡션에
+ * 그대로 옮기면, 우리가 검증하지 않은 효능을 광고하는 셈이 된다(표시광고법 위험).
+ * 문구에서는 막고(폴백), 상품명에서는 지운다(stripBannedFromProductName).
+ */
+export const HEALTH_CLAIM_PHRASES = [
+  "살균",
+  "항균",
+  "제균",
+  "멸균",
+  "바이러스",
+  "세균",
+  "99.9",
+  "미세먼지 제거",
+  "전자파",
+  "숙면",
+  "면역",
+  "치료",
+  "완화",
+  "예방",
+  "탈모",
+  "혈액순환",
+  "통증",
+  "의료기기",
+];
+
+/**
  * 숫자가 섞여 낱말 목록으로는 못 잡는 위반 표현.
  *
  * "80％OFF", "50% 할인" 같은 할인율 표기가 대표적이다. 쿠팡파트너스는 확인되지
@@ -140,6 +167,7 @@ export function findPolicyIssues(text: string): string[] {
   const hits = [
     ...POLICY_BANNED_PHRASES.filter((p) => body.includes(p)),
     ...BANNED_PHRASES.filter((p) => body.includes(p)),
+    ...HEALTH_CLAIM_PHRASES.filter((p) => body.includes(p)),
   ];
   for (const { label, re } of REGEX_BANNED) {
     // 전역 정규식은 lastIndex 가 남으므로 매번 초기화한다(안 하면 호출마다 결과가 달라진다)
@@ -195,7 +223,7 @@ export function stripBannedFromProductName(name: string): string {
   let out = name ?? "";
 
   // 긴 표현부터 지운다. "대박"을 먼저 지우면 "대박템"이 "템"이라는 부스러기로 남는다.
-  const phrases = [...POLICY_BANNED_PHRASES, ...BANNED_PHRASES].sort(
+  const phrases = [...POLICY_BANNED_PHRASES, ...BANNED_PHRASES, ...HEALTH_CLAIM_PHRASES].sort(
     (a, b) => b.length - a.length
   );
   for (const phrase of phrases) {

@@ -11,7 +11,7 @@
  *    (공정위 지침 + 쿠팡파트너스 정책 - 위반 시 계정 정지 = 수익 0)
  *  - 하루 발행 편수 상한(12) - 유튜브 "대량 생산" 판정 위험
  *  - 설정 워크플로 허용 키에 자격증명류가 섞이지 않았는지
- *  - 쿠팡 스카우트 호출 예산이 시간당 한도(약 75) 아래인지
+ *  - 쿠팡 스카우트 호출 예산, 모든 쿠팡 호출이 장부(최근 60분 35회)를 지나는지
  */
 import fs from "fs";
 import { DISCLOSURE_LINE } from "../src/lib/policy";
@@ -57,7 +57,25 @@ check(
 const scout = read("src/lib/scout.ts");
 const budget = scout.match(/KEYWORDS_PER_RUN\s*=\s*(\d+)/)?.[1];
 check("scout.ts 에서 KEYWORDS_PER_RUN 을 못 찾았다", !!budget);
-if (budget) check(`스카우트 실행당 키워드 ${budget} 이 50 을 넘는다`, Number(budget) <= 50);
+if (budget) check(`스카우트 실행당 키워드 ${budget} 이 20 을 넘는다(장부 상한 35)`, Number(budget) <= 20);
+
+// 6. 쿠팡 API 장부: 모든 호출이 request() 한 곳을 지나고, 거기서 장부 자리를 받는다
+const coupangSrc = read("src/lib/coupang.ts");
+const reqBody = coupangSrc.slice(coupangSrc.indexOf("async function request"), coupangSrc.indexOf("await fetch(url"));
+check("coupang.ts request() 가 fetch 전에 acquireCoupangCall 을 부르지 않는다", reqBody.includes("await acquireCoupangCall("));
+check("coupangLedger 상한이 35 를 넘는다", /COUPANG_ROLLING_CAP\s*=\s*(\d+)/.test(read("src/lib/coupangLedger.ts")) &&
+  Number(read("src/lib/coupangLedger.ts").match(/COUPANG_ROLLING_CAP\s*=\s*(\d+)/)![1]) <= 35);
+function walk(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+    const p = `${dir}/${d.name}`;
+    if (d.isDirectory()) return d.name === "node_modules" ? [] : walk(p);
+    return /\.(ts|tsx|mjs|js)$/.test(d.name) ? [p] : [];
+  });
+}
+for (const f of [...walk("src"), ...walk("worker"), ...walk("scripts")]) {
+  if (f === "src/lib/coupang.ts" || f === "scripts/guardrails-selftest.ts") continue;
+  check(`${f} 가 쿠팡 API 주소를 직접 부른다(장부 우회)`, !read(f).includes("api-gateway.coupang.com"));
+}
 
 if (failures > 0) {
   console.error(`안전장치 점검 실패 ${failures}건 - 푸시하지 않는다`);

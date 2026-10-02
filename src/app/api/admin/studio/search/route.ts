@@ -41,6 +41,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.add) {
+      // 2026-10-03: 도우인 검색 키워드(남의 영상 소싱용)는 더 만들지 않는다.
+      if (process.env.STUDIO_DOUYIN_SOURCING !== "on") {
+        return NextResponse.json({ error: "도우인 영상 소싱은 중단했어요(남의 영상 재사용은 저작권·플랫폼 정책 위험, 2026-10-03). 직접 찍은 영상만 써 주세요." }, { status: 410 });
+      }
       const { douyinKeywords, reason } = await chineseKeywordsFor(
         body.add.productName
       );

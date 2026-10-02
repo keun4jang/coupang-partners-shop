@@ -7,7 +7,13 @@
  *  · 이미 큐에 들어간(문구가 만들어진) 영상에도 같은 규칙이 적용돼야 한다.
  *    발행 시점에 붙이므로 예전 항목도 자동으로 고쳐진다.
  *
- * 고지 위치 (2026-09-29 사장님 결정): 예전엔 캡션·설명 첫 줄이었는데, 접힌 상태에서
+ * 2026-10-03 수정(전략 재점검, 사장님 승인): 첫 줄 맨 앞에 짧은 "[광고]"를 다시 붙인다.
+ * 9/29 처럼 고지를 본문 뒤로만 두면 접힌 캡션('더보기' 앞)에 광고 표시가 없어 공정위
+ * 지침("더보기를 눌러야 확인 가능한 경우 부적절")에 걸릴 수 있다. 긴 문장을 첫 줄에
+ * 두면 광고 느낌이 너무 강하다는 사장님 의견은 그대로 살려, 첫 줄은 "[광고] + 본문
+ * 첫 문장"으로 하고 고지 전문은 본문 바로 뒤에 둔다.
+ *
+ * (이전 기록) 고지 위치 (2026-09-29 사장님 결정): 예전엔 캡션·설명 첫 줄이었는데, 접힌 상태에서
  * 보이는 유일한 줄이 "이 게시물은 쿠팡파트너스…"라 광고 느낌이 너무 강했다.
  * 공정위 「추천·보증 등에 관한 표시·광고 심사지침」의 "동영상 내 표시"는 쇼츠·릴스
  * 화면 하단에 영상 내내 떠 있는 고지(TemplateD Disclosure · TemplateE DisclosureTag)가
@@ -16,6 +22,11 @@
  * 롱폼(longform.ts)은 화면 고지가 영상 내내 있지 않아 설명란 첫 줄을 유지한다.
  */
 import { DISCLOSURE_LINE } from "./ai";
+
+/** 접힌 캡션·설명에서도 보이도록 첫 줄 맨 앞에 붙이는 짧은 광고 표시 */
+export const AD_PREFIX = "[광고]";
+const withAdPrefix = (firstLine: string) =>
+  firstLine.startsWith(AD_PREFIX) ? firstLine : `${AD_PREFIX} ${firstLine}`;
 import { landingUrl, type TemplateVariant } from "./tracking";
 
 /** 숏폼 캡션·설명의 템플릿 변형 (성과 비교용 - 링크에 tpl= 로 실린다) */
@@ -40,7 +51,7 @@ export function youtubeShortsDescription(
   });
 
   return [
-    shortProductName,
+    withAdPrefix(shortProductName),
     "",
     DISCLOSURE_LINE,
     "",
@@ -79,5 +90,5 @@ export function instagramCaption(
 
   // 본문이 통째로 비어 있는 경우(문구 생성 실패)에도 최소한의 안내는 나가야 한다.
   const fallback = `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`;
-  return [body || fallback, "", DISCLOSURE_LINE, ...(tags.length ? ["", ...tags] : [])].join("\n");
+  return [withAdPrefix(body || fallback), "", DISCLOSURE_LINE, ...(tags.length ? ["", ...tags] : [])].join("\n");
 }

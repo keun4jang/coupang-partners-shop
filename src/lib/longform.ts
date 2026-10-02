@@ -92,6 +92,13 @@ function todaysUploadTarget(now: Date): Date {
  * 간격을 조정할 수 있다(기본 1일 = 매일).
  */
 export async function shouldRunLongformToday(now = new Date()): Promise<boolean> {
+  // 2026-10-03 전략 재점검: 매일 자동 TOP10 롱폼을 멈춘다. 40일 동안 사람 클릭이
+  // 거의 0이었고(쿠팡 이동 537건은 구글 안전검사 봇), 반복 콘텐츠 신호만 늘리며
+  // 업로드 한도를 쓴다. 다시 켜려면 app_settings.longform_auto = "on".
+  if ((await getSetting("longform_auto"))?.trim() !== "on") {
+    console.log("자동 롱폼 정지 중 (app_settings.longform_auto != on) - 건너뜀");
+    return false;
+  }
   const target = todaysUploadTarget(now);
   if (now < target) {
     console.log(

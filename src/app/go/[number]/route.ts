@@ -14,6 +14,7 @@ import {
   unknownUaTag,
 } from "@/lib/requestFilter";
 import type { VideoItemWithProduct } from "@/types/db";
+import { dryRunResponse, headResponse, isOwnerBrowser, withNoindex } from "@/lib/outboundGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,11 @@ export const dynamic = "force-dynamic";
  *
  * 집계 실패는 무시한다. 통계 때문에 구매 동선을 막지 않는다.
  */
+/** 링크 미리보기·검사기의 HEAD 는 이동 없이 응답만 (lib/outboundGuard.ts) */
+export function HEAD() {
+  return headResponse();
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ number: string }> }
@@ -69,6 +75,27 @@ export async function GET(
     return NextResponse.redirect(new URL(`/n/${displayNumber}`, request.url), 302);
   }
 
+  // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚는다.
+  // 쿠팡이 v번호를 서버에 묶어 발급한 짧은 링크가 있으면 그걸 쓴다(가장 확실 -
+  // lib/subLinks.ts). 아직 없으면 쿼리로 덧붙이는 예전 방식.
+  // 알리는 subId 개념이 없고 제휴 링크에 쿼리를 덧붙이면 링크가 깨질 수 있어
+  // 쿠팡일 때만 붙인다 (/api/click 과 같은 규칙).
+  const via =
+    item.products.source === "aliexpress" ? "aliexpress" : item.coupang_sub_url ? "sub_link" : "subid_query";
+  const finalUrl =
+    item.products.source === "aliexpress"
+      ? target
+      : item.coupang_sub_url || withSubId(target, `v${displayNumber}`);
+
+  // 점검용: 이동·집계 없이 목적지만 보여 준다
+  if (request.nextUrl.searchParams.get("dry") === "1") {
+    return dryRunResponse(displayNumber, finalUrl, via);
+  }
+  // 자기 클릭 방지: 사장님(관리자) 브라우저는 쿠팡 대신 상품 소개 페이지로
+  if (await isOwnerBrowser()) {
+    return withNoindex(NextResponse.redirect(new URL(`/n/${displayNumber}`, request.url), 302));
+  }
+
   // 크롤러·미리보기·프리페치는 이동만 시켜 주고 집계에서 뺀다.
   // (걸러도 리다이렉트는 그대로 - 자세한 이유는 lib/requestFilter.ts 머리말)
   const skipReason = outboundSkipReason(request, displayNumber, Date.now(), tracking.source);
@@ -92,15 +119,5 @@ export async function GET(
     ]);
   }
 
-  // subId 로 영상 번호를 심어 커미션 리포트에서 영상별 수익을 되짚는다.
-  // 쿠팡이 v번호를 서버에 묶어 발급한 짧은 링크가 있으면 그걸 쓴다(가장 확실 -
-  // lib/subLinks.ts). 아직 없으면 쿼리로 덧붙이는 예전 방식.
-  // 알리는 subId 개념이 없고 제휴 링크에 쿼리를 덧붙이면 링크가 깨질 수 있어
-  // 쿠팡일 때만 붙인다 (/api/click 과 같은 규칙).
-  const finalUrl =
-    item.products.source === "aliexpress"
-      ? target
-      : item.coupang_sub_url || withSubId(target, `v${displayNumber}`);
-
-  return NextResponse.redirect(finalUrl, 302);
+  return withNoindex(NextResponse.redirect(finalUrl, 302));
 }

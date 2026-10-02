@@ -4,7 +4,6 @@ import os from "os";
 import path from "path";
 import type { Product } from "@/types/db";
 import { findMatchingAliVideo, hasAliexpressEnv } from "./aliexpress";
-import { findCoupangProductVideo, hasCoupangScraperEnv } from "./coupangVideo";
 import { supabaseAdmin } from "./supabase";
 
 /** 소싱 실패한 상품을 다시 확인하기까지의 간격(일) */
@@ -44,7 +43,6 @@ export function brollFileDurations(files: string[]): number[] {
   );
 }
 /** 가장자리 크롭 비율 - 모서리 워터마크/자막 제거용 (86%만 남김) */
-const EDGE_KEEP = 0.86;
 /** 다운로드 용량 상한 */
 const MAX_DOWNLOAD_BYTES = 120 * 1024 * 1024;
 
@@ -165,8 +163,9 @@ export function segmentLocalVideo(
         "-t",
         String(segLen),
         "-vf",
-        // 가장자리 크롭(워터마크 제거) 후 세로 1280 기준으로 축소
-        `crop=iw*${EDGE_KEEP}:ih*${EDGE_KEEP},scale=-2:1280`,
+        // 세로 1280 기준으로 축소. (2026-10-03: 가장자리 크롭으로 워터마크를 지우던
+        // 처리는 삭제했다 - 남의 영상 출처 표시를 지우는 건 저작권·플랫폼 정책 위반)
+        "scale=-2:1280",
         "-an",
         "-c:v",
         "libx264",
@@ -217,12 +216,6 @@ const FOOTAGE_BUCKET = "footage";
 /** 직접 올린 영상은 사용자가 이미 골라온 것이라 길이 기준을 느슨하게 (3초 이상) */
 const FOOTAGE_MIN_SECONDS = 3;
 
-/** 도우인 앱 다운로드 영상 끝의 홍보/링크 아웃트로 컷 길이 추정 (영상 길이별) */
-function douyinTailTrim(durationSec: number): number {
-  if (durationSec >= 12) return 4;
-  if (durationSec >= 8) return 3;
-  return 1;
-}
 
 /**
  * 업로드된 footage 영상들 → broll 세그먼트 (총 totalCount 개를 파일들에 고르게 배분).
@@ -252,7 +245,6 @@ export async function segmentsFromFootage(
           continue;
         }
         fs.writeFileSync(tmp, Buffer.from(await data.arrayBuffer()));
-        const info = probeVideo(tmp);
         // 남은 컷을 남은 파일 수로 나눠 배분한다. 예전 ceil 선점 방식은 5개 파일에
         // 6컷이면 앞 3개가 2컷씩 다 가져가 뒤 2개 파일이 아예 안 쓰였고,
         // 이 방식은 앞 파일이 실패해도 그 몫을 뒤 파일이 자연히 흡수한다.
@@ -262,7 +254,7 @@ export async function segmentsFromFootage(
         );
         const got = segmentLocalVideo(tmp, want, `ftg${displayNumber}-${fi}`, {
           minSeconds: FOOTAGE_MIN_SECONDS,
-          tailTrimSeconds: info ? douyinTailTrim(info.duration) : 0,
+          tailTrimSeconds: 0,
         });
         // 중국어 텍스트 지우기 (OCR 감지 - 실패해도 세그먼트는 그대로 사용)
         for (const name of got) {
@@ -744,29 +736,7 @@ export async function sourceProductClips(
     console.warn("캐시된 소스 영상 사용 불가 - 재소싱 시도");
   }
 
-  // ② 쿠팡 상세페이지 판매자 영상 (프록시 설정 시) - 그 상품 자체의 영상이라 최우선
-  //
-  // 키가 없어 건너뛴 것과 실제로 못 찾은 것을 구분해 남긴다. 예전엔 아무 로그도
-  // 없어서 "왜 항상 스톡 배경인가"를 알 수 없었다(SCRAPER_PROXY_URL 미설정이 원인).
-  if (!hasCoupangScraperEnv()) {
-    console.log("쿠팡 상세영상 소싱 건너뜀: SCRAPER_PROXY_URL 미설정");
-  }
-  // 알리 상품에는 쿠팡 링크가 없다 - 이 경로는 쿠팡 상품일 때만 의미가 있다
-  if (hasCoupangScraperEnv() && product.coupang_partner_url) {
-    try {
-      const videoUrl = await findCoupangProductVideo(product.coupang_partner_url);
-      if (videoUrl) {
-        const files = await segmentRemoteVideo(videoUrl, displayNumber, count);
-        if (files.length > 0) {
-          const origin = "쿠팡 상세영상";
-          await cacheSourceVideo(product.id, videoUrl, origin);
-          return { files, origin };
-        }
-      }
-    } catch (e) {
-      console.warn(`쿠팡 소싱 실패: ${(e as Error).message.slice(0, 150)}`);
-    }
-  }
+  // ② (삭제 2026-10-03) 쿠팡 상세페이지 판매자 영상 스크래핑 - 쿠팡 약관상 금지
 
   // ③ 알리익스프레스 이미지 매칭
   if (!hasAliexpressEnv()) {

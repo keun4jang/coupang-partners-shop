@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { withSubId } from "@/lib/coupang";
 import { productTargetUrl } from "@/lib/format";
 import type { VideoItemWithProduct } from "@/types/db";
+import { dryRunResponse, headResponse, isOwnerBrowser, withNoindex } from "@/lib/outboundGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,11 @@ export const dynamic = "force-dynamic";
 /** 허용 slot 값 (임의 문자열이 DB 에 들어가지 않게 화이트리스트) */
 const SLOTS = new Set(["hero", "list", "search", "direct"]);
 
+/** 링크 미리보기·검사기의 HEAD 는 이동 없이 응답만 (lib/outboundGuard.ts) */
+export function HEAD() {
+  return headResponse();
+}
+
 export async function GET(request: NextRequest) {
   const videoItemId = request.nextUrl.searchParams.get("videoItemId");
   const slotParam = request.nextUrl.searchParams.get("slot");
@@ -47,6 +53,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  const finalUrl =
+    item.products.source === "aliexpress"
+      ? target
+      : item.coupang_sub_url || withSubId(target, `v${item.display_number}`);
+
+  // 점검용(이동·기록 없음)과 자기 클릭 방지(사장님 브라우저는 상품 소개 페이지로)
+  if (request.nextUrl.searchParams.get("dry") === "1") {
+    const via =
+      item.products.source === "aliexpress" ? "aliexpress" : item.coupang_sub_url ? "sub_link" : "subid_query";
+    return dryRunResponse(item.display_number, finalUrl, via);
+  }
+  if (await isOwnerBrowser()) {
+    return withNoindex(NextResponse.redirect(new URL(`/n/${item.display_number}`, request.url)));
+  }
+
   const row = {
     video_item_id: item.id,
     product_id: item.product_id,
@@ -66,9 +87,5 @@ export async function GET(request: NextRequest) {
   // 쿠팡이 v번호를 서버에 묶어 발급한 짧은 링크(lib/subLinks.ts)가 있으면 그걸 쓴다.
   // 알리는 subId 개념이 없고(tracking_id 로 귀속) 제휴 링크에 쿼리를 덧붙이면
   // 링크가 깨질 수 있으므로 쿠팡일 때만 붙인다.
-  const finalUrl =
-    item.products.source === "aliexpress"
-      ? target
-      : item.coupang_sub_url || withSubId(target, `v${item.display_number}`);
-  return NextResponse.redirect(finalUrl, 302);
+  return withNoindex(NextResponse.redirect(finalUrl, 302));
 }

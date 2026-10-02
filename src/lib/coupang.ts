@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { optionalEnv, requireEnv } from "./env";
+import { acquireCoupangCall } from "./coupangLedger";
 
 /**
  * 쿠팡파트너스 Open API 클라이언트.
@@ -94,6 +95,9 @@ async function request<T>(
   body?: unknown
 ): Promise<T> {
   const url = HOST + path + (query ? `?${query}` : "");
+  // 모든 쿠팡 호출은 여기서 장부 자리를 받는다(최근 60분 상한, 장부 불가면 호출 안 함).
+  // 한도 위반 3회 중 2회 - 3번째는 되돌릴 수 없다. src/lib/coupangLedger.ts 참고.
+  await acquireCoupangCall(path);
   // 타임아웃이 없으면 응답이 안 오는 호출 하나가 스카우트 전체를 붙잡는다.
   // Vercel 함수는 60초에 강제 종료되므로 그 자리에서 수집분이 통째로 날아간다
   // (deadlineAt 도 진행 중인 fetch 는 못 끊는다).
@@ -514,15 +518,17 @@ export const SCOUT_KEYWORDS: Array<{ keyword: string; appCategory: string }> = [
   { keyword: "스마트 플러그", appCategory: "테크가젯" },
   { keyword: "신상 무선 이어폰 케이스", appCategory: "테크가젯" },
 
+  // 2026-10-03: 마사지기·탈모·피부관리기·체지방계처럼 의료기기·효능 광고 위험이 큰
+  // 품목은 뺐다(표시광고·의료기기법). 미용 도구·위생용품 위주로만 둔다.
   { keyword: "신상 뷰티 기기", appCategory: "뷰티헬스" },
-  { keyword: "휴대용 마사지건", appCategory: "뷰티헬스" },
+  { keyword: "무선 헤어 고데기", appCategory: "뷰티헬스" },
   { keyword: "각질 제거기", appCategory: "뷰티헬스" },
-  { keyword: "탈모 방지 기기", appCategory: "뷰티헬스" },
-  { keyword: "피부 관리기 가정용", appCategory: "뷰티헬스" },
+  { keyword: "전동 면도기", appCategory: "뷰티헬스" },
+  { keyword: "메이크업 브러쉬 세척기", appCategory: "뷰티헬스" },
   { keyword: "전동 클렌징 브러쉬", appCategory: "뷰티헬스" },
-  { keyword: "체지방 측정기", appCategory: "뷰티헬스" },
-  { keyword: "휴대용 넥밴드 마사지기", appCategory: "뷰티헬스" },
-  { keyword: "신제품 눈마사지기", appCategory: "뷰티헬스" },
+  { keyword: "디지털 체중계", appCategory: "뷰티헬스" },
+  { keyword: "무선 헤어드라이어", appCategory: "뷰티헬스" },
+  { keyword: "전동 손톱깎이", appCategory: "뷰티헬스" },
 
   { keyword: "강아지 자동 급식기", appCategory: "펫용품" },
   { keyword: "고양이 자동 화장실", appCategory: "펫용품" },

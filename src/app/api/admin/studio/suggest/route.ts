@@ -18,6 +18,11 @@ export async function POST() {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // 2026-10-03 중단: 이 추천은 도우인에서 남의 리뷰 영상을 받아 재사용하는 흐름의
+  // 입구였다(저작권·플랫폼 정책 위험). 직접 촬영 영상은 다른 경로로 받는다.
+  if (process.env.STUDIO_DOUYIN_SOURCING !== "on") {
+    return NextResponse.json({ error: "도우인 영상 소싱은 중단했어요(남의 영상 재사용은 저작권·플랫폼 정책 위험, 2026-10-03). 직접 찍은 영상만 써 주세요." }, { status: 410 });
+  }
   try {
     const exclude = await knownProductIds();
     const fresh = await suggestStudioIdeas(5, exclude);

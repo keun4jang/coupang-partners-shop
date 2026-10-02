@@ -302,7 +302,7 @@ export const CATEGORY_VARIANTS: Record<string, CategoryVariants> = {
   생활템: {
     hooks: [
       "현관에 이걸 왜 두지?",
-      "이게 만원도 안 한다고?",
+      "이건 어디에 쓰는 물건일까요?",
       "집안일 하나가 사라진 이유",
       "이런 방법이 다 있더라고요",
     ],
