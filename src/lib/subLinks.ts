@@ -135,6 +135,12 @@ let usedThisHour = 0;
  * 최근 번호부터 채운다.
  */
 export async function backfillSubLinks(): Promise<void> {
+  // 2026-10-02 정지(기본 꺼짐): 쿠팡 API 한도 위반이 이미 3회 중 2회다(커밋 e1a165e·a9f0856).
+  // 스카우트는 GH 21:40·06:20 UTC + Vercel 23:00 에 돌고, 한도는 "최근 60분"일 수 있어
+  // 스카우트 직전 시간대의 채우기 호출(시간당 10)이 같은 60분에 겹칠 수 있다. 3번째
+  // 위반은 되돌릴 수 없으므로, 전체 호출 장부가 생기기 전까지는 켜지 않는다.
+  // 다시 켜려면 app_settings.coupang_sublink_backfill = "on".
+  if ((await getSetting("coupang_sublink_backfill").catch(() => null)) !== "on") return;
   const now = new Date();
   if (QUIET_UTC_HOURS.has(now.getUTCHours())) return;
   const key = now.toISOString().slice(0, 13);
