@@ -239,7 +239,7 @@ export function fallbackCopy(
   const seed = displayNumber + nameHash(product.product_name);
 
   // 상품명에서 실제 특징 문장 뽑기 (장점 자리에 제품 설명으로 들어간다)
-  const features = extractFeatureLines(product.product_name, 2);
+  const features = extractFeatureLines(stripBannedFromProductName(product.product_name), 2);
   const spec = specLine(product.product_name, product.price_text);
 
   // 후킹: pain 이 그 자체로 강한 훅이면 쓰고, 아니면 검증된 카테고리 프리셋 훅.

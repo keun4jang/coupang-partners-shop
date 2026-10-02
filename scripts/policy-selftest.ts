@@ -100,6 +100,21 @@ for (const category of Object.keys(CATEGORY_VARIANTS)) {
   }
 }
 
+// ── 3-1. 효능 표현이 든 상품명도 폴백 문구는 통과해야 한다 (2026-10-03) ──
+// 상품명에 항균·살균·위생이 있으면 예전 폴백이 "항균 처리라…"를 스스로 써서
+// HEALTH_CLAIM_PHRASES 에 걸려 발행이 막혔다(리뷰 지적).
+for (const name of ["항균 위생장갑 100매", "UV 살균 건조기 99.9% 제균", "위생팩 대용량 항균 지퍼백"]) {
+  const product = { ...sampleProduct, product_name: name, category: "생활템" };
+  const copy = fallbackCopy(product, 77);
+  const script = composeScriptText(copy, 77);
+  const caption = instagramCaption(copy.captionText, 77);
+  const issues = checkPublishTexts({ script, caption });
+  if (issues.length > 0) {
+    failures++;
+    console.error(`✗ [가짜 양성] 효능어 상품명 폴백: ${name} → ${issues.map((i) => `${i.field}: ${i.phrases.join(", ")}`).join(" / ")}`);
+  }
+}
+
 // ── 4. 롱폼 제목·설명란 ─────────────────────────────────────
 const top10 = Array.from({ length: 10 }, (_, i) => ({
   rank: 10 - i,

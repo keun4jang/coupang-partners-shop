@@ -18,6 +18,12 @@
 import { supabaseAdmin } from "./supabase";
 
 export const COUPANG_ROLLING_CAP = 35;
+/**
+ * 리포트(커미션·수익 조회) 호출은 더 낮은 상한으로 받는다. 관리자 대시보드는 열 때마다
+ * 리포트를 2~3번 부르는데, 같은 35칸을 쓰면 대시보드 몇 번에 스카우트(약 27회)가
+ * 막힌다. 리포트는 최근 60분 합계가 20 미만일 때만 부를 수 있게 해 스카우트 몫을 남긴다.
+ */
+export const COUPANG_REPORT_CAP = 20;
 export const LEDGER_REFUSAL_PREFIX = "쿠팡 API 장부";
 
 export class CoupangLedgerRefusal extends Error {
@@ -42,10 +48,11 @@ function callSource(): string {
 
 /** 호출 직전에 부른다. 자리를 못 받으면 CoupangLedgerRefusal 를 던진다. */
 export async function acquireCoupangCall(path: string): Promise<number> {
+  const cap = path.includes("/reports/") ? COUPANG_REPORT_CAP : COUPANG_ROLLING_CAP;
   let result: { data: unknown; error: { message: string } | null };
   try {
     result = await supabaseAdmin().rpc("coupang_api_acquire", {
-      p_cap: COUPANG_ROLLING_CAP,
+      p_cap: cap,
       p_source: callSource(),
       p_path: path.split("?")[0].slice(0, 120),
     });
@@ -59,7 +66,7 @@ export async function acquireCoupangCall(path: string): Promise<number> {
   }
   const n = typeof result.data === "number" ? result.data : Number(result.data);
   if (!Number.isFinite(n) || n < 0) {
-    throw new CoupangLedgerRefusal(`최근 60분 상한 ${COUPANG_ROLLING_CAP}회 - 호출 중단`);
+    throw new CoupangLedgerRefusal(`최근 60분 상한 ${cap}회 - 호출 중단`);
   }
   return n;
 }

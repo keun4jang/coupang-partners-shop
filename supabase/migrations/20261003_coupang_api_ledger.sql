@@ -29,6 +29,7 @@ create or replace function coupang_api_acquire(p_cap int, p_source text, p_path 
 returns int
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   n int;
@@ -52,3 +53,13 @@ stable
 as $$
   select count(*)::int from coupang_api_calls where called_at > now() - interval '60 minutes';
 $$;
+
+-- 잠금: 앱은 service_role 키(supabaseAdmin)로만 부른다. anon 키는 공개돼 있으므로
+-- 장부를 지우거나(상한 무력화) 채우는(쿠팡 호출 전면 차단) 길을 막는다.
+alter table coupang_api_calls enable row level security;
+revoke all on table coupang_api_calls from anon, authenticated;
+revoke all on sequence coupang_api_calls_id_seq from anon, authenticated;
+revoke all on function coupang_api_acquire(int, text, text) from public, anon, authenticated;
+revoke all on function coupang_api_recent_count() from public, anon, authenticated;
+grant execute on function coupang_api_acquire(int, text, text) to service_role;
+grant execute on function coupang_api_recent_count() to service_role;

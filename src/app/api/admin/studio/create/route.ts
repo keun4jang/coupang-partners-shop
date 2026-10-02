@@ -32,6 +32,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // 2026-10-03 중단: 스튜디오는 도우인 영상을 받아(아웃트로 자르기·중국어 글자 지우기)
+  // 재사용하는 흐름이라 저작권·플랫폼 정책 위험이 크다. 직접 촬영 영상은 별도 경로로 받는다.
+  if (process.env.STUDIO_DOUYIN_SOURCING !== "on") {
+    return NextResponse.json(
+      { error: "스튜디오(도우인 영상 재사용)는 중단했어요(2026-10-03). 직접 찍은 영상은 텔레그램으로 보내 주세요." },
+      { status: 410 }
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as CreateBody;
   const { productName, coupangUrl } = body;
   const footagePaths = (body.footagePaths ?? []).filter(Boolean);

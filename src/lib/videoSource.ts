@@ -720,8 +720,9 @@ export async function sourceProductClips(
     }
   }
 
-  // ① 캐시된 소스 영상
-  if (product.source_video_url) {
+  // ① 캐시된 소스 영상. 단, 예전에 쿠팡 상세페이지에서 긁어 온 판매자 영상은 다시 쓰지
+  // 않는다(2026-10-03 스크래퍼 삭제 - 쿠팡 약관상 스크래핑 금지·판매자 저작권).
+  if (product.source_video_url && product.source_video_origin !== "쿠팡 상세영상") {
     const files = await segmentRemoteVideo(
       product.source_video_url,
       displayNumber,
