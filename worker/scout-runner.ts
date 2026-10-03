@@ -64,7 +64,15 @@ async function main() {
   }
 
   try {
-    await sendTelegramMessage(formatScoutMessage(result));
+    // 오류가 없으면 formatScoutMessage 가 빈 문자열을 준다(수집 결과는 알리지 않는 방침) -
+    // 빈 메시지를 보내면 텔레그램이 400 을 돌려준다.
+    const message = formatScoutMessage(result);
+    if (!message) {
+      console.log("\n(오류 없음 - 텔레그램 알림 생략)");
+      console.log("=== 스카우트 완료 ===");
+      return;
+    }
+    await sendTelegramMessage(message);
     console.log("\n텔레그램 알림 전송 완료");
   } catch (e) {
     console.error("텔레그램 전송 실패:", (e as Error).message);

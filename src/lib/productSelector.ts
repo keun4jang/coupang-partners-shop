@@ -1,3 +1,4 @@
+import { offBrandReason } from "./appeal";
 import type { Product } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { appealScore, spamTitleReason } from "./appeal";
@@ -168,6 +169,15 @@ export async function takeFirstPassing(
     // 사진이 없는 상품은 API 를 쓰지 않고 건너뛴다. paused 로 내리지는 않는다
     // (사진은 나중에 채워질 수 있고, 다른 선정 경로는 이미 image_url 로 거른다).
     if (!p.image_url) continue;
+
+    // 살림템 아닌 품목(상품권·입장권·환자식 등)은 선정 단계에서도 다시 거른다. 스카우트
+    // 규칙이 나중에 늘어나도 이미 들어와 있는 후보까지 걸러지게 한다(rejected → paused).
+    const off = offBrandReason(p.product_name);
+    if (off) {
+      console.log(`제외(살림템 아님 · ${off}): ${p.product_name.slice(0, 45)}`);
+      rejected.push(p);
+      continue;
+    }
 
     if (!overBudget && (checks >= opts.maxChecks || now() >= opts.deadlineAt)) {
       overBudget = true;

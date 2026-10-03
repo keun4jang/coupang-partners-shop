@@ -47,6 +47,7 @@ export const POLICY_BANNED_PHRASES = [
   "한정수량",
   "수량 한정",
   "마감 임박",
+  "선착순",
   "오늘만",
   // 과장·오인성
   "미쳤",
