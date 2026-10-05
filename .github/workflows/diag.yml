@@ -19,6 +19,7 @@ on:
           - subid-probe
           - google-keys-probe
           - longform-report
+          - publish-status
 
 concurrency:
   group: diag

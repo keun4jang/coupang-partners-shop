@@ -10,6 +10,7 @@
  * 실행: npx tsx scripts/selector-selftest.ts   (또는 npm run selector:check)
  */
 import { takeFirstPassing } from "../src/lib/productSelector";
+import { offBrandReason } from "../src/lib/appeal";
 import type { Product } from "../src/types/db";
 
 let failures = 0;
@@ -140,6 +141,20 @@ async function main() {
     });
     check("통과가 없으면 아무것도 안 뽑는다", picked.length === 0);
     check("둘 다 paused 대상", rejected.length === 2);
+  }
+
+  // 품목 규칙 (2026-10-05 스카우트에서 새어 들어온 실제 이름들)
+  {
+    const blocked = [
+      "[골드박스] ★연휴찬스★ 경주월드 종일권(~10/11) 소인",
+      "★롯데월드 아쿠아리움 1인권(~10/18)",
+      "라이프익스텐션 뉴로-매그 마그네슘 L-트레오네이트 베지테리안 캡슐",
+      "곰곰 2026년산 햅쌀 소중한 우리쌀 상등급",
+      "비비고 왕교자 (냉동)",
+    ];
+    for (const n of blocked) check(`부적합 품목 차단: ${n}`, offBrandReason(n) !== null);
+    const allowed = ["피지 캡슐세제 60개", "쌀통 10kg", "아이스크림 스쿱", "식기건조대 2단", "쌀국수 그릇", "핸드크림 거치대"];
+    for (const n of allowed) check(`살림템 통과: ${n}`, offBrandReason(n) === null, String(offBrandReason(n)));
   }
 
   if (failures > 0) {
