@@ -810,13 +810,26 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       // 렌더는 이미 성공했으므로, 업로드가 실패해도 영상 자체는 완료로 남긴다.
       try {
         console.log("구글드라이브 임시 업로드 중... (발행 후 삭제)");
-        const folderId = await ensureDateFolder(dateFolderName());
-        const video = await uploadFileToDrive(
-          folderId,
-          driveFileName(item.display_number, product.product_name, "video"),
-          "video/mp4",
-          videoPath
-        );
+        // 2026-10-05: 377번이 드라이브 502 한 번에 인스타를 통째로 놓쳤다 → 일시 오류는 2번 더 시도
+        let video: Awaited<ReturnType<typeof uploadFileToDrive>> | null = null;
+        for (let attempt = 1; ; attempt++) {
+          try {
+            const folderId = await ensureDateFolder(dateFolderName());
+            video = await uploadFileToDrive(
+              folderId,
+              driveFileName(item.display_number, product.product_name, "video"),
+              "video/mp4",
+              videoPath
+            );
+            break;
+          } catch (e) {
+            const m = e instanceof Error ? e.message : String(e);
+            const transient = /\b(5\d\d)\b|Server Error|ECONNRESET|ETIMEDOUT|socket hang up/i.test(m);
+            if (!transient || attempt >= 3) throw e;
+            console.warn(`드라이브 업로드 일시 오류(${attempt}/3) - ${attempt * 20}초 뒤 재시도: ${m.slice(0, 80)}`);
+            await new Promise((r) => setTimeout(r, attempt * 20_000));
+          }
+        }
         driveVideoUrl = video.url;
         driveVideoFileId = video.id;
       } catch (uploadError) {
