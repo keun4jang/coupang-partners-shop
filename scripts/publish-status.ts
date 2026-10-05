@@ -36,12 +36,18 @@ async function main(): Promise<void> {
     .select(
       "display_number, video_status, created_at, published_at, youtube_url, youtube_error, instagram_url, instagram_error, error_message"
     )
-    .gte("created_at", since)
+    // 큐는 며칠 앞서 만들어진다(created_at) - 발행 기준(published_at)으로 보고, 대기열은 따로 센다
+    .or(`published_at.gte.${since},and(published_at.is.null,video_status.neq.pending)`)
+    .gte("created_at", new Date(Date.now() - (days + 14) * 86_400_000).toISOString())
     .order("display_number");
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Row[];
 
-  console.log(`① 최근 ${days}일 영상 ${rows.length}편`);
+  const { count: pending } = await db
+    .from("video_items")
+    .select("id", { count: "exact", head: true })
+    .eq("video_status", "pending");
+  console.log(`① 최근 ${days}일 발행·처리 영상 ${rows.length}편 (대기열 pending ${pending ?? "?"}편)`);
   const byStatus = new Map<string, number>();
   for (const r of rows) byStatus.set(r.video_status ?? "?", (byStatus.get(r.video_status ?? "?") ?? 0) + 1);
   console.log("   상태별: " + [...byStatus].map(([k, v]) => `${k} ${v}`).join(" · "));
