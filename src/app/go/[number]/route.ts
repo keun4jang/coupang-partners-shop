@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { withSubId } from "@/lib/coupang";
 import { productTargetUrl } from "@/lib/format";
+import { isOwnProduct } from "@/lib/ownProducts";
 import {
   parseTrackingParams,
   recordBlockedOutbound,
@@ -80,10 +81,13 @@ export async function GET(
   // lib/subLinks.ts). 아직 없으면 쿼리로 덧붙이는 예전 방식.
   // 알리는 subId 개념이 없고 제휴 링크에 쿼리를 덧붙이면 링크가 깨질 수 있어
   // 쿠팡일 때만 붙인다 (/api/click 과 같은 규칙).
-  const via =
-    item.products.source === "aliexpress" ? "aliexpress" : item.coupang_sub_url ? "sub_link" : "subid_query";
+  // 사장님 본인 상품은 파트너스 링크가 아니라 상품 페이지 그대로 (lib/ownProducts.ts)
+  const own = isOwnProduct(item.products);
+  const via = own
+    ? "own_product"
+    : item.products.source === "aliexpress" ? "aliexpress" : item.coupang_sub_url ? "sub_link" : "subid_query";
   const finalUrl =
-    item.products.source === "aliexpress"
+    own || item.products.source === "aliexpress"
       ? target
       : item.coupang_sub_url || withSubId(target, `v${displayNumber}`);
 

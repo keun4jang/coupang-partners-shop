@@ -43,8 +43,14 @@ check(
   "화면 고지 문구(DISCLOSURE_TEXT)에 쿠팡파트너스 고지 문장이 없다",
   read("remotion/config/videoConfig.ts").includes(`"${SCREEN_DISCLOSURE}"`)
 );
+// 2026-10-07: E 템플릿 고지는 컨텍스트(useDisclosureText, 기본값 DISCLOSURE_TEXT)에서 읽는다 -
+// 사장님 본인 상품만 판매자 고지로 바뀐다(src/lib/ownProducts.ts).
+check(
+  "Disclosure 컨텍스트 기본값이 DISCLOSURE_TEXT 가 아니다",
+  /createContext<string>\(DISCLOSURE_TEXT\)/.test(read("remotion/components/Disclosure.tsx"))
+);
 for (const t of ["TemplateE", "TemplateEUseCase"]) {
-  check(`${t} 화면 고지 문장이 없다`, read(`remotion/templates/${t}.tsx`).includes(SCREEN_DISCLOSURE));
+  check(`${t} 화면 고지가 useDisclosureText 를 안 쓴다`, read(`remotion/templates/${t}.tsx`).includes("useDisclosureText()"));
 }
 
 // 3. 발행 편수 상한

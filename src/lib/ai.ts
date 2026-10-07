@@ -15,6 +15,7 @@ import {
   pick,
 } from "./copyPresets";
 import { getSetting } from "./settings";
+import { isOwnProduct, OWN_SELLER_NAME } from "./ownProducts";
 import {
   BANNED_PHRASES,
   DISCLOSURE_LINE,
@@ -283,7 +284,9 @@ export function fallbackCopy(
     `${shortenProductName(stripBannedFromProductName(product.product_name))}, ${copy.benefit1}. ${copy.benefit2}.`,
     copy.usageTip,
     "",
-    "쿠팡에서 찾은 살림템을 번호로 정리하고 있어요.",
+    isOwnProduct(product)
+      ? `${OWN_SELLER_NAME}이 직접 판매하는 제품이에요.`
+      : "쿠팡에서 찾은 살림템을 번호로 정리하고 있어요.",
     `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`,
     "",
     "#살림템 #생활템 #쿠팡추천템 #추천템",
@@ -529,8 +532,21 @@ function buildUserPrompt(
     "hookText 는 18자 이내로 짧게 - 썸네일에 초대형으로 박힌다.",
     hookPatternHint(displayNumber),
     ...(variant === "usecase" ? ["", USECASE_PROMPT_BLOCK] : []),
+    ...(isOwnProduct(product) ? ["", OWN_PRODUCT_PROMPT_BLOCK] : []),
   ].join("\n");
 }
+
+/**
+ * 사장님 본인 상품(lib/ownProducts.ts) 지시. 판매자가 자기 상품을 소개하는 것이므로
+ * 제3자 추천·후기처럼 꾸미지 않고, 파트너스용 문장("쿠팡에서 찾은 살림템…")도 쓰지 않는다.
+ */
+const OWN_PRODUCT_PROMPT_BLOCK = [
+  `이 상품은 이 채널 운영자(쿠팡 판매자 '${OWN_SELLER_NAME}')가 직접 판매하는 상품이다.`,
+  "- 남이 추천하는 것처럼 꾸미지 말고, 판매자가 자기 상품을 담백하게 소개하는 톤으로 쓴다.",
+  "- 써 본 후기·판매량·평점은 지어내지 않는다. 상품명에 있는 소재·구성·용도만 근거로 쓴다.",
+  `- 캡션에는 "쿠팡에서 찾은 살림템을 번호로 정리하고 있어요." 대신 "${OWN_SELLER_NAME}이 직접 판매하는 제품이에요." 를 넣는다.`,
+  "- 살림템이 아니어도 된다(캠핑·가죽·바이크 용품 등) - 그 용도에 맞는 생활 장면으로 쓴다.",
+].join("\n");
 
 /**
  * 사용상황형 변형 지시.

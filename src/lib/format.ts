@@ -1,3 +1,5 @@
+import { isOwnProduct } from "./ownProducts";
+
 /** http/https 스킴만 허용 (관리자 폼으로 저장되는 링크가 그대로 redirect 되므로 검증 필요) */
 export function isValidHttpUrl(value: string): boolean {
   try {
@@ -208,7 +210,10 @@ export function productTargetUrl(p: {
   source?: string | null;
   coupang_partner_url?: string | null;
   affiliate_url?: string | null;
+  source_memo?: string | null;
 }): string | null {
+  // 사장님 본인 상품은 파트너스 링크가 아니라 상품 페이지 주소(affiliate_url)로 바로 간다
+  if (isOwnProduct(p)) return p.affiliate_url || null;
   if (p.source === "aliexpress") {
     return p.affiliate_url || p.coupang_partner_url || null;
   }

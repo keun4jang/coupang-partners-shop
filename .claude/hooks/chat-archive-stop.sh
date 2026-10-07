@@ -11,6 +11,11 @@
 # 이 훅은 절대 turn 을 막지 않는다(항상 exit 0).
 
 ARCHIVE_DIR="${CHAT_ARCHIVE_DIR:-/home/user/claude-chat-archive}"
+# 클라우드 경로가 없으면(사장님 PC 등) 이 저장소 옆 폴더를 쓴다: C:\Projects\claude-chat-archive
+if [[ -z "${CHAT_ARCHIVE_DIR:-}" && ! -d "$ARCHIVE_DIR" ]]; then
+  SIBLING="$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)/claude-chat-archive"
+  [[ -d "$SIBLING" ]] && ARCHIVE_DIR="$SIBLING"
+fi
 export CHAT_ARCHIVE_DIR="$ARCHIVE_DIR"
 export CHAT_ARCHIVE_PROJECT="coupang-partners-shop"
 export CHAT_ARCHIVE_SOURCE_REPO="keun4jang/coupang-partners-shop"

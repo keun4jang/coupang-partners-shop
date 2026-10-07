@@ -8,6 +8,7 @@ import { TemplateC } from "./templates/TemplateC";
 import { TemplateD } from "./templates/TemplateD";
 import { TemplateE } from "./templates/TemplateE";
 import { TemplateEUseCase } from "./templates/TemplateEUseCase";
+import { withDisclosureText } from "./components/Disclosure";
 import {
   TOP10_FPS,
   TOP10_HEIGHT,
@@ -29,6 +30,11 @@ const top10Metadata: CalculateMetadataFunction<Top10Props> = ({ props }) => ({
   durationInFrames: Math.round(top10DurationSeconds(props) * TOP10_FPS),
 });
 
+// 하단 고지 문구를 props.disclosureText 로 바꿀 수 있게 감싼다 (사장님 본인 상품 = 판매자 고지)
+const TemplateDWithDisclosure = withDisclosureText(TemplateD);
+const TemplateEWithDisclosure = withDisclosureText(TemplateE);
+const TemplateEUseCaseWithDisclosure = withDisclosureText(TemplateEUseCase);
+
 const defaultTop10Props: Top10Props = { categoryLabel: "생활템", items: [] };
 
 export const RemotionRoot: React.FC = () => {
@@ -46,12 +52,12 @@ export const RemotionRoot: React.FC = () => {
       <Composition id="TemplateA" component={TemplateA} {...shared} />
       <Composition id="TemplateB" component={TemplateB} {...shared} />
       <Composition id="TemplateC" component={TemplateC} {...shared} />
-      <Composition id="TemplateD" component={TemplateD} {...shared} />
-      <Composition id="TemplateE" component={TemplateE} {...shared} />
+      <Composition id="TemplateD" component={TemplateDWithDisclosure} {...shared} />
+      <Composition id="TemplateE" component={TemplateEWithDisclosure} {...shared} />
       {/* 사용상황형 변형 - 같은 props 규격을 쓰므로 shared 를 그대로 재사용한다 */}
       <Composition
         id="TemplateEUseCase"
-        component={TemplateEUseCase}
+        component={TemplateEUseCaseWithDisclosure}
         {...shared}
       />
       <Composition

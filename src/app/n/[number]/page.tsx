@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { formatDisplayNumber, shortenProductName } from "@/lib/format";
 import { parseTrackingParams, shortsVariantOf, trackingQuery } from "@/lib/tracking";
 import { findPolicyIssues } from "@/lib/policy";
+import { isOwnProduct, OWN_DISCLOSURE_LINE } from "@/lib/ownProducts";
 import { APP_VERSION } from "@/lib/appVersion";
 import type { VideoItemWithProduct } from "@/types/db";
 import { ViewBeacon } from "./ViewBeacon";
@@ -168,8 +169,10 @@ export default async function NumberPage({
         "더보기"를 눌러야 보이는 위치에 있으면 안 된다고 본다.
       */}
       <p className="mt-4 mb-5 bg-accent-soft text-ink/80 text-[13px] leading-relaxed rounded-xl px-4 py-3">
-        이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를
-        제공받습니다.
+        {/* 사장님 본인 상품은 수수료가 아니라 판매자 직접 판매라 고지가 다르다 (lib/ownProducts.ts) */}
+        {isOwnProduct(product)
+          ? OWN_DISCLOSURE_LINE
+          : "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
       </p>
 
       <div className="bg-card rounded-3xl border border-accent-soft shadow-sm overflow-hidden">

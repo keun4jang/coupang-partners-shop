@@ -1,4 +1,5 @@
 import React from "react";
+import { useDisclosureText } from "../components/Disclosure";
 import {
   AbsoluteFill,
   Img,
@@ -108,7 +109,8 @@ const DisclosureTag: React.FC = () => (
       whiteSpace: "nowrap",
     }}
   >
-    쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
+    {/* 문구는 Root.tsx 의 withDisclosureText 가 내려준다(본인 상품 = 판매자 고지) */}
+    {useDisclosureText()}
   </div>
 );
 

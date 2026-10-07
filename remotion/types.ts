@@ -67,6 +67,11 @@ export type ShortsProps = {
    * 모른 채 떠난다는 가설을 검증하려는 스위치. app_settings.d_product_first=on.
    */
   productFirst?: boolean | null;
+  /**
+   * 하단 고지 문구 덮어쓰기. null 이면 파트너스 고지(DISCLOSURE_TEXT).
+   * 사장님 본인 상품은 판매자 고지를 넣는다(src/lib/ownProducts.ts).
+   */
+  disclosureText?: string | null;
 };
 
 export const defaultShortsProps: ShortsProps = {

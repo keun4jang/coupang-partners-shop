@@ -26,6 +26,12 @@
  * 롱폼(longform.ts)은 화면 고지가 영상 내내 있지 않아 설명란 첫 줄을 유지한다.
  */
 import { DISCLOSURE_LINE } from "./ai";
+import { OWN_DISCLOSURE_LINE } from "./ownProducts";
+
+/** 사장님 본인 상품(lib/ownProducts.ts)이면 파트너스 고지 대신 판매자 고지를 쓴다 */
+type CopyOpts = { own?: boolean };
+/** 본인 상품 본문에서 빼는 파트너스용 문장 (사실이 아니게 된다) */
+const PARTNER_ONLY_SENTENCE = "쿠팡에서 찾은 살림템을 번호로 정리하고 있어요.";
 
 import { landingUrl, type TemplateVariant } from "./tracking";
 
@@ -42,7 +48,8 @@ type ShortsVariant = Extract<TemplateVariant, "classic" | "usecase">;
 export function youtubeShortsDescription(
   displayNumber: number,
   shortProductName: string,
-  variant: ShortsVariant = "classic"
+  variant: ShortsVariant = "classic",
+  opts: CopyOpts = {}
 ): string {
   const url = landingUrl(displayNumber, {
     source: "youtube_shorts",
@@ -53,7 +60,7 @@ export function youtubeShortsDescription(
   return [
     shortProductName,
     "",
-    DISCLOSURE_LINE,
+    opts.own ? OWN_DISCLOSURE_LINE : DISCLOSURE_LINE,
     "",
     `제품명·가격·상세 정보는 살림템 메모장 ${displayNumber}번에 정리했습니다.`,
     url,
@@ -62,7 +69,7 @@ export function youtubeShortsDescription(
     // (/from/youtube-shorts)를 가리킨다 - "같은 주소"라고 하면 부정확하다.
     "채널 프로필 첫 화면에서도 최근 번호들을 확인하실 수 있어요.",
     "",
-    "#Shorts #살림템 #생활템 #쿠팡추천템",
+    opts.own ? "#Shorts #근사장 #쿠팡" : "#Shorts #살림템 #생활템 #쿠팡추천템",
   ].join("\n");
 }
 
@@ -74,11 +81,14 @@ export function youtubeShortsDescription(
  */
 export function instagramCaption(
   baseCaption: string,
-  displayNumber: number
+  displayNumber: number,
+  opts: CopyOpts = {}
 ): string {
-  const lines = (baseCaption ?? "")
-    .split(DISCLOSURE_LINE)
-    .join("")
+  const disclosure = opts.own ? OWN_DISCLOSURE_LINE : DISCLOSURE_LINE;
+  let raw = (baseCaption ?? "").split(DISCLOSURE_LINE).join("").split(OWN_DISCLOSURE_LINE).join("");
+  if (opts.own) raw = raw.split(PARTNER_ONLY_SENTENCE).join("");
+  const lines = raw
+    .replace(/\n{3,}/g, "\n\n")
     .trim()
     .split("\n");
   // 끝에 붙은 해시태그 줄은 고지 뒤로 보낸다
@@ -90,5 +100,5 @@ export function instagramCaption(
 
   // 본문이 통째로 비어 있는 경우(문구 생성 실패)에도 최소한의 안내는 나가야 한다.
   const fallback = `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`;
-  return [body || fallback, "", DISCLOSURE_LINE, ...(tags.length ? ["", ...tags] : [])].join("\n");
+  return [body || fallback, "", disclosure, ...(tags.length ? ["", ...tags] : [])].join("\n");
 }

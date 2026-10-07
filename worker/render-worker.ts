@@ -43,6 +43,7 @@ import {
 } from "../src/lib/drive";
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
+import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
 import {
@@ -172,6 +173,8 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     // 배경을 실제로 넣는 쪽(renderVideo)에서 소재 성격에 맞는 라벨을 채운다.
     // 배경이 없으면 라벨도 없다 - 제품 사진만 보이는 화면엔 오해의 소지가 없다.
     brollNotice: null,
+    // 사장님 본인 상품은 "쿠팡파트너스 활동…" 대신 판매자 고지 (lib/ownProducts.ts)
+    disclosureText: isOwnProduct(product) ? OWN_SCREEN_DISCLOSURE : null,
   };
 }
 
@@ -614,8 +617,11 @@ async function publishToSns(
   // 붙이므로 이미 문구가 만들어져 큐에 들어가 있던 항목에도 그대로 적용된다.
   // 이 영상 번호가 쿠팡 서버에 묶인 짧은 링크를 발행 전에 받아 둔다(쿠팡 호출 1번).
   // 실패해도 발행은 계속되고, 링크 이동은 예전 방식으로 폴백된다.
-  await ensureSubLink(item.id);
-  const snsCaption = instagramCaption(captionText, item.display_number);
+  // 사장님 본인 상품은 파트너스 짧은 링크를 만들지 않는다(lib/ownProducts.ts) -
+  // ensureSubLink 도 coupang_partner_url 이 비어 있으면 호출 없이 건너뛰지만, 명시적으로 막는다.
+  const own = isOwnProduct(product);
+  if (!own) await ensureSubLink(item.id);
+  const snsCaption = instagramCaption(captionText, item.display_number, { own });
   // 판매자 상품명에 붙은 마케팅 문구는 지우고 내보낸다(차단이 아니라 정화 -
   // policy.ts stripBannedFromProductName 주석 참고). 이게 없으면 "쿠팡특가 …"
   // 같은 이름 하나 때문에 렌더까지 끝낸 영상이 발행 직전에 통째로 막힌다.
@@ -626,7 +632,8 @@ async function publishToSns(
   const ytDescription = youtubeShortsDescription(
     item.display_number,
     shortName,
-    shortsVariantOf(item)
+    shortsVariantOf(item),
+    { own }
   );
 
   // 발행 직전 정책 검사.

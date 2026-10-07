@@ -10,6 +10,14 @@ import { composeScriptText, generateVideoCopy } from "./ai";
 import { selectProductsForVideos } from "./productSelector";
 import { shortsVariantOf } from "./tracking";
 import { pickShortsVariant } from "./usecaseScore";
+import { getSetting } from "./settings";
+import {
+  isOwnProduct,
+  OWN_DAILY_DEFAULT,
+  OWN_MARKER,
+  OWN_PRODUCTS,
+  ownProductRow,
+} from "./ownProducts";
 
 // 자동 로테이션은 A/B/C. D(실사용 스톡영상 배경)는 텔레그램 "영상D" 로 명시 선택.
 const TEMPLATE_ROTATION: TemplateType[] = ["A", "B", "C"];
@@ -135,14 +143,102 @@ export async function queueDailyVideos(
   const remaining = target - (createdToday ?? 0);
   if (remaining <= 0) return [];
 
-  const products = await selectProductsForVideos(remaining, opts);
+  // 사장님 본인 상품을 하루 몇 편 끼워 넣는다(lib/ownProducts.ts). 실패해도 일반 편성은 계속.
+  let ownPicks: Product[] = [];
+  try {
+    ownPicks = await pickOwnProductsForToday(startOfDay, remaining);
+  } catch (e) {
+    console.warn("본인 상품 편성 실패(일반 편성만 진행):", (e as Error).message.slice(0, 150));
+  }
+
+  const products = await selectProductsForVideos(remaining - ownPicks.length, opts);
   const created: VideoItem[] = [];
-  for (const product of products) {
+  // 본인 상품은 그날 묶음의 가운데쯤에 넣는다("중간중간") - 발행은 번호 순이다
+  const order = [...products];
+  order.splice(Math.ceil(order.length / 2), 0, ...ownPicks);
+  for (const product of order) {
     // template_type 은 A/B/C 로 저장되지만, 렌더 시 FORCE_TEMPLATE=D 로 포맷 D 로 뽑힌다.
     const item = await createVideoItem(product);
     created.push(item);
   }
   return created;
+}
+
+/**
+ * 본인 상품 목록(ownProducts.ts OWN_PRODUCTS)을 DB 에 맞춘다. 멱등.
+ * [own:등록상품ID] 로 찾아 없으면 추가, 있으면 이름·가격·링크·사진을 갱신한다.
+ * 큐잉 때마다 불려서, 목록을 고쳐 push 하면 다음 큐잉에 자동 반영된다(SQL 수동 실행 불필요).
+ */
+export async function ensureOwnProducts(): Promise<{ added: number; updated: number }> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("products")
+    .select("id, source_memo")
+    .ilike("source_memo", `%${OWN_MARKER}%`);
+  if (error) throw new Error(`본인 상품 조회 실패: ${error.message}`);
+  const byInv = new Map<string, string>();
+  for (const r of (data ?? []) as { id: string; source_memo: string | null }[]) {
+    const inv = r.source_memo?.match(/\[own:(\d+)\]/)?.[1];
+    if (inv) byInv.set(inv, r.id);
+  }
+  let added = 0;
+  let updated = 0;
+  for (const o of OWN_PRODUCTS) {
+    const row = ownProductRow(o);
+    const id = byInv.get(o.inv);
+    const { error: wErr } = id
+      ? await db.from("products").update(row).eq("id", id)
+      : await db.from("products").insert(row);
+    if (wErr) throw new Error(`본인 상품 ${o.inv} 저장 실패: ${wErr.message}`);
+    if (id) updated++;
+    else added++;
+  }
+  if (added > 0) console.log(`본인 상품 ${added}개 새로 등록`);
+  return { added, updated };
+}
+
+/**
+ * 오늘 끼워 넣을 본인 상품. 하루 own_product_daily(기본 1, 0~3)편까지,
+ * 영상이 적게 만들어진 상품부터 돌아가며 고른다(12개뿐이라 반복된다).
+ * 본인 상품은 status=paused 라 일반 선정에는 섞이지 않는다.
+ */
+async function pickOwnProductsForToday(startOfDay: Date, room: number): Promise<Product[]> {
+  const raw = Number((await getSetting("own_product_daily"))?.trim());
+  const daily = Number.isFinite(raw) && raw >= 0 && raw <= 3 ? Math.floor(raw) : OWN_DAILY_DEFAULT;
+  if (daily <= 0 || room <= 0) return [];
+
+  await ensureOwnProducts();
+  const db = supabaseAdmin();
+  const { data: own, error } = await db
+    .from("products")
+    .select("*")
+    .ilike("source_memo", `%${OWN_MARKER}%`);
+  if (error) throw new Error(`본인 상품 조회 실패: ${error.message}`);
+  const ownProducts = ((own ?? []) as Product[]).filter((p) => isOwnProduct(p) && p.image_url);
+  if (ownProducts.length === 0) return [];
+  const ids = ownProducts.map((p) => p.id);
+
+  const { data: vids, error: vErr } = await db
+    .from("video_items")
+    .select("product_id, created_at, manual")
+    .in("product_id", ids)
+    .neq("video_status", "failed");
+  if (vErr) throw new Error(`본인 상품 영상 조회 실패: ${vErr.message}`);
+  const rows = (vids ?? []) as { product_id: string; created_at: string; manual: boolean }[];
+
+  const today = rows.filter((r) => !r.manual && r.created_at >= startOfDay.toISOString()).length;
+  const want = Math.min(daily - today, room);
+  if (want <= 0) return [];
+
+  const count = new Map<string, number>();
+  for (const r of rows) count.set(r.product_id, (count.get(r.product_id) ?? 0) + 1);
+  return ownProducts
+    .sort(
+      (a, b) =>
+        (count.get(a.id) ?? 0) - (count.get(b.id) ?? 0) ||
+        a.created_at.localeCompare(b.created_at)
+    )
+    .slice(0, want);
 }
 
 /**

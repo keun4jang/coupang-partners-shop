@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { withSubId } from "@/lib/coupang";
 import { productTargetUrl } from "@/lib/format";
+import { isOwnProduct } from "@/lib/ownProducts";
 import type { VideoItemWithProduct } from "@/types/db";
 import { dryRunResponse, headResponse, isOwnerBrowser, withNoindex } from "@/lib/outboundGuard";
 
@@ -53,15 +54,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  // 사장님 본인 상품은 파트너스 링크가 아니라 상품 페이지 그대로 (subId 도 붙이지 않는다)
+  const own = isOwnProduct(item.products);
   const finalUrl =
-    item.products.source === "aliexpress"
+    own || item.products.source === "aliexpress"
       ? target
       : item.coupang_sub_url || withSubId(target, `v${item.display_number}`);
 
   // 점검용(이동·기록 없음)과 자기 클릭 방지(사장님 브라우저는 상품 소개 페이지로)
   if (request.nextUrl.searchParams.get("dry") === "1") {
-    const via =
-      item.products.source === "aliexpress" ? "aliexpress" : item.coupang_sub_url ? "sub_link" : "subid_query";
+    const via = own
+      ? "own_product"
+      : item.products.source === "aliexpress" ? "aliexpress" : item.coupang_sub_url ? "sub_link" : "subid_query";
     return dryRunResponse(item.display_number, finalUrl, via);
   }
   if (await isOwnerBrowser()) {
