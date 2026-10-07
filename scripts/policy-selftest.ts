@@ -79,12 +79,12 @@ for (const category of Object.keys(CATEGORY_VARIANTS)) {
     const caption = instagramCaption(copy.captionText, n);
     const description = youtubeShortsDescription(n, "펜로리스 이동식 선반", "usecase");
 
-    // 고지: 첫 줄은 "[광고]"로 시작(접힌 상태에서도 보이게), 전문은 정확히 한 번 (2026-10-03)
+    // 고지: 전문은 정확히 한 번, "[광고]" 표기는 없다 (2026-10-07 사장님 결정)
     for (const [field, text] of [["캡션", caption], ["설명", description]] as const) {
       const count = text.split(DISCLOSURE_LINE).length - 1;
-      if (count !== 1 || !text.startsWith("[광고] ")) {
+      if (count !== 1 || text.includes("[광고]")) {
         failures++;
-        console.error(`✗ [고지 위치] ${field} ${category} ${n}번: 전문 ${count}회, 첫 줄 [광고]=${text.startsWith("[광고] ")}`);
+        console.error(`✗ [고지] ${field} ${category} ${n}번: 전문 ${count}회, [광고] 포함=${text.includes("[광고]")}`);
       }
     }
 

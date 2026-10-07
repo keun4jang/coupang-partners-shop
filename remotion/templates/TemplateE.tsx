@@ -108,7 +108,7 @@ const DisclosureTag: React.FC = () => (
       whiteSpace: "nowrap",
     }}
   >
-    [광고] 쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
+    쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
   </div>
 );
 

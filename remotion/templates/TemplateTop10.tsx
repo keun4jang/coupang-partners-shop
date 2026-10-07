@@ -480,7 +480,7 @@ const Intro: React.FC<{ categoryLabel: string; narrationUri?: string | null }> =
             padding: "6px 18px",
           }}
         >
-          [광고] 쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
+          쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다
         </span>
         <div style={{ fontSize: 68, fontWeight: 800, letterSpacing: "-0.02em" }}>
           {categoryLabel}{" "}

@@ -7,7 +7,11 @@
  *  · 이미 큐에 들어간(문구가 만들어진) 영상에도 같은 규칙이 적용돼야 한다.
  *    발행 시점에 붙이므로 예전 항목도 자동으로 고쳐진다.
  *
- * 2026-10-03 수정(전략 재점검, 사장님 승인): 첫 줄 맨 앞에 짧은 "[광고]"를 다시 붙인다.
+ * 2026-10-07 사장님 결정: "[광고]" 표기를 전부 뺀다("보는 사람이 무시하고 넘어간다").
+ * 첫 줄은 다시 본문 첫 문장이고, 쿠팡파트너스 고지 전문은 본문 바로 뒤에 정확히 한 번
+ * (9/29 구조). 영상 하단 화면 고지는 "[광고]" 없이 고지 문장만 영상 내내 유지한다.
+ *
+ * (이전 기록) 2026-10-03 수정(전략 재점검, 사장님 승인): 첫 줄 맨 앞에 짧은 "[광고]"를 다시 붙인다.
  * 9/29 처럼 고지를 본문 뒤로만 두면 접힌 캡션('더보기' 앞)에 광고 표시가 없어 공정위
  * 지침("더보기를 눌러야 확인 가능한 경우 부적절")에 걸릴 수 있다. 긴 문장을 첫 줄에
  * 두면 광고 느낌이 너무 강하다는 사장님 의견은 그대로 살려, 첫 줄은 "[광고] + 본문
@@ -23,10 +27,6 @@
  */
 import { DISCLOSURE_LINE } from "./ai";
 
-/** 접힌 캡션·설명에서도 보이도록 첫 줄 맨 앞에 붙이는 짧은 광고 표시 */
-export const AD_PREFIX = "[광고]";
-const withAdPrefix = (firstLine: string) =>
-  firstLine.startsWith(AD_PREFIX) ? firstLine : `${AD_PREFIX} ${firstLine}`;
 import { landingUrl, type TemplateVariant } from "./tracking";
 
 /** 숏폼 캡션·설명의 템플릿 변형 (성과 비교용 - 링크에 tpl= 로 실린다) */
@@ -51,7 +51,7 @@ export function youtubeShortsDescription(
   });
 
   return [
-    withAdPrefix(shortProductName),
+    shortProductName,
     "",
     DISCLOSURE_LINE,
     "",
@@ -90,5 +90,5 @@ export function instagramCaption(
 
   // 본문이 통째로 비어 있는 경우(문구 생성 실패)에도 최소한의 안내는 나가야 한다.
   const fallback = `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`;
-  return [withAdPrefix(body || fallback), "", DISCLOSURE_LINE, ...(tags.length ? ["", ...tags] : [])].join("\n");
+  return [body || fallback, "", DISCLOSURE_LINE, ...(tags.length ? ["", ...tags] : [])].join("\n");
 }

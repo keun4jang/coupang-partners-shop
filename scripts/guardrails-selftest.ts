@@ -37,10 +37,15 @@ check(
   "TemplateEUseCase 에 <DisclosureTag /> 가 없다",
   /<DisclosureTag\s*\/>/.test(read("remotion/templates/TemplateEUseCase.tsx"))
 );
+// 2026-10-07: "[광고]" 접두는 사장님 결정으로 뺐다. 고지 문장 자체는 반드시 남아 있어야 한다.
+const SCREEN_DISCLOSURE = "쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다";
 check(
-  "화면 고지 문구에 [광고] 가 없다",
-  /DISCLOSURE_TEXT\s*=\s*\n?\s*"\[광고\]/.test(read("remotion/config/videoConfig.ts"))
+  "화면 고지 문구(DISCLOSURE_TEXT)에 쿠팡파트너스 고지 문장이 없다",
+  read("remotion/config/videoConfig.ts").includes(`"${SCREEN_DISCLOSURE}"`)
 );
+for (const t of ["TemplateE", "TemplateEUseCase"]) {
+  check(`${t} 화면 고지 문장이 없다`, read(`remotion/templates/${t}.tsx`).includes(SCREEN_DISCLOSURE));
+}
 
 // 3. 발행 편수 상한
 const setSetting = read("scripts/set-setting.ts");
