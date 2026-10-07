@@ -20,6 +20,7 @@ on:
           - google-keys-probe
           - longform-report
           - publish-status
+          - shelf-candidates
 
 concurrency:
   group: diag
