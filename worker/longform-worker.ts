@@ -81,6 +81,8 @@ async function main(): Promise<void> {
   const dryRun = args.includes("--dry-run");
   const force = args.includes("--force");
   const publish = args.includes("--publish");
+  // --topic=세탁세제 : 선반(구매 키워드 비교 롱폼) - 그 키워드 상품만으로 고른다
+  const topic = (args.find((a) => a.startsWith("--topic="))?.slice(8) ?? process.env.LONGFORM_TOPIC ?? "").trim();
 
   // shouldRunLongformToday 가 건너뛰는 구체적 이유(목표 시각 미도달/간격 미도달)를
   // 자체적으로 로그에 남긴다.
@@ -89,7 +91,8 @@ async function main(): Promise<void> {
   }
 
   console.log("TOP10 상품 선정 중...");
-  const { categoryLabel, topicKind, selected } = await selectTop10();
+  const { categoryLabel, topicKind, selected } = await selectTop10({ topic: topic || undefined });
+  if (topic) console.log(`지정 주제(선반): ${topic}`);
   console.log(
     `오늘 주제: ${categoryLabel} (${topicKind === "keyword" ? "세부 키워드" : "카테고리 안전망"})`
   );

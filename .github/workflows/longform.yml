@@ -37,6 +37,10 @@ on:
         description: "재고/주기 판정 무시하고 강행 (수동 테스트용)"
         type: boolean
         default: false
+      topic:
+        description: "선반 주제 키워드 (예: 세탁세제) - 비우면 자동 로테이션"
+        type: string
+        default: ""
   schedule:
     # 10분마다 깨어나 "오늘의 무작위 목표 시각(KST 05:20~06:50)이 됐는지"만
     # 확인한다(worker/longform-worker.ts shouldRunLongformToday 참고) - 매일
@@ -105,6 +109,8 @@ jobs:
         # 없으므로 실수로 로컬에서 돌려도 업로드까지 가지 않는다.
         env:
           LONGFORM_UPLOAD_OK: "1"
+          # 입력값은 셸에 직접 끼우지 않고 환경변수로 넘긴다(명령 주입 방지)
+          LONGFORM_TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || '' }}
         run: |
           # 예약 실행(schedule)은 기본 전체공개. 수동 실행(workflow_dispatch)은
           # 기본 비공개(unlisted) - publish 체크박스를 눌러야 전체공개된다.

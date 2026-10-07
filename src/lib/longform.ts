@@ -330,7 +330,7 @@ function sortByPreference(list: ScoredCandidate[]): void {
  * 부족하면(어느 주제도 10개를 못 채우면) selected.length < 10 로 돌아온다 -
  * 호출부가 최소 개수를 확인해서 건너뛸지 판단한다.
  */
-export async function selectTop10(): Promise<Top10Selection> {
+export async function selectTop10(opts: { topic?: string } = {}): Promise<Top10Selection> {
   const [pool, history, clicks, commission] = await Promise.all([
     eligiblePool(),
     recentLongformHistory(),
@@ -347,6 +347,20 @@ export async function selectTop10(): Promise<Top10Selection> {
       commissionScore: commission.get(item.display_number) ?? 0,
       recentlyUsed: history.usedProductIds.has(item.product_id),
     }));
+
+  // 선반(구체적 구매 키워드 비교 롱폼, 2026-10-07): 주제를 직접 지정하면 상품명에
+  // 그 키워드가 들어간(또는 그 키워드로 스카우트된) 상품만으로 고른다. 롱폼 실측에서
+  // 조회의 절반이 '세탁세제 추천'처럼 구체적 구매 검색어에서 왔다.
+  const topic = opts.topic?.trim();
+  if (topic) {
+    const list = candidates.filter(
+      (c) =>
+        c.item.products.product_name.includes(topic) ||
+        extractScoutKeyword(c.item.products.source_memo) === topic
+    );
+    sortByPreference(list);
+    return { categoryLabel: topic, topicKind: "keyword", selected: list.slice(0, 10).map((c) => c.item) };
+  }
 
   const byKeyword = new Map<string, ScoredCandidate[]>();
   for (const c of candidates) {
