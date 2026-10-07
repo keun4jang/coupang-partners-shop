@@ -62,8 +62,9 @@
 
 ## 새 계정에서 시작하는 법
 1. claude.ai 설정 → 커넥터에서 GitHub 연결(저장소 keun4jang/coupang-partners-shop 권한).
-2. PC 터미널: 이 폴더에서 `claude` 실행 → CLAUDE.md 와 이어가기 메모가 자동으로 읽힌다.
-   "이어서 해줘"라고만 하면 된다. 웹(claude.ai/code)에서 이 저장소로 세션을 열어도 같다.
-3. 위 루틴 2개를 다시 만든다.
+2. PC 터미널은 이 폴더에서 `claude`, 웹은 claude.ai/code 에서 이 저장소로 세션을 연다.
+3. **"쿠팡 시작"** 이라고 말한다 → `.claude/skills/coupang-start` 절차가 돈다: 상황 메모 읽기,
+   브랜치 맞추기, 자동화 점검, 사라진 루틴 복구, 브리핑까지 자동.
+   (사장님이 "쿠팡 시작"이라고 하면 Claude 는 반드시 coupang-start 스킬을 실행한다.)
 4. (선택) 대화 원문 저장을 PC 에서도 쓰려면 `C:\Projects` 에서
    `git clone https://github.com/keun4jang/claude-chat-archive.git` 한 번.
