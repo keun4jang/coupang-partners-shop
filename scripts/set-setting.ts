@@ -30,6 +30,14 @@ const ALLOWED: Record<string, { check: (v: string) => boolean; hint: string }> =
   },
   // 포맷 D 에서 제품 카드를 첫 장면부터 띄울지. worker/render-worker.ts 가 읽는다.
   d_product_first: { check: (v) => v === "on" || v === "off", hint: "on 또는 off" },
+  // 선반(구매 키워드 비교 롱폼) 1회 예약. 다음 새벽 롱폼 창(05:20~06:50 KST)에서 이 주제로
+  // 비공개(unlisted) 업로드 후 스스로 비운다. "-" 는 예약 취소. (worker/longform-worker.ts)
+  longform_topic_once: {
+    check: (v) => v === "-" || /^[가-힣A-Za-z0-9 ]{2,20}$/.test(v),
+    hint: "한글·영문·숫자 2~20자 키워드(예: 세탁세제), 취소는 -",
+  },
+  // 하루에 끼워 넣을 근사장 본인 상품 편수 (src/lib/ownProducts.ts)
+  own_product_daily: { check: (v) => /^[0-3]$/.test(v), hint: "0~3" },
 };
 
 async function main(): Promise<void> {

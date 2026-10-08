@@ -51,6 +51,7 @@ import { optionalEnv } from "../src/lib/env";
 import { generateNarration } from "../src/lib/tts";
 import { fetchImageAsDataUri } from "../src/lib/mediaFetch";
 import { youtubeUploadedTodayCount } from "../src/lib/quota";
+import { getSetting, setSetting } from "../src/lib/settings";
 import {
   hasYoutubeEnv,
   loadYoutubeCredsFromSettings,
@@ -79,10 +80,28 @@ const RENDER_DIR = path.resolve("renders/longform");
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
-  const force = args.includes("--force");
-  const publish = args.includes("--publish");
+  let force = args.includes("--force");
+  let publish = args.includes("--publish");
   // --topic=세탁세제 : 선반(구매 키워드 비교 롱폼) - 그 키워드 상품만으로 고른다
-  const topic = (args.find((a) => a.startsWith("--topic="))?.slice(8) ?? process.env.LONGFORM_TOPIC ?? "").trim();
+  let topic = (args.find((a) => a.startsWith("--topic="))?.slice(8) ?? process.env.LONGFORM_TOPIC ?? "").trim();
+
+  // 선반 1회 예약(app_settings.longform_topic_once): 새벽 롱폼 창의 예약 실행이 집어
+  // 비공개(unlisted)로 올리고 비운다. 자동 롱폼(longform_auto)이 꺼져 있어도 돈다 -
+  // 쇼츠 첫 업로드(07:40) 전이어야 할당량 보호에 안 걸리기 때문(2026-10-08).
+  let onceTopic = false;
+  if (!topic) {
+    const once = (await getSetting("longform_topic_once"))?.trim() ?? "";
+    if (once && once !== "-") {
+      topic = once;
+      force = true;
+      publish = false;
+      onceTopic = true;
+      console.log(`선반 1회 예약 실행: ${once} (비공개 업로드)`);
+    }
+  }
+  const clearOnce = async () => {
+    if (onceTopic) await setSetting("longform_topic_once", "-");
+  };
 
   // shouldRunLongformToday 가 건너뛰는 구체적 이유(목표 시각 미도달/간격 미도달)를
   // 자체적으로 로그에 남긴다.
@@ -100,6 +119,10 @@ async function main(): Promise<void> {
     console.log(
       `선정 가능한 상품이 ${selected.length}/10개뿐 - 이번 회차 건너뜀(재고 부족 또는 재사용 쿨다운)`
     );
+    if (onceTopic) {
+      await clearOnce();
+      await sendTelegramMessage(`📚 선반 예약 '${topic}' 취소: 해당 상품이 ${selected.length}개뿐이라 TOP10 을 못 채웠어요.`);
+    }
     return;
   }
   console.log(`카테고리: ${categoryLabel} · 선정 ${selected.length}개`);
@@ -300,6 +323,7 @@ async function main(): Promise<void> {
       privacyStatus: publish ? "public" : "unlisted",
     });
     console.log("유튜브 업로드 완료:", result.url);
+    await clearOnce();
 
     // 이 기록이 실패하면 "오늘 이미 했다"는 흔적이 없어, 같은 창의 다음 10분 틱이
     // 전 과정을 다시 돌려 같은 영상을 한 번 더 전체공개로 올린다. supabase-js 는
@@ -340,6 +364,8 @@ async function main(): Promise<void> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("유튜브 업로드 실패:", msg);
+    // 같은 새벽 창의 다음 틱이 또 렌더·업로드를 반복하지 않게 예약은 비운다(알림으로 사람이 본다)
+    await clearOnce();
     await db.from("longform_items").insert({
       category_label: categoryLabel,
       items: itemsSnapshot,
