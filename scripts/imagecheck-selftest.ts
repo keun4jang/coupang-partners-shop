@@ -11,7 +11,7 @@
  *
  * 실행: npx tsx scripts/imagecheck-selftest.ts   (또는 npm run imagecheck:check)
  */
-import { looksCjk } from "../src/lib/productImageCheck";
+import { findPromoText, looksCjk } from "../src/lib/productImageCheck";
 
 let failures = 0;
 
@@ -63,6 +63,31 @@ expectAccepted("번체", "多功能收納盒");
 expectAccepted("일본어 히라가나", "かんたん収納");
 expectAccepted("일본어 가타카나", "キッチン用品");
 expectAccepted("중국어+영어 혼합", "收纳箱 STORAGE BOX");
+
+// ── 4. 사진 속 판매자 홍보 문구 (2026-10-08 인스타 점검에서 실제로 나간 것) ──
+for (const [label, text] of [
+  ["수세미거치대", "Best / 선착순 한정특가 / 3세대 개선판"],
+  ["암막커튼", "1+1 / 200×200 / 차광율 99.9% / 강력고정 무타공"],
+  ["할인율", "30% 할인"],
+  ["타임세일", "타임세일 오늘만"],
+] as const) {
+  if (!findPromoText(text)) {
+    failures++;
+    console.error(`✗ [홍보 문구 놓침] ${label}: "${text}"`);
+  }
+}
+for (const [label, text] of [
+  ["소재 표기", "면 100% / 국내생산"],
+  ["스펙", "3세대 개선판 / 360° 세이프 밴딩"],
+  ["브랜드·용량", "KITCHEN TOWEL / 200매"],
+  ["빈 문구", ""],
+] as const) {
+  const hit = findPromoText(text);
+  if (hit) {
+    failures++;
+    console.error(`✗ [홍보 문구 가짜 양성] ${label}: "${text}" → "${hit}"`);
+  }
+}
 
 if (failures > 0) {
   console.error(`\n대표 사진 검사 자가 점검 실패 ${failures}건`);

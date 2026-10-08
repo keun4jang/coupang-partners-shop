@@ -384,5 +384,51 @@ export async function selectProductsForVideos(
     if (!progressed) break; // 더 뽑을 후보가 없음
   }
 
-  return takeWithImageCheck(ordered, count, opts);
+  return takeWithImageCheck(await spreadSameKeyword(ordered), count, opts);
+}
+
+/** 스카우트 검색 키워드(source_memo "스카우트 · '암막커튼' 검색 · …"). 골드박스 등은 null */
+export function scoutKeywordOf(sourceMemo: string | null | undefined): string | null {
+  return (sourceMemo ?? "").match(/스카우트 · '([^']+)' 검색/)?.[1] ?? null;
+}
+
+/** 같은 키워드 상품을 연달아 뽑지 않게 미룬다. 최근 N일에 나간 키워드도 뒤로 (재고가 바닥나면 그래도 쓴다) */
+const SAME_KEYWORD_GAP_DAYS = 4;
+
+/**
+ * 2026-10-08 인스타 점검: 피드 맨 윗줄에 암막커튼이 두 번(394·389번) 나와 단조로웠다.
+ * 같은 스카우트 키워드는 최근 4일·같은 묶음 안에서 한 번만 앞에 두고 나머지는 뒤로 민다.
+ * 버리지 않고 순서만 바꾸므로 재고가 줄지 않는다(순수 함수 부분은 orderBySpreadKeyword).
+ */
+async function spreadSameKeyword(ordered: Product[]): Promise<Product[]> {
+  let recent: string[] = [];
+  try {
+    const since = new Date(Date.now() - SAME_KEYWORD_GAP_DAYS * 86_400_000).toISOString();
+    const { data } = await supabaseAdmin()
+      .from("video_items")
+      .select("products(source_memo)")
+      .gte("created_at", since);
+    recent = ((data ?? []) as unknown as { products: { source_memo: string | null } | null }[])
+      .map((r) => scoutKeywordOf(r.products?.source_memo))
+      .filter((k): k is string => !!k);
+  } catch (e) {
+    console.warn("최근 키워드 조회 실패(순서 조정 없이 진행):", (e as Error).message.slice(0, 100));
+  }
+  return orderBySpreadKeyword(ordered, recent);
+}
+
+export function orderBySpreadKeyword(ordered: Product[], recentKeywords: string[]): Product[] {
+  const seen = new Set(recentKeywords);
+  const first: Product[] = [];
+  const later: Product[] = [];
+  for (const p of ordered) {
+    const k = scoutKeywordOf(p.source_memo);
+    if (k && seen.has(k)) {
+      later.push(p);
+      continue;
+    }
+    if (k) seen.add(k);
+    first.push(p);
+  }
+  return [...first, ...later];
 }

@@ -9,7 +9,7 @@
  *
  * 실행: npx tsx scripts/selector-selftest.ts   (또는 npm run selector:check)
  */
-import { takeFirstPassing } from "../src/lib/productSelector";
+import { orderBySpreadKeyword, takeFirstPassing } from "../src/lib/productSelector";
 import { offBrandReason } from "../src/lib/appeal";
 import type { Product } from "../src/types/db";
 
@@ -141,6 +141,19 @@ async function main() {
     });
     check("통과가 없으면 아무것도 안 뽑는다", picked.length === 0);
     check("둘 다 paused 대상", rejected.length === 2);
+  }
+
+  // 같은 키워드 연속 방지 (2026-10-08 암막커튼 두 번 연속)
+  {
+    const mk = (id: string, kw: string | null): Product => ({
+      ...product(id),
+      source_memo: kw ? `스카우트 · '${kw}' 검색 · [cpid:${id}] · 2026-10-08` : "골드박스",
+    });
+    const out = orderBySpreadKeyword(
+      [mk("a", "암막커튼"), mk("b", "암막커튼"), mk("c", "텀블러"), mk("d", null), mk("e", "수세미")],
+      ["수세미"]
+    ).map((p) => p.id);
+    check("같은 키워드는 하나만 앞에", out.join("") === "acdbe", out.join(""));
   }
 
   // 품목 규칙 (2026-10-05 스카우트에서 새어 들어온 실제 이름들)

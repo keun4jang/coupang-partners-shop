@@ -41,11 +41,15 @@ export interface ProductImageVerdict {
   showsProduct: boolean;
   /** 사진의 주요 피사체 (디버깅용: "사람", "제품 단독" 등) */
   mainSubject: string;
+  /** 사진에 박힌 판매자 홍보 문구(선착순·특가 등) - 근거 문구가 코드로 확인된 것만 */
+  promoText?: string;
 }
 
 interface VisionAnswer {
   cjkTextOverlay: boolean;
   cjkTextSample: string;
+  /** 사진에 보이는 한국어·영어 문구를 그대로 받아 적은 것 (홍보 문구 판정은 코드가 한다) */
+  visibleText?: string;
   showsProduct: boolean;
   mainSubject: string;
   confidence: number;
@@ -56,6 +60,7 @@ const SCHEMA = {
   properties: {
     cjkTextOverlay: { type: "BOOLEAN" },
     cjkTextSample: { type: "STRING" },
+    visibleText: { type: "STRING" },
     showsProduct: { type: "BOOLEAN" },
     mainSubject: { type: "STRING" },
     confidence: { type: "NUMBER" },
@@ -64,6 +69,7 @@ const SCHEMA = {
   propertyOrdering: [
     "cjkTextOverlay",
     "cjkTextSample",
+    "visibleText",
     "showsProduct",
     "mainSubject",
     "confidence",
@@ -91,6 +97,10 @@ function buildPrompt(productName: string): string {
   한국 쇼핑몰 상품 사진에 영어가 들어간 건 지극히 정상이다. 오직 중국어·일본어만 잡는다.
 
 cjkTextSample 에는 발견한 중국어/일본어를 그대로 짧게 적는다(없으면 빈 문자열).
+
+visibleText 에는 사진 위에 얹힌 한국어·영어 문구(배지·자막·스티커)를 보이는 그대로
+" / " 로 이어 적는다(예: "선착순 한정특가 / Best / 3세대 개선판"). 판단하지 말고 받아 적기만 한다.
+제품 자체에 인쇄된 브랜드명은 빼도 된다. 없으면 빈 문자열.
 
 【판정 2】 showsProduct — 상품명 "${productName}" 이 가리키는 그 물건이
 사진의 주인공으로 또렷이 보이면 true.
@@ -133,6 +143,22 @@ export function looksCjk(sample: string): boolean {
   // 한글이 섞여 있으면 한자가 낀 한국어 문장이다 (예: "特價 세일")
   if (HANGUL_RE.test(s)) return false;
   return true;
+}
+
+/**
+ * 사진에 박힌 판매자 홍보 문구 중 우리 영상에 나가면 안 되는 것 (2026-10-08 인스타 점검).
+ *
+ * 수세미거치대 사진의 "선착순 한정특가", 암막커튼의 "차광율 99.9%" 가 그대로 릴스
+ * 첫 화면에 나갔다. 우리 문구에서는 재촉·수치 주장을 막는데(policy.ts) 사진 속 글자는
+ * 빠져 있었다. 모델은 받아 적기만 하고 판정은 이 정규식이 한다(모델 판단은 흔들린다).
+ * "면 100%" 같은 소재 표기는 막지 않도록 % 는 할인 문맥만 잡는다.
+ */
+const PROMO_RE =
+  /선착순|한정\s*(특가|수량|판매|세일)|특가|타임\s*(세일|딜)|최저가|파격|품절\s*임박|마감\s*임박|오늘만|폭탄\s*세일|역대급|1\s*\+\s*1|\b(BEST|Best|SALE|Sale)\b|베스트\s*셀러|\d{1,2}\s*%\s*(할인|OFF|off|세일|DC)|99\.9|할인\s*쿠폰|무료\s*증정/;
+
+export function findPromoText(visibleText: string | null | undefined): string | null {
+  const m = (visibleText ?? "").match(PROMO_RE);
+  return m ? m[0] : null;
 }
 
 /**
@@ -215,6 +241,8 @@ export async function checkProductImage(input: {
     const subject = (answer.mainSubject ?? "").trim();
     reasons.push(subject ? `제품이 안 보임(주요 피사체: ${subject})` : "제품이 안 보임");
   }
+  const promo = findPromoText(answer.visibleText);
+  if (promo) reasons.push(`홍보 문구 박힘("${promo}")`);
 
   return {
     ok: reasons.length === 0,
@@ -222,5 +250,6 @@ export async function checkProductImage(input: {
     cjkTextOverlay: cjkConfirmed,
     showsProduct: Boolean(answer.showsProduct),
     mainSubject: (answer.mainSubject ?? "").trim(),
+    promoText: promo ?? undefined,
   };
 }
