@@ -44,6 +44,7 @@ import {
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
+import { packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
 import {
@@ -155,10 +156,13 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     );
   }
 
+  // hook_text 는 "누구에게\n훅" 두 줄일 수 있다 (lib/coverText.ts) - 옛 한 줄 값은 훅만
+  const { forWho, hook } = unpackHookText(item.hook_text);
   return {
     displayNumber: item.display_number,
     productName: shortenProductName(product.product_name),
-    hookLine: item.hook_text ?? lines[0] ?? shortenProductName(product.product_name),
+    hookLine: hook ?? lines[0] ?? shortenProductName(product.product_name),
+    coverForWho: forWho,
     empathyLine: lines[1] ?? "은근 신경 쓰이잖아요",
     benefit1: lines[2] ?? product.main_benefit ?? "하나 있으면 은근 편해 보여요",
     benefit2: lines[3] ?? "쓰기도 간편해 보이고요",
@@ -1489,7 +1493,7 @@ async function runDemo(): Promise<void> {
 
   const demoItem: VideoItem = {
     ...row,
-    hook_text: copy.hookText,
+    hook_text: packHookText(copy.forWho, copy.hookText),
     script_text: composeScriptText(copy, displayNumber),
     caption_text: copy.captionText,
     template_type: "D",

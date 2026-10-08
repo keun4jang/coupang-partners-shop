@@ -16,6 +16,7 @@ import {
 } from "./copyPresets";
 import { getSetting } from "./settings";
 import { isOwnProduct, OWN_SELLER_NAME } from "./ownProducts";
+import { cleanForWho } from "./coverText";
 import {
   BANNED_PHRASES,
   DISCLOSURE_LINE,
@@ -42,6 +43,7 @@ function singleLine(text: string): string {
 function sanitizeCopy(copy: VideoCopy): VideoCopy {
   return {
     hookText: singleLine(copy.hookText),
+    forWho: cleanForWho(copy.forWho),
     empathyLine: singleLine(copy.empathyLine),
     benefit1: singleLine(copy.benefit1),
     benefit2: singleLine(copy.benefit2),
@@ -133,6 +135,7 @@ export function hasNegativeTone(text: string): boolean {
 /** 대본 전체(캡션 포함)에서 부정 표현이 있는 줄들을 찾는다 */
 export function findNegativeLines(copy: VideoCopy): string[] {
   return [
+    copy.forWho ?? "",
     copy.hookText,
     copy.empathyLine,
     copy.benefit1,
@@ -145,6 +148,7 @@ export function findNegativeLines(copy: VideoCopy): string[] {
 
 function containsBannedPhrase(copy: VideoCopy): boolean {
   const all = [
+    copy.forWho ?? "",
     copy.hookText,
     copy.empathyLine,
     copy.benefit1,
@@ -163,6 +167,7 @@ function containsBannedPhrase(copy: VideoCopy): boolean {
  */
 export function findPolicyViolations(copy: VideoCopy): string[] {
   const body = [
+    copy.forWho ?? "",
     copy.hookText,
     copy.empathyLine,
     copy.benefit1,
@@ -303,6 +308,11 @@ const COPY_SCHEMA = {
       description:
         "첫 화면 후킹. 이 물건이 필요할 타겟을 콕 집어 부르거나(예: '아이 태우고 다니는 집이라면') 타겟이 뜨끔할 상황 제시. 18자 내외, 1줄.",
     },
+    forWho: {
+      type: "string",
+      description:
+        "썸네일 맨 위 작은 줄. 이 물건이 꼭 필요한 사람을 생활 장면으로 짚는다. 예: '출근길에 커피 들고 다니는 분께', '아이 태우고 차 자주 타는 집'. 20자 이내.",
+    },
     empathyLine: {
       type: "string",
       description: "공감 문장. 15자 내외, 1줄. 예: 은근 신경 쓰이잖아요",
@@ -335,6 +345,7 @@ const COPY_SCHEMA = {
   },
   required: [
     "hookText",
+    "forWho",
     "empathyLine",
     "benefit1",
     "benefit2",
@@ -410,6 +421,11 @@ const SYSTEM_PROMPT = `너는 생활 꿀템·신박한 아이디어 상품을 �
    자가 검증: 훅만 읽고 장면과 정답이 다 그려지면 탈락, 다시 쓴다.
    자가 검증2: 훅이 위 ✗ 목록의 종결로 끝나는지 쓰고 나서 반드시 다시 확인한다.
    훅에서 던진 질문·반전의 답은 benefit1~usageTip 에서 반드시 회수한다(낚시로 끝나면 실패).
+   forWho(썸네일 맨 위 작은 줄, 영상 대본에는 안 들어감): 이 물건이 "꼭 필요한 사람"을 생활 장면으로 짚는다.
+   보는 사람이 "어, 내 얘기네" 하고 멈추게 하는 줄이다. 20자 이내, "~하는 집" / "~하는 분께" 형태.
+   좋은 예) "출근길에 커피 들고 다니는 분께", "아이 태우고 차 자주 타는 집", "베란다 없는 원룸 사는 분께"
+   금지: 나이·성별·외모·몸 상태를 넘겨짚기("뱃살 고민", "50대 여성"), 질병·증상, 부정 낱말, 과장·재촉.
+   훅과 같은 말을 반복하지 않는다(훅은 물건 쪽, forWho 는 사람 쪽).
 2. empathyLine: "이런 거 있으면 좋겠다 싶었던 지점"을 반갑게 짚어준다. 훅의 궁금증을 이어받아 증폭.
    불평·하소연이 아니라 바람·기대로 쓴다. 예) "이런 게 있으면 편하겠다 싶었잖아요"
 3. benefit1: 제품이 그걸 어떻게 편하게 만들어 주는지 핵심 장점을 소개한다.
@@ -451,6 +467,7 @@ const GEMINI_COPY_SCHEMA = {
   type: "OBJECT",
   properties: {
     hookText: { type: "STRING" },
+    forWho: { type: "STRING" },
     empathyLine: { type: "STRING" },
     benefit1: { type: "STRING" },
     benefit2: { type: "STRING" },
@@ -460,6 +477,7 @@ const GEMINI_COPY_SCHEMA = {
   },
   required: [
     "hookText",
+    "forWho",
     "empathyLine",
     "benefit1",
     "benefit2",
@@ -469,6 +487,7 @@ const GEMINI_COPY_SCHEMA = {
   ],
   propertyOrdering: [
     "hookText",
+    "forWho",
     "empathyLine",
     "benefit1",
     "benefit2",

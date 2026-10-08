@@ -180,6 +180,7 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           productImageUrl={props.productImageUrl}
           displayNumber={props.displayNumber}
           hookLine={props.hookLine}
+          forWho={props.coverForWho}
         />
       </Sequence>
     </AbsoluteFill>

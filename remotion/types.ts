@@ -24,6 +24,8 @@ export type ShortsProps = {
   productName: string;
   /** 후킹 문구(타겟 호명) */
   hookLine: string;
+  /** 썸네일 맨 위 "누구에게" 줄 (예: "출근길에 커피 들고 다니는 분께"). 없으면 생략 */
+  coverForWho?: string | null;
   /** 공감 문장(문제) */
   empathyLine: string;
   /** 장점 1 */

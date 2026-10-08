@@ -7,6 +7,7 @@ import type {
 } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { composeScriptText, generateVideoCopy } from "./ai";
+import { packHookText } from "./coverText";
 import { selectProductsForVideos } from "./productSelector";
 import { shortsVariantOf } from "./tracking";
 import { pickShortsVariant } from "./usecaseScore";
@@ -266,7 +267,8 @@ export async function fillVideoCopy(
     // 남는다. 시청자가 영상에서 번호를 보고 랜딩에 오는 흐름이라 순서가 뒤집히면
     // "없는 번호"를 보게 된다. 발행 완료 시점(render-worker 의 completed 갱신)에서만 켠다.
     .update({
-      hook_text: copy.hookText,
+      // 썸네일 "누구에게" 줄을 훅 위에 한 줄 더 얹어 저장한다 (lib/coverText.ts)
+      hook_text: packHookText(copy.forWho, copy.hookText),
       script_text: composeScriptText(copy, item.display_number),
       caption_text: copy.captionText,
     })

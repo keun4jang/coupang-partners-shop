@@ -1,6 +1,7 @@
 import type { VideoItemWithProduct } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { getSetting } from "./settings";
+import { unpackHookText } from "./coverText";
 import { cleanProductTitle, productTargetUrl, formatDisplayNumber } from "./format";
 import { DISCLOSURE_LINE } from "./ai";
 import { fetchCommissionReport } from "./coupang";
@@ -501,7 +502,8 @@ export function itemBenefitLines(item: VideoItemWithProduct): { benefit1: string
  */
 export function itemNarrationLine(item: VideoItemWithProduct, rank: number, name: string): string {
   const lines = (item.script_text ?? "").split("\n");
-  const hook = (item.hook_text || lines[0] || "").trim();
+  // hook_text 는 "누구에게\n훅" 두 줄일 수 있다 - 나레이션엔 훅만 (lib/coverText.ts)
+  const hook = (unpackHookText(item.hook_text).hook || lines[0] || "").trim();
   const { benefit1, benefit2 } = itemBenefitLines(item);
   const parts = [`${rank}위, ${name}.`, hook, benefit1, benefit2].filter(Boolean);
   return parts.join(" ");

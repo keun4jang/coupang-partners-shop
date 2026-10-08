@@ -129,6 +129,8 @@ export interface StudioIdeaRow {
 export interface VideoCopy {
   /** 타겟 호명 후킹 (예: "아이 태우고 다니는 집이라면") */
   hookText: string;
+  /** 썸네일 맨 위 "누구에게" 줄 (예: "출근길에 커피 들고 다니는 분께"). 없으면 생략 */
+  forWho?: string | null;
   /** 문제 공감 문장 (예: "차 안 부스러기 은근 신경 쓰이잖아요") */
   empathyLine: string;
   /** 핵심 장점 1 (예: "차에 하나 두면 바로 치울 수 있어 보여요") */
