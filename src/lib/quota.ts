@@ -26,8 +26,9 @@ export async function youtubeDailyCap(): Promise<number | null> {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 4;
 }
 
-/** 오늘(KST) 유튜브에 올라간 편 수 (숏폼+롱폼 합산 - video_items 만 집계하므로
- *  롱폼 업로드는 longform-worker.ts 가 별도로 자기 몫을 보수적으로 아껴 쓴다) */
+/** 오늘(KST) 유튜브에 올라간 편 수 (숏폼 video_items + 롱폼 longform_items 합산).
+ *  2026-10-09 롱폼도 세게 했다: 선반 영상이 숏폼 뒤에 올라가는 날(새벽 크론 지연)에도
+ *  하루 합계가 상한(기본 4편) 안에 들게 - 롱폼이 올라간 날은 숏폼이 1편 줄고 그 편은 인스타 전용. */
 export async function youtubeUploadedTodayCount(now = new Date()): Promise<number | null> {
   const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
   const kstMidnightUtc = new Date(
@@ -46,5 +47,13 @@ export async function youtubeUploadedTodayCount(now = new Date()): Promise<numbe
     console.warn("유튜브 일일 업로드 수 조회 실패 - 상한 미적용으로 진행:", error.message.slice(0, 100));
     return null;
   }
-  return count ?? 0;
+  const { count: longCount, error: longErr } = await db
+    .from("longform_items")
+    .select("id", { count: "exact", head: true })
+    .not("youtube_url", "is", null)
+    .gte("published_at", kstMidnightUtc.toISOString());
+  if (longErr) {
+    console.warn("롱폼 업로드 수 조회 실패 - 숏폼만 집계:", longErr.message.slice(0, 100));
+  }
+  return (count ?? 0) + (longErr ? 0 : longCount ?? 0);
 }

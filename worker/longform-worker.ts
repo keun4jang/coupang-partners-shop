@@ -50,7 +50,7 @@ import { sendTelegramMessage } from "../src/lib/telegram";
 import { optionalEnv } from "../src/lib/env";
 import { generateNarration } from "../src/lib/tts";
 import { fetchImageAsDataUri } from "../src/lib/mediaFetch";
-import { youtubeUploadedTodayCount } from "../src/lib/quota";
+import { youtubeDailyCap, youtubeUploadedTodayCount } from "../src/lib/quota";
 import { getSetting, setSetting } from "../src/lib/settings";
 import {
   hasYoutubeEnv,
@@ -299,9 +299,18 @@ async function main(): Promise<void> {
   // 여러 편 올라갔으면(오전 슬롯 이후) 뒤에 올 숏폼분과 부딪힐 수 있어, 이 크론을
   // 숏폼 첫 슬롯(07:30 KST)보다 이르게 돌리는 걸 전제로 "오늘 첫 업로드"일 때만 진행한다.
   // 놓치면 실패로 기록되고 다음날 재시도된다(주간 간격은 completed 에만 걸리므로).
+  // 선반 1회 예약(onceTopic)은 예외(2026-10-09 사장님 승인): 새벽 크론이 GitHub 지연으로
+  // 숏폼 뒤에 돌아 매일 막혔다. 이제 롱폼도 하루 상한(youtubeDailyCap) 한 칸으로 세므로
+  // (lib/quota.ts) 상한이 남아 있으면 올리고, 그날 숏폼이 1편 줄어 인스타 전용으로 나간다.
   const ytToday = await youtubeUploadedTodayCount();
-  if (ytToday !== 0 && ytToday !== null) {
-    const msg = `오늘 이미 유튜브 업로드가 ${ytToday}건 있어 할당량 보호를 위해 이번 회차는 건너뜁니다(내일 재시도)`;
+  const cap = onceTopic ? await youtubeDailyCap() : null;
+  const blocked = onceTopic
+    ? ytToday !== null && cap !== null && ytToday >= cap
+    : ytToday !== 0 && ytToday !== null;
+  if (blocked) {
+    const msg = onceTopic
+      ? `오늘 유튜브 업로드가 이미 ${ytToday}건(상한 ${cap}) - 선반 영상은 내일 재시도`
+      : `오늘 이미 유튜브 업로드가 ${ytToday}건 있어 할당량 보호를 위해 이번 회차는 건너뜁니다(내일 재시도)`;
     console.warn(msg);
     await db.from("longform_items").insert({
       category_label: categoryLabel,
