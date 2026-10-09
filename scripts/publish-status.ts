@@ -89,6 +89,43 @@ async function main(): Promise<void> {
     .eq("status", "candidate");
   if (pErr || cErr) console.log(`⑤ 상품 수 조회 실패: ${(pErr ?? cErr)!.message}`);
   else console.log(`⑤ 상품: candidate ${cand} · paused ${paused}`);
+
+  // ⑥ 근사장 본인 상품 영상 (2026-10-09: 첫 편이 대기열 어디쯤인지 보려고)
+  const { data: own, error: oErr } = await db
+    .from("video_items")
+    .select("display_number, video_status, published_at, hook_text, caption_text, youtube_url, instagram_url, products!inner(product_name, source_memo)")
+    .like("products.source_memo", "%[own]%")
+    .order("display_number");
+  if (oErr) console.log(`⑥ 근사장 상품 영상 조회 실패: ${oErr.message}`);
+  else {
+    const list = (own ?? []) as unknown as Array<{
+      display_number: number;
+      video_status: string;
+      published_at: string | null;
+      hook_text: string | null;
+      caption_text: string | null;
+      youtube_url: string | null;
+      instagram_url: string | null;
+      products: { product_name: string };
+    }>;
+    console.log(`⑥ 근사장 상품 영상 ${list.length}편`);
+    for (const r of list) {
+      const sellerLine = (r.caption_text ?? "").includes("근사장이 직접 판매") ? "판매자고지○" : "판매자고지×";
+      console.log(
+        `   ${r.display_number}번 ${r.video_status} ${r.youtube_url ? "YT○" : "YT×"} ${r.instagram_url ? "IG○" : "IG×"} ${sellerLine} ${short(r.products.product_name, 30)} | 훅: ${short(r.hook_text, 60)}`
+      );
+    }
+  }
+
+  // ⑦ 대기열 앞쪽 훅 (새 썸네일 "누구에게" 줄이 들어간 첫 번호 확인용 - 두 줄이면 새 방식)
+  const { data: next } = await db
+    .from("video_items")
+    .select("display_number, hook_text")
+    .eq("video_status", "pending")
+    .order("display_number")
+    .limit(30);
+  const firstNew = (next ?? []).find((r) => (r.hook_text ?? "").includes("\n"));
+  console.log(`⑦ 새 썸네일 문구가 들어간 첫 대기 번호: ${firstNew ? `${firstNew.display_number}번 (${short(firstNew.hook_text, 60)})` : "아직 없음"}`);
 }
 
 main().catch((e) => {
