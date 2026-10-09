@@ -16,7 +16,7 @@ import { FontFaceStyle } from "./FontFaceStyle";
  *
  * 데드존: 인스타 프로필 그리드는 세로 9:16 커버를 위·아래로 잘라 보여주고,
  * 재생 중엔 상·하단에 플랫폼 UI가 겹친다. 그래서 글자·사진을
- * 세로 12%~88% 안쪽에 둔다.
+ * 세로 15.5%~87% 안쪽에 둔다(2026-10-09 실측: 3:4 그리드가 위 12.5% 를 잘라 12% 에선 훅 윗줄이 가장자리에 붙었다).
  */
 const INK = "#1F1B17";
 
@@ -45,10 +45,10 @@ export const CoverFrame: React.FC<{
       <div
         style={{
           position: "absolute",
-          top: H * 0.36,
+          top: H * 0.39,
           left: 0,
           right: 0,
-          height: H * 0.52,
+          height: H * 0.48,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -60,7 +60,7 @@ export const CoverFrame: React.FC<{
           <span style={{ fontSize: 220 }}>🧺</span>
         )}
       </div>
-      <div style={{ position: "absolute", top: H * 0.12, left: pad, right: pad }}>
+      <div style={{ position: "absolute", top: H * 0.155, left: pad, right: pad }}>
         <div
           style={{
             color: INK,
