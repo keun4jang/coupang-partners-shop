@@ -10,7 +10,7 @@
  * 실행: npx tsx scripts/selector-selftest.ts   (또는 npm run selector:check)
  */
 import { orderBySpreadKeyword, takeFirstPassing } from "../src/lib/productSelector";
-import { offBrandReason } from "../src/lib/appeal";
+import { offBrandReason, searchabilityPenalty } from "../src/lib/appeal";
 import type { Product } from "../src/types/db";
 
 let failures = 0;
@@ -168,6 +168,24 @@ async function main() {
     for (const n of blocked) check(`부적합 품목 차단: ${n}`, offBrandReason(n) !== null);
     const allowed = ["피지 캡슐세제 60개", "쌀통 10kg", "아이스크림 스쿱", "식기건조대 2단", "쌀국수 그릇", "핸드크림 거치대"];
     for (const n of allowed) check(`살림템 통과: ${n}`, offBrandReason(n) === null, String(offBrandReason(n)));
+  }
+
+  // 검색 쉬움 감점 (2026-10-11): 뻔한 품목·모델번호는 감점, 이름 모를 아이디어 상품은 0
+  {
+    const cases: Array<[string, number]> = [
+      ["쿠첸 전기압력밥솥 10인용", -2],
+      ["신일 EMF 전기요 SEB-FP100MCP", -2],
+      ["카시오 군인 학생 스포츠 디지털시계 F-91W-1", -2],
+      ["요이치 게이밍 마우스 장패드 800 x 300 x 5 mm", -2],
+      ["리빙홈디테일 무타공 접착식 철제 6구 후크걸이 LHD-071", 0],
+      ["라임리빙 보관이 간편한 실리콘 접이식 식기 건조 배수 매트", 0],
+      ["접이식 무선 미니 선풍기", 0],
+      ["팬앤팟 길이조절 슬라이딩 후라이팬 정리대", 0],
+    ];
+    for (const [n, want] of cases) {
+      const got = searchabilityPenalty(n);
+      check(`검색 쉬움 감점 ${want}: ${n}`, got === want, `실제 ${got}`);
+    }
   }
 
   if (failures > 0) {

@@ -76,6 +76,30 @@ export function appealScore(productName: string): number {
 }
 
 /**
+ * "검색해서 직접 사기 쉬운 물건" 감점 (2026-10-11 사장님 승인).
+ *
+ * 왜: 시청자가 굳이 우리 링크로 살 이유는 "이 물건을 찾는 가장 쉬운 길"일 때뿐이다.
+ * 밥솥·드라이기·전기요처럼 이름이 뻔한 물건은 영상을 보고 쿠팡에서 직접 검색해
+ * 사 버린다(우리 몫 0원). 브랜드+모델번호 상품(쿠첸 …, F-91W-1)도 그 이름으로 바로 찾는다.
+ * 반대로 "그 접히는 실리콘 뭐였지" 같은 이름 모를 물건은 번호 링크가 제일 쉬운 길이다.
+ *
+ * 0(보통) · -1(브랜드/모델번호로 검색 가능) · -2(흔한 품목명 그 자체).
+ * 신기함 신호(appealScore)와는 별개 축이다 - 둘 다 순위에 반영된다.
+ */
+const GENERIC_SEARCH_ITEM =
+  /밥솥|세탁기|건조기|냉장고|김치냉장고|전자레인지|에어프라이어|드라이기|드라이어|청소기|선풍기|전기요|전기장판|이불|베개|수건|칫솔|치약|건전지|캐리어|마우스|장패드|손목시계|디지털시계|키친타올|물티슈|휴지|화장지|쓰레기봉투|지퍼백|고무장갑/;
+const MODEL_NUMBER = /\b[A-Z]{1,5}-?\d{2,}[A-Z0-9-]*\b/;
+
+export function searchabilityPenalty(productName: string): number {
+  const name = productName ?? "";
+  // 신기함 신호가 강하면(접이식·무타공·자동 등) 품목명이 흔해도 "그 물건"은 검색으로 찾기 어렵다
+  const idea = appealScore(name) >= 3;
+  if (GENERIC_SEARCH_ITEM.test(name) && !idea) return -2;
+  if (MODEL_NUMBER.test(name) && !idea) return -1;
+  return 0;
+}
+
+/**
  * 검색 노출만 노리고 키워드를 도배한 "스팸성 제목" 판정.
  *
  * 이런 제목은 두 군데서 손해가 난다:

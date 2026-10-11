@@ -1,7 +1,7 @@
 import { offBrandReason } from "./appeal";
 import type { Product } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
-import { appealScore, spamTitleReason } from "./appeal";
+import { appealScore, searchabilityPenalty, spamTitleReason } from "./appeal";
 
 /**
  * video_items 의 product_id 전량 조회.
@@ -243,6 +243,8 @@ function score(product: Product): number {
   //  필요한 사람은 어차피 산다. 중요한 건 눌러보고 싶게 만드는 아이템인지).
   // 가중치를 크게 줘서 다른 항목보다 이 점수가 순위를 지배하게 한다.
   s += appealScore(product.product_name) * 2;
+  // 검색해서 직접 사기 쉬운 물건은 우리 링크를 거칠 이유가 없다 (appeal.ts searchabilityPenalty)
+  s += searchabilityPenalty(product.product_name) * 2;
   return s;
 }
 
