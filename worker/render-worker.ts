@@ -44,6 +44,7 @@ import {
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
+import { findOwn, inPhotoCutsArm, makePhotoCuts, PHOTO_CUTS_ORIGIN } from "../src/lib/photoCuts";
 import { packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
@@ -279,10 +280,38 @@ async function renderVideo(
   const BROLL_CUT_COUNT = effectiveTemplate === "E" ? 3 : 6;
   let brollOrigin = "배경 없음(블러 사진)";
 
+  // 근사장 본인 상품 시험(10/19~, 홀수 번호): 윙 사진 여러 장으로 만든 컷을 배경으로 쓴다.
+  // 판매자 본인 사진이라 "사용 상황 예시" 라벨은 붙이지 않는다. src/lib/photoCuts.ts 참고.
+  if (
+    usesBroll &&
+    inPhotoCutsArm(product, item.display_number) &&
+    (await getSetting("own_photo_cuts"))?.trim() !== "off"
+  ) {
+    const own = findOwn(product);
+    const files = own
+      ? await makePhotoCuts(
+          own,
+          item.display_number,
+          BROLL_CUT_COUNT,
+          effectiveTemplate === "E" ? "landscape" : "portrait"
+        )
+      : [];
+    if (files.length > 0) {
+      inputProps.brollFiles = files;
+      inputProps.brollDurations = brollFileDurations(files);
+      inputProps.brollNotice = null;
+      cachedBundle = null;
+      brollOrigin = PHOTO_CUTS_ORIGIN;
+      console.log(`근사장 사진 컷 사용: ${files.join(", ")}`);
+    } else {
+      console.warn("근사장 사진 컷 실패 - 기존 배경 경로로 폴백");
+    }
+  }
+
   // 사장님이 직접 넣은 소재(public/assets/broll/catalog.json)가 있으면 그게 1순위다.
   // 상품명에서 "어느 자리에 놓는 물건인지"를 읽어 그 장면 태그로 고른다.
   // 카탈로그가 없으면(기본 상태) 빈 배열이 돌아와 기존 경로가 그대로 돈다.
-  if (usesBroll) {
+  if (usesBroll && !inputProps.brollFiles) {
     const tags = sceneTagsFor(product.product_name, product.category);
     const picked = pickCatalogAssets(tags, BROLL_CUT_COUNT);
     if (picked.length > 0) {

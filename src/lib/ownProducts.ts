@@ -83,8 +83,8 @@ export const OWN_PRODUCTS: Own[] = [
 /**
  * 본인 상품 추가 사진 (2026-10-12 쿠팡 윙 OPEN API 로 읽음 - scripts/wing-images.ts, 읽기만).
  * 값은 image.coupangcdn.com/image/ 뒤 경로. gallery = 대표·추가 이미지(첫 장이 대표),
- * detail = 상세페이지 이미지(글씨가 많은 안내 그림일 수 있어 그대로 쓰기 전에 확인).
- * 아직 렌더에서 쓰지 않는다 - 다음 시험(사진 1장 → 여러 컷)에서 쓸 재료.
+ * detail = 상세페이지 이미지(영상에는 안 씀 - ownImageUrls 참고).
+ * 렌더: src/lib/photoCuts.ts (10/19~ 홀수 번호 근사장 영상 배경).
  * 윙은 허용 IP 만 받아 GitHub Actions 에서는 못 읽는다 → 상품이 바뀌면 PC 에서 다시 실행해 갱신.
  */
 export const OWN_IMAGES: Record<string, { gallery: string[]; detail: string[] }> = {
@@ -138,9 +138,13 @@ export const OWN_IMAGES: Record<string, { gallery: string[]; detail: string[] }>
   },
 };
 
-/** 본인 상품의 사진 URL 목록 (추가 이미지 → 상세 이미지 순, 없으면 대표 사진 1장) */
+/**
+ * 본인 상품의 사진 URL 목록 (대표·추가 이미지, 없으면 대표 사진 1장).
+ * 상세 이미지는 뺀다 - 413번에서 추가 이미지와 같은 사진이 주소만 달리 들어 있었고,
+ * 글씨 많은 안내 그림일 수도 있다.
+ */
 export function ownImageUrls(o: Own): string[] {
   const x = OWN_IMAGES[o.inv];
-  const paths = x ? [...x.gallery, ...x.detail] : [o.image];
+  const paths = x?.gallery.length ? x.gallery : [o.image];
   return [...new Set(paths)].map((p) => `https://image.coupangcdn.com/image/${p}`);
 }
