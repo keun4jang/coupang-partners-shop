@@ -509,12 +509,15 @@ export function itemNarrationLine(item: VideoItemWithProduct, rank: number, name
   return parts.join(" ");
 }
 
-export function introNarrationLine(categoryLabel: string): string {
-  return `오늘은 저희가 소개했던 ${categoryLabel} 중에서 열 가지를 골라봤어요. 10위부터 순서대로 보여드릴게요.`;
+const KOREAN_COUNT: Record<number, string> = { 8: "여덟", 9: "아홉", 10: "열" };
+
+/** n: 선반은 상품이 8~9개여도 만든다(2026-10-12) - 개수를 실제와 맞춘다 */
+export function introNarrationLine(categoryLabel: string, n = 10): string {
+  return `오늘은 저희가 소개했던 ${categoryLabel} 중에서 ${KOREAN_COUNT[n] ?? n} 가지를 골라봤어요. ${n}위부터 순서대로 보여드릴게요.`;
 }
 
 export const OUTRO_NARRATION_LINE =
-  "오늘 소개한 상품 정보는 전부 설명란에 순서대로 정리해 뒀어요. 다음에도 새로운 TOP10으로 찾아올게요.";
+  "오늘 소개한 상품 정보는 전부 설명란에 순서대로 정리해 뒀어요. 다음에도 새로운 추천으로 찾아올게요.";
 
 /**
  * 유튜브 롱폼 제목 (100자 제한).
@@ -524,11 +527,11 @@ export const OUTRO_NARRATION_LINE =
  * 상당수가 클릭 0건이다 - 그 상태로 "반응이 좋았던"이라고 하면 근거 없는 주장이
  * 된다. 실제로 사실인 것만 쓴다: 우리가 이미 소개한 상품 중에서 골랐다는 것.
  */
-export function longformTitle(categoryLabel: string): string {
+export function longformTitle(categoryLabel: string, n = 10): string {
   // 뒷문구에 품목명을 또 넣으면 키워드가 '살림템'일 때 "살림템 추천 TOP10 |
   // 직접 골라본 살림템 모음"처럼 같은 말이 두 번 나온다. 키워드와 안 겹치는
   // 표현만 쓴다.
-  return `${categoryLabel} 추천 TOP10 | 직접 골라 정리했어요`;
+  return `${categoryLabel} 추천 TOP${n} | 직접 골라 정리했어요`;
 }
 
 /**

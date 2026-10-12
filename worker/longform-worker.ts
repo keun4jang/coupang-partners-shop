@@ -115,13 +115,15 @@ async function main(): Promise<void> {
   console.log(
     `오늘 주제: ${categoryLabel} (${topicKind === "keyword" ? "세부 키워드" : "카테고리 안전망"})`
   );
-  if (selected.length < 10) {
+  // 선반(주제 지정)은 8개 이상이면 TOP8·TOP9 로 만든다 - 10/11 빨래건조대가 9개라 통째로 건너뛰었다(2026-10-12 사장님 승인)
+  const minCount = topic ? 8 : 10;
+  if (selected.length < minCount) {
     console.log(
-      `선정 가능한 상품이 ${selected.length}/10개뿐 - 이번 회차 건너뜀(재고 부족 또는 재사용 쿨다운)`
+      `선정 가능한 상품이 ${selected.length}/${minCount}개뿐 - 이번 회차 건너뜀(재고 부족 또는 재사용 쿨다운)`
     );
     if (onceTopic) {
       await clearOnce();
-      await sendTelegramMessage(`📚 선반 예약 '${topic}' 취소: 해당 상품이 ${selected.length}개뿐이라 TOP10 을 못 채웠어요.`);
+      await sendTelegramMessage(`📚 선반 예약 '${topic}' 취소: 해당 상품이 ${selected.length}개뿐이라 TOP${minCount} 도 못 채웠어요.`);
     }
     return;
   }
@@ -146,7 +148,7 @@ async function main(): Promise<void> {
   // 항상 작아(1~3문장) 구글 TTS 무료 등급 상한(GOOGLE_CHAR_CAP_PER_VIDEO=2000)에
   // 절대 안 걸린다(전체를 한 번에 합쳐 부르면 롱폼은 쉽게 넘긴다).
   console.log("나레이션 합성 중...");
-  const introLine = introNarrationLine(categoryLabel);
+  const introLine = introNarrationLine(categoryLabel, selected.length);
   const introNarration = (await generateNarration([introLine]))?.[0] ?? null;
 
   for (let i = 0; i < items.length; i++) {
@@ -215,7 +217,7 @@ async function main(): Promise<void> {
   });
   console.log("렌더링 완료");
 
-  const title = longformTitle(categoryLabel);
+  const title = longformTitle(categoryLabel, selected.length);
   const description = longformDescription(
     categoryLabel,
     items,
@@ -245,7 +247,7 @@ async function main(): Promise<void> {
       [
         "🚫 롱폼 발행 중단 (정책 검사)",
         "",
-        `${categoryLabel} TOP10`,
+        `${categoryLabel} TOP${selected.length}`,
         "",
         `걸린 표현 → ${summary}`,
         "",

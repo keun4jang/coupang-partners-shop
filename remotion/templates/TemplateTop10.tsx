@@ -164,8 +164,9 @@ const LongformBgm: React.FC = () => {
  * 롱폼은 이탈이 관건이라 "얼마나 왔는지"를 항상 보여주는 게 컨설팅 답변에 없던
  * 리텐션 장치다. 왼쪽 = 10위(시작), 오른쪽 = 1위(끝).
  */
-const ProgressBar: React.FC<{ rank: number }> = ({ rank }) => {
-  const passedCount = 10 - rank; // rank=10 이면 0칸, rank=1 이면 9칸 채워짐(현재 칸은 아래서 강조)
+// total: 선반은 상품이 9개뿐일 때도 만든다(2026-10-12) - 칸 수를 실제 개수에 맞춘다
+const ProgressBar: React.FC<{ rank: number; total: number }> = ({ rank, total }) => {
+  const passedCount = total - rank; // rank=10 이면 0칸, rank=1 이면 9칸 채워짐(현재 칸은 아래서 강조)
   return (
     <div
       style={{
@@ -177,8 +178,8 @@ const ProgressBar: React.FC<{ rank: number }> = ({ rank }) => {
         gap: 6,
       }}
     >
-      {Array.from({ length: 10 }, (_, i) => {
-        const segRank = 10 - i;
+      {Array.from({ length: total }, (_, i) => {
+        const segRank = total - i;
         const done = i < passedCount;
         const current = segRank === rank;
         return (
@@ -308,7 +309,7 @@ const BenefitLine: React.FC<{
   );
 };
 
-const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
+const ProductCard: React.FC<{ item: Top10Item; total: number }> = ({ item, total }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const slide = spring({ frame, fps, config: { damping: 22 } });
@@ -329,7 +330,7 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
       }}
     >
       {item.narrationUri ? <Audio src={item.narrationUri} /> : null}
-      <ProgressBar rank={item.rank} />
+      <ProgressBar rank={item.rank} total={total} />
       <div
         style={{
           position: "absolute",
@@ -432,8 +433,11 @@ const ProductCard: React.FC<{ item: Top10Item }> = ({ item }) => {
   );
 };
 
-const Intro: React.FC<{ categoryLabel: string; narrationUri?: string | null }> = ({
+const KOREAN_COUNT: Record<number, string> = { 8: "여덟", 9: "아홉", 10: "열" };
+
+const Intro: React.FC<{ categoryLabel: string; total: number; narrationUri?: string | null }> = ({
   categoryLabel,
+  total,
   narrationUri,
 }) => {
   const frame = useCurrentFrame();
@@ -484,10 +488,10 @@ const Intro: React.FC<{ categoryLabel: string; narrationUri?: string | null }> =
         </span>
         <div style={{ fontSize: 68, fontWeight: 800, letterSpacing: "-0.02em" }}>
           {categoryLabel}{" "}
-          <span style={{ color: E.accent }}>TOP10</span>
+          <span style={{ color: E.accent }}>TOP{total}</span>
         </div>
         <div style={{ fontSize: 26, opacity: 0.75 }}>
-          저희가 소개했던 아이템 중 열 가지 · 10위부터 공개합니다
+          저희가 소개했던 아이템 중 {KOREAN_COUNT[total] ?? total} 가지 · {total}위부터 공개합니다
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
@@ -516,7 +520,7 @@ const Outro: React.FC<{ items: Top10Item[]; narrationUri?: string | null }> = ({
     >
       {narrationUri ? <Audio src={narrationUri} /> : null}
       <div style={{ fontSize: 36, fontWeight: 800, color: E.ink, marginBottom: 20 }}>
-        오늘의 TOP10 요약
+        오늘의 TOP{items.length} 요약
       </div>
       <div
         style={{
@@ -596,8 +600,9 @@ export const COVER_FRAME_COUNT = TOP10_FPS;
  * Intro 화면(이 커버 바로 다음)과 설명란 맨 위에는 그대로 남겨 요건을 지킨다.
  * 이 화면은 정지 이미지(썸네일) 용도로만 쓰이는 부분이라 뺀 것뿐이다.
  */
-const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
+const Top10Cover: React.FC<{ categoryLabel: string; total: number; topItem?: Top10Item }> = ({
   categoryLabel,
+  total,
   topItem,
 }) => {
   const frame = useCurrentFrame();
@@ -654,7 +659,7 @@ const Top10Cover: React.FC<{ categoryLabel: string; topItem?: Top10Item }> = ({
             letterSpacing: "-0.02em",
           }}
         >
-          TOP<span style={{ color: E.accent }}>10</span>
+          TOP<span style={{ color: E.accent }}>{total}</span>
         </div>
         {topItem && (
           <div style={{ fontSize: 72, fontWeight: 800, color: E.accent, lineHeight: 1.1 }}>
@@ -703,11 +708,11 @@ export const TemplateTop10: React.FC<Top10Props> = (props) => {
       <FontFaceStyle />
       <LongformBgm />
       <Sequence durationInFrames={secToFrame(introDur)}>
-        <Intro categoryLabel={categoryLabel} narrationUri={props.introNarrationUri} />
+        <Intro categoryLabel={categoryLabel} total={items.length} narrationUri={props.introNarrationUri} />
       </Sequence>
       {ranges.map(({ item, from, dur }) => (
         <Sequence key={item.rank} from={secToFrame(from)} durationInFrames={secToFrame(dur)}>
-          <ProductCard item={item} />
+          <ProductCard item={item} total={items.length} />
         </Sequence>
       ))}
       <Sequence from={secToFrame(outroFrom)} durationInFrames={secToFrame(outroDur)}>
@@ -715,7 +720,7 @@ export const TemplateTop10: React.FC<Top10Props> = (props) => {
       </Sequence>
       {/* 맨 위에 짧게 한 번 덮는다 - 썸네일 캡처 전용 화면(고지 문구 없음, Intro 는 그대로 재생됨) */}
       <Sequence durationInFrames={COVER_FRAME_COUNT}>
-        <Top10Cover categoryLabel={categoryLabel} topItem={topItem} />
+        <Top10Cover categoryLabel={categoryLabel} total={items.length} topItem={topItem} />
       </Sequence>
     </AbsoluteFill>
   );
