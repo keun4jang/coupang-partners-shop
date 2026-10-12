@@ -7,6 +7,12 @@
 마지막 갱신: 2026-10-12
 
 ## 최근에 한 것
+- 10/12 사장님 결정: **비용 절대 0원**(CLAUDE.md 규칙) → 유료 AI 영상 생성 제외.
+  윙 API 키 등록(GitHub Secrets COUPANG_WING_*). 키는 유효하나 윙이 **허용 IP 만 받음**(403, GitHub Actions IP
+  20.49.14.178 거절 - Actions IP 는 매번 바뀌어 등록 불가). 무료 해법: 사장님 PC IP 를 윙 허용 IP 에 등록 →
+  PC 터미널에서 scripts/wing-images.ts 1회 실행 → 결과 이미지 경로를 ownProducts.ts 에 반영(상품 목록이
+  원래 코드 고정이라 1회면 충분). 로컬은 장부(Supabase) 접속이 필요하니 .env.local 확인.
+  다음: 무료 '사진 1장 → 여러 컷'(확대·이동·생활 장면) 만들기 - 10/19 홀짝 비교 예정(승인 대기).
 - 10/12 사장님 "공개해": 선반 1호 세탁세제 TOP10(XIyMLyJ6ADQ) unlisted → public 전환 완료
   (scripts/shelf-publish.ts 승인 목록 + diag shelf-publish). 새 선반 공개 때 목록에 ID 추가.
 - 10/12 사장님 "추천대로 진행": 선반은 8개 이상이면 TOP8·TOP9 로 제작(제목·화면·내레이션 개수 맞춤),
