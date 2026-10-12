@@ -332,6 +332,39 @@ export async function updateYoutubeDescription(
   });
 }
 
+/**
+ * 영상 공개 상태만 바꾼다 (선반 검수 후 비공개 → 공개 전환용, 2026-10-12).
+ * status 를 통째로 덮으므로 현재 값을 읽어 나머지 항목은 그대로 둔다.
+ * 반환: 바꾸기 전 상태 (이미 같은 상태면 아무것도 안 한다).
+ */
+export async function setYoutubePrivacy(
+  videoId: string,
+  privacyStatus: "public" | "unlisted" | "private"
+): Promise<{ before: string; title: string }> {
+  const youtube = youtubeClient();
+  if (!youtube) throw new Error("유튜브 환경변수 미설정");
+  const { data } = await youtube.videos.list({ part: ["status", "snippet"], id: [videoId] });
+  const item = data.items?.[0];
+  if (!item?.status) throw new Error(`영상 ${videoId} 조회 실패(권한/삭제 확인)`);
+  const before = item.status.privacyStatus ?? "?";
+  const title = item.snippet?.title ?? "";
+  if (before === privacyStatus) return { before, title };
+  await youtube.videos.update({
+    part: ["status"],
+    requestBody: {
+      id: videoId,
+      status: {
+        privacyStatus,
+        selfDeclaredMadeForKids: item.status.selfDeclaredMadeForKids ?? false,
+        embeddable: item.status.embeddable ?? undefined,
+        license: item.status.license ?? undefined,
+        publicStatsViewable: item.status.publicStatsViewable ?? undefined,
+      },
+    },
+  });
+  return { before, title };
+}
+
 /** 유튜브 제목: "N번 | 제품명 #Shorts" (100자 제한 고려해 제품명은 이미 요약된 값을 받는다) */
 export function youtubeTitle(displayNumber: number, shortProductName: string): string {
   return `${displayNumber}번 | ${shortProductName} 살림템 추천 #Shorts`;

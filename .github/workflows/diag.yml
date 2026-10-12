@@ -21,6 +21,7 @@ on:
           - longform-report
           - publish-status
           - shelf-candidates
+          - shelf-publish
 
 concurrency:
   group: diag
