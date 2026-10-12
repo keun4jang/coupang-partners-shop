@@ -22,6 +22,7 @@ on:
           - publish-status
           - shelf-candidates
           - shelf-publish
+          - wing-images
 
 concurrency:
   group: diag
@@ -74,6 +75,10 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           SCRIPT: ${{ github.event.inputs.script }}
+          # 윙(판매자) API 키 - 사장님이 2026-10-12 GitHub Secrets 에 등록 (근사장 상품 이미지 읽기 전용)
+          COUPANG_WING_VENDOR_ID: ${{ secrets.COUPANG_WING_VENDOR_ID }}
+          COUPANG_WING_ACCESS_KEY: ${{ secrets.COUPANG_WING_ACCESS_KEY }}
+          COUPANG_WING_SECRET_KEY: ${{ secrets.COUPANG_WING_SECRET_KEY }}
         run: |
           set -o pipefail
           npx tsx "scripts/${SCRIPT}.ts" 2>&1 | tee diag.log

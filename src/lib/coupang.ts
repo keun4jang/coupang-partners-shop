@@ -76,9 +76,17 @@ function signedDate(): string {
 }
 
 /** Authorization 헤더 생성 (message = datetime + method + path + query) */
-function authHeader(method: string, path: string, query: string): string {
-  const accessKey = requireEnv("COUPANG_ACCESS_KEY");
-  const secretKey = requireEnv("COUPANG_SECRET_KEY");
+function authHeader(
+  method: string,
+  path: string,
+  query: string,
+  keys: { access: string; secret: string } = {
+    access: requireEnv("COUPANG_ACCESS_KEY"),
+    secret: requireEnv("COUPANG_SECRET_KEY"),
+  }
+): string {
+  const accessKey = keys.access;
+  const secretKey = keys.secret;
   const datetime = signedDate();
   const message = datetime + method + path + query;
   const signature = crypto
@@ -552,4 +560,75 @@ export const EMERGING_CATEGORIES = new Set(["테크가젯", "뷰티헬스", "펫
 /** 가격을 "21,990원" 형태로 */
 export function priceText(price: number): string {
   return `${price.toLocaleString("ko-KR")}원`;
+}
+
+/* ───────────────────────── 쿠팡 윙(판매자) OPEN API ─────────────────────────
+ * 2026-10-12: 근사장 본인 상품의 상세 이미지를 가져오려고 추가(사장님이 윙 키 발급).
+ * 파트너스 API 와 키·한도가 별개지만 같은 게이트웨이라, 안전하게 같은 장부를 거친다
+ * (호출 수가 상품 12개 수준이라 장부 여유에 영향 없음). 읽기(GET)만 한다.
+ */
+export function hasWingEnv(): boolean {
+  return Boolean(
+    process.env.COUPANG_WING_ACCESS_KEY && process.env.COUPANG_WING_SECRET_KEY && process.env.COUPANG_WING_VENDOR_ID
+  );
+}
+
+async function wingGet<T>(path: string, query = ""): Promise<T> {
+  await acquireCoupangCall(path);
+  const res = await fetch(HOST + path + (query ? `?${query}` : ""), {
+    method: "GET",
+    headers: {
+      Authorization: authHeader("GET", path, query, {
+        access: requireEnv("COUPANG_WING_ACCESS_KEY"),
+        secret: requireEnv("COUPANG_WING_SECRET_KEY"),
+      }),
+      "Content-Type": "application/json;charset=UTF-8",
+      "X-Requested-By": requireEnv("COUPANG_WING_VENDOR_ID"),
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  const text = await res.text();
+  let json: { code?: string; message?: string; data?: unknown };
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`윙 API 응답 파싱 실패 (${res.status}): ${text.slice(0, 200)}`);
+  }
+  if (!res.ok || (json.code && json.code !== "SUCCESS")) {
+    throw new Error(`윙 API 오류 (${res.status}, ${json.code}): ${json.message ?? text.slice(0, 200)}`);
+  }
+  return json.data as T;
+}
+
+type WingImage = { imageOrder?: number; imageType?: string; cdnPath?: string; vendorPath?: string };
+type WingContent = { contentsType?: string; contentDetails?: { content?: string; detailType?: string }[] };
+type WingProduct = { sellerProductName?: string; items?: { images?: WingImage[]; contents?: WingContent[] }[] };
+
+const toImageUrl = (p: string): string =>
+  /^https?:\/\//.test(p) ? p : `https://image.coupangcdn.com/image/${p.replace(/^\/+/, "")}`;
+
+/** 등록상품ID(sellerProductId) 의 대표·추가 이미지와 상세페이지 이미지 URL (중복 제거, 순서 유지) */
+export async function fetchWingProductImages(
+  sellerProductId: string
+): Promise<{ name: string; gallery: string[]; detail: string[] }> {
+  const data = await wingGet<WingProduct>(
+    `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products/${sellerProductId}`
+  );
+  const gallery: string[] = [];
+  const detail: string[] = [];
+  for (const item of data.items ?? []) {
+    for (const img of [...(item.images ?? [])].sort((a, b) => (a.imageOrder ?? 0) - (b.imageOrder ?? 0))) {
+      const path = img.cdnPath || img.vendorPath;
+      if (path) gallery.push(toImageUrl(path));
+    }
+    for (const c of item.contents ?? []) {
+      for (const d of c.contentDetails ?? []) {
+        if (!d.content) continue;
+        if (d.detailType === "IMAGE") detail.push(toImageUrl(d.content));
+        else for (const m of d.content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) detail.push(toImageUrl(m[1]));
+      }
+    }
+  }
+  const uniq = (xs: string[]) => [...new Set(xs)];
+  return { name: data.sellerProductName ?? "", gallery: uniq(gallery), detail: uniq(detail) };
 }
