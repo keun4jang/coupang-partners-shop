@@ -505,8 +505,27 @@ export function itemNarrationLine(item: VideoItemWithProduct, rank: number, name
   // hook_text 는 "누구에게\n훅" 두 줄일 수 있다 - 나레이션엔 훅만 (lib/coverText.ts)
   const hook = (unpackHookText(item.hook_text).hook || lines[0] || "").trim();
   const { benefit1, benefit2 } = itemBenefitLines(item);
-  const parts = [`${rank}위, ${name}.`, hook, benefit1, benefit2].filter(Boolean);
+  // 가격·숫자는 말하지 않는다(2026-10-13 사장님 지침) - 예전 숏폼 대본에 "가격은 21,990원이에요" 같은
+  // 줄이 남아 있어 그 줄은 빼고, 상품명은 숫자 낱말("3단", "80*24*120CM")을 떼고 읽는다.
+  const spoken = [hook, benefit1, benefit2].filter((l) => l && !hasPriceOrNumber(l));
+  const parts = [`${rank}위, ${spokenProductName(name)}.`, ...spoken];
   return parts.join(" ");
+}
+
+/** 나레이션에서 뺄 줄 - 숫자·가격·할인 언급 */
+export function hasPriceOrNumber(line: string): boolean {
+  return /\d|가격|할인|원대|만원|값도/.test(line);
+}
+
+/** 나레이션용 상품명 - 숫자가 든 낱말을 뗀다(남는 게 없으면 원래 이름) */
+export function spokenProductName(name: string): string {
+  const out = name
+    .split(/\s+/)
+    .filter((w) => !/\d/.test(w))
+    .join(" ")
+    .replace(/[,\s]+$/, "")
+    .trim();
+  return out || name;
 }
 
 const KOREAN_COUNT: Record<number, string> = { 8: "여덟", 9: "아홉", 10: "열" };

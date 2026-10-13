@@ -48,25 +48,6 @@ export function extractFeatureLines(productName: string, max = 2): string[] {
   return out;
 }
 
-/** 상품명·가격에서 구성 스펙 한 줄 (수량/용량 + 가격) */
-export function specLine(productName: string, priceText?: string | null): string | null {
-  const parts: string[] = [];
-  const vol = productName.match(/(\d+(?:\.\d+)?\s*(?:ml|L|리터|kg|g))\b/i);
-  if (vol) parts.push(vol[1].replace(/\s+/g, ""));
-  const qty = productName.match(/(\d+)\s*(개입|개|매|장|입|종|세트|팩)/);
-  if (qty) {
-    const n = qty[1];
-    const unit = qty[2] === "종" ? "종 세트" : qty[2] === "세트" ? "세트" : `${qty[2]} 구성`;
-    parts.push(`${n}${unit}`);
-  }
-  const price = priceText?.replace(/\s/g, "");
-  if (parts.length === 0 && !price) return null;
-  const spec = parts.join("에 ");
-  if (spec && price) return `${spec}, 가격은 ${price}이에요`;
-  if (spec) return `${spec}로 나와요`;
-  return `가격은 ${price} 수준이라 부담 없어요`;
-}
-
 export interface CategoryVariants {
   hooks: string[];
   empathies: string[];
@@ -103,10 +84,10 @@ export const CATEGORY_VARIANTS: Record<string, CategoryVariants> = {
       "가족 태우는 차라 더 신경 쓰이는데 손이 안 가죠",
     ],
     b1: "이거 하나 차에 두면 신호 대기 중에도 쓱 정리가 돼요",
-    b2: "자리 안 차지하고 값도 부담 없는 수준이에요",
+    b2: "자리 안 차지하고 차 안에 깔끔하게 놓여요",
     tips: [
       "시트 틈새랑 컵홀더처럼 손 안 닿는 데 위주로 쓰면 딱이에요",
-      "출발 전에 30초만 쓱 훑어도 차 안 공기가 달라요",
+      "출발 전에 잠깐 쓱 훑어도 차 안 공기가 달라요",
       "글로브박스에 하나 넣어두면 급할 때 진짜 요긴해요",
     ],
     checks: [
@@ -149,7 +130,7 @@ export const CATEGORY_VARIANTS: Record<string, CategoryVariants> = {
     tips: [
       "자기 전에 거실만 한 번 쓱 밀어두면 아침 공기가 달라요",
       "제일 손 안 가던 구석부터 써보세요, 차이가 확 나요",
-      "손님 오기 10분 전에 한 번 돌리면 급한 청소 끝이에요",
+      "손님 오기 직전에 한 번 돌리면 급한 청소 끝이에요",
     ],
     checks: [
       "쓸 자리 폭이랑 손잡이 길이를 먼저 재보면 좋아요",
@@ -313,7 +294,7 @@ export const CATEGORY_VARIANTS: Record<string, CategoryVariants> = {
       "사소한 게 편해지면 하루가 가벼워지잖아요",
     ],
     b1: "이거 하나 두면 생각보다 훨씬 자주, 요긴하게 쓰게 돼요",
-    b2: "가격도 착해서 가볍게 들여놓기 좋은 수준이에요",
+    b2: "부담 없이 가볍게 들여놓기 좋은 물건이에요",
     tips: [
       "제일 자주 쓰는 자리에 아예 놔두세요, 그래야 매일 써요",
       "두 개 사서 하나는 선물해도 좋아하시더라고요",
@@ -338,7 +319,7 @@ export const CATEGORY_VARIANTS: Record<string, CategoryVariants> = {
       "충전식인지 건전지식인지에 따라 관리가 달라져요",
     ],
     fits: [
-      "그 자리를 매일 쓰는 집이라면 값을 해요",
+      "그 자리를 매일 쓰는 집이라면 두고두고 잘 써요",
       "가끔만 쓰는 자리면 굳이 서둘러 들일 필요는 없어요",
     ],
   },
