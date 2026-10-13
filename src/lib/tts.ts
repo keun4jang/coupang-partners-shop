@@ -1,3 +1,7 @@
+import { execFileSync } from "child_process";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { optionalEnv } from "./env";
 
@@ -9,6 +13,7 @@ import { optionalEnv } from "./env";
  *   길이는 워커가 장면 컷 타이밍을 나레이션에 맞추는 데 쓴다.
  *
  * 음성 품질 체인:
+ *  0) Supertonic 무료 오픈소스 음성 (2026-10-13~, 남자 M1 - 아래 synthesizeSupertonic)
  *  1) GOOGLE_TTS_API_KEY 가 있으면 Google Cloud TTS (Chirp3-HD, 훨씬 자연스러움)
  *     - 프로젝트에서 Text-to-Speech API 를 활성화해야 동작. 미활성/오류 시 자동 폴백.
  *  2) Microsoft Edge 무료 음성 (ko-KR-SunHiNeural)
@@ -171,14 +176,67 @@ async function synthesizeLineGoogle(
   };
 }
 
+/* ── Supertonic 무료 오픈소스 음성 (2026-10-13~ 1순위) ─────────────────
+ * 10/12 구글 TTS(결제 꺼짐 403)·Edge(마이크로소프트 차단 403)가 동시에 막혀 영상이 무음으로
+ * 나갔다. 사장님 승인(10/13 "추천대로 2번", 목소리 "남자 M1")으로 렌더 서버 CPU 에서 도는
+ * Supertonic 을 1순위로 둔다. 비용 0원. 파이썬 쪽은 scripts/supertonic_tts.py.
+ * 끄기: TTS_ENGINE=legacy (구글 → Edge 옛 경로만).
+ */
+const SUPERTONIC_VOICE = "M1";
+/** 사장님이 들은 샘플과 같은 속도 */
+const SUPERTONIC_SPEED = 1.15;
+
+function synthesizeSupertonic(lines: string[]): (NarrationLine | null)[] | null {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "supertonic-"));
+  try {
+    const python = optionalEnv("TTS_PYTHON") ?? (process.platform === "win32" ? "python" : "python3");
+    const stdout = execFileSync(python, [path.resolve("scripts/supertonic_tts.py")], {
+      input: JSON.stringify({
+        lines: lines.map((l) => (l.trim() ? naturalizePhrasing(ttsReadable(l.trim())) : "")),
+        outDir,
+        voice: optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE,
+        speed: SUPERTONIC_SPEED,
+      }),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 300_000,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    const last = stdout.trim().split("\n").pop() ?? "";
+    const { files, seconds } = JSON.parse(last) as { files: (string | null)[]; seconds: (number | null)[] };
+    const out = files.map((f, i): NarrationLine | null => {
+      if (!f || !seconds[i]) return null;
+      const buf = fs.readFileSync(f);
+      return { uri: `data:audio/mpeg;base64,${buf.toString("base64")}`, seconds: Math.max(0.5, seconds[i]!) };
+    });
+    return out.some((x) => x !== null) ? out : null;
+  } catch (e) {
+    const err = e as Error & { stderr?: string };
+    console.warn(`Supertonic 음성 실패: ${(err.stderr || err.message).slice(-300)}`);
+    return null;
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+}
+
 /**
  * 여러 줄을 순서대로 합성. 전부 실패하면 null (나레이션 없음).
- * 구글 TTS(자연스러움) 우선 → 실패 시 Edge 무료 음성 폴백.
+ * Supertonic(무료, 1순위) → 구글 TTS → Edge 무료 음성 순서로 폴백.
  */
 export async function generateNarration(
   lines: string[]
 ): Promise<(NarrationLine | null)[] | null> {
   if (optionalEnv("TTS_DISABLED") === "1") return null;
+
+  // 0) Supertonic
+  if (optionalEnv("TTS_ENGINE") !== "legacy") {
+    const st = synthesizeSupertonic(lines);
+    if (st) {
+      console.log(`Supertonic 음성 사용 (${optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE})`);
+      return st;
+    }
+    console.warn("Supertonic 사용 불가 → 구글/Edge 음성으로 폴백");
+  }
 
   // 1) Google Cloud TTS 시도
   // [결제 안전장치] 영상당 합성 글자 수 상한. 무료 한도(월 100만 자) 대비

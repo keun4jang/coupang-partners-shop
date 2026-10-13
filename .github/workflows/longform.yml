@@ -98,6 +98,29 @@ jobs:
         if: steps.check.outputs.ready == 'true' && steps.modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      # 무료 오픈소스 음성 Supertonic (2026-10-13 - 구글·Edge 음성이 막혀 1순위로, src/lib/tts.ts).
+      # 모델(약 385MB)은 캐시해 매번 받지 않는다. 설치 실패해도 렌더는 옛 음성 경로/무음으로 계속된다.
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/supertonic-requirements.txt
+
+      - name: Supertonic 모델 캐시
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/supertonic3
+          key: supertonic3-${{ hashFiles('scripts/supertonic-requirements.txt') }}
+
+      - name: Supertonic 음성 설치
+        if: steps.check.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          pip install -q -r scripts/supertonic-requirements.txt
+          echo '{"lines":["준비"],"outDir":"/tmp/st-warmup"}' | python3 scripts/supertonic_tts.py | tail -1
+
       - name: Remotion 브라우저 준비
         if: steps.check.outputs.ready == 'true'
         run: npx remotion browser ensure

@@ -54,7 +54,9 @@
   실패 - MS 쪽 차단). 영상은 무음 + 고정 15초로 계속 발행 중. 선반 2호 빨래건조대 TOP9 비공개 업로드
   (wYpCGeAbrxs)도 무음 → 공개 금지, 음성 복구 후 재제작. 이번 주 '검색 쉬움 감점' 측정에 음성 변수 섞임.
   10/13 사장님 "추천대로 2번": 무료 오픈소스 음성으로 교체. 후보 Supertonic-3(pip supertonic 1.3.1, 코드 MIT·
-  모델 OpenRAIL-M, CPU 로 3문장 5~6초, 한국어 지원, 목소리 F1~F5·M1~M5). 샘플 7개 전달 → 목소리 선택 대기.
+  모델 OpenRAIL-M, CPU 로 3문장 5~6초, 한국어 지원, 목소리 F1~F5·M1~M5). 사장님 "남자 M1" 선택 → 1순위 음성으로 적용
+  (src/lib/tts.ts synthesizeSupertonic + scripts/supertonic_tts.py, mp3, 속도 1.15, render·longform 워크플로에 설치·모델 캐시).
+  끄기 TTS_ENGINE=legacy. 다음 렌더 로그에 'Supertonic 음성 사용' 확인 → 선반 2호 빨래건조대 재제작.
 - 본인 상품 첫 영상은 413번(승마 안장 패드), 다음 419번 - 아직 대기열(10/11~12 예상).
   나가면 publish-status ⑥ 줄에서 판매자 고지·발행 확인, /go/413?dry=1 로 상품 페이지 직행 확인.
 - 선반 1호 '세탁세제 추천 TOP10': 10/12 공개 https://youtube.com/watch?v=XIyMLyJ6ADQ (새벽 크론 지연으로 막혀서 10/9 사장님 승인: 롱폼도 하루
