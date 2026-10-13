@@ -78,7 +78,15 @@ export function sinoKorean(n: number): string {
  * 숫자+번 패턴을 한자어 표기로 치환한다. 자막 텍스트에는 영향 없음(TTS 입력 전용).
  */
 export function ttsReadable(text: string): string {
-  return text.replace(/(\d+)\s*번/g, (_, d: string) => `${sinoKorean(parseInt(d, 10))}번`);
+  const num = (d: string) => sinoKorean(parseInt(d.replace(/,/g, ""), 10));
+  return (
+    text
+      .replace(/(\d+)\s*번/g, (_, d: string) => `${num(d)}번`)
+      // 금액·쉼표 숫자: 음성 엔진이 "23,123원"을 "이십삼 백이십삼원"처럼 쉼표에서 끊어 읽는다
+      // (2026-10-13 사장님). 대본엔 가격·숫자를 안 쓰지만 남은 것이 있어도 바르게 읽히게 한자어로 바꾼다.
+      .replace(/(\d{1,3}(?:,\d{3})+|\d+)\s*원/g, (_, d: string) => `${num(d)}원`)
+      .replace(/\d{1,3}(?:,\d{3})+/g, (d) => num(d))
+  );
 }
 
 async function synthesizeLineEdge(
