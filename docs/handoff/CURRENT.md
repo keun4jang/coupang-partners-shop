@@ -57,7 +57,9 @@
   모델 OpenRAIL-M, CPU 로 3문장 5~6초, 한국어 지원, 목소리 F1~F5·M1~M5). 사장님 "남자 M1" 선택 → 1순위 음성으로 적용
   (src/lib/tts.ts synthesizeSupertonic + scripts/supertonic_tts.py, mp3, 속도 1.15, render·longform 워크플로에 설치·모델 캐시).
   끄기 TTS_ENGINE=legacy. **10/13 복구 확인**(render run 38366262758): 420번·421번 'Supertonic 음성 사용 (M1)',
-  나레이션 7/7줄, 31~34초. 유튜브 4I8Xi1QEWIs. 다음: 선반 2호 빨래건조대 음성 넣어 재제작(사장님 승인 필요).
+  나레이션 7/7줄, 31~34초. 유튜브 4I8Xi1QEWIs. 10/13 사장님 "진행": 선반 2호 빨래건조대 음성 넣어 재제작 예약
+  (longform_topic_once=빨래건조대, settings run 38393298334) → 10/14 새벽 비공개 업로드 → 사장님 검수 후 공개.
+  무음판 wYpCGeAbrxs 는 비공개 유지(삭제는 사장님 판단).
 - 본인 상품 첫 영상은 413번(승마 안장 패드), 다음 419번 - 아직 대기열(10/11~12 예상).
   나가면 publish-status ⑥ 줄에서 판매자 고지·발행 확인, /go/413?dry=1 로 상품 페이지 직행 확인.
 - 선반 1호 '세탁세제 추천 TOP10': 10/12 공개 https://youtube.com/watch?v=XIyMLyJ6ADQ (새벽 크론 지연으로 막혀서 10/9 사장님 승인: 롱폼도 하루
