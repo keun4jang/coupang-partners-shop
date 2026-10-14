@@ -60,6 +60,10 @@ const pCap = instagramCaption(aiCaption, 412);
 check("파트너스 캡션: 파트너스 고지 1회", count(pCap, DISCLOSURE_LINE) === 1, pCap);
 check("파트너스 캡션: 판매자 고지 없음", !pCap.includes(OWN_DISCLOSURE_LINE));
 
+// 2026-10-14 사장님: 시청자에게 보이는 문구에 판매자 이름('근사장')을 쓰지 않는다
+check("본인 캡션: 판매자 이름 없음", !ownCap.includes("근사장"), ownCap);
+check("본인 설명: 판매자 이름 없음", !ownDesc.includes("근사장"), ownDesc);
+
 if (failures > 0) {
   console.error(`\n본인 상품 자가 점검 실패 ${failures}건`);
   process.exit(1);

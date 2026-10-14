@@ -22,11 +22,12 @@
 export const OWN_MARKER = "[own]";
 export const OWN_SELLER_NAME = "근사장";
 
+// 2026-10-14 사장님: 멘트는 좋지만 '근사장'이라는 이름은 빼 달라 → 시청자에게 보이는 문구는 1인칭("제가")
 /** 캡션·설명에 들어가는 고지 (파트너스 DISCLOSURE_LINE 자리) */
-export const OWN_DISCLOSURE_LINE = `${OWN_SELLER_NAME}이 쿠팡에서 직접 판매하는 제품이에요.`;
+export const OWN_DISCLOSURE_LINE = "제가 쿠팡에서 직접 판매하는 제품이에요.";
 
 /** 영상 하단 화면 고지 (파트너스 DISCLOSURE_TEXT 자리) */
-export const OWN_SCREEN_DISCLOSURE = `${OWN_SELLER_NAME}이 직접 판매하는 제품입니다`;
+export const OWN_SCREEN_DISCLOSURE = "제가 직접 판매하는 제품입니다";
 
 /** 하루에 끼워 넣을 본인 상품 편수 (app_settings.own_product_daily 로 0~3 조정) */
 export const OWN_DAILY_DEFAULT = 1;

@@ -69,7 +69,7 @@ export function youtubeShortsDescription(
     // (/from/youtube-shorts)를 가리킨다 - "같은 주소"라고 하면 부정확하다.
     "채널 프로필 첫 화면에서도 최근 번호들을 확인하실 수 있어요.",
     "",
-    opts.own ? "#Shorts #근사장 #쿠팡" : "#Shorts #살림템 #생활템 #쿠팡추천템",
+    opts.own ? "#Shorts #살림템 #쿠팡" : "#Shorts #살림템 #생활템 #쿠팡추천템",
   ].join("\n");
 }
 

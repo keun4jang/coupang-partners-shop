@@ -110,7 +110,7 @@ async function main(): Promise<void> {
     }>;
     console.log(`⑥ 근사장 상품 영상 ${list.length}편`);
     for (const r of list) {
-      const sellerLine = (r.caption_text ?? "").includes("근사장이 직접 판매") ? "판매자고지○" : "판매자고지×";
+      const sellerLine = (r.caption_text ?? "").includes("직접 판매하는 제품") ? "판매자고지○" : "판매자고지×";
       console.log(
         `   ${r.display_number}번 ${r.video_status} ${r.youtube_url ? "YT○" : "YT×"} ${r.instagram_url ? "IG○" : "IG×"} ${sellerLine} ${short(r.products.product_name, 30)} | 훅: ${short(r.hook_text, 60)}`
       );
