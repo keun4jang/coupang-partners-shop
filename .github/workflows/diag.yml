@@ -23,6 +23,7 @@ on:
           - shelf-candidates
           - shelf-publish
           - wing-images
+          - own-desc-fix
 
 concurrency:
   group: diag
