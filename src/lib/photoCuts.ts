@@ -79,20 +79,46 @@ function ffmpeg(args: string[]): void {
 }
 
 /**
- * 사진 → 배경 컷 count 개 (public/assets/broll 기준 파일명). 사진이 컷보다 많으면 마지막 컷은
- * 남은 사진을 0.5초씩 넘기는 색상·구성 몰아보기. 실패하면 빈 배열(호출부가 기존 경로로 폴백).
+ * 사진 1장뿐인 상품(파트너스 - 쿠팡 API 는 대표 사진 1장만 준다)용 움직임 (2026-10-15).
+ * 같은 사진이라도 "전체 → 왼쪽 위 디테일 → 가운데 확대 → 오른쪽 아래 훑기 → 축소"로
+ * 보는 곳을 바꿔 상품이 화면을 계속 채우게 한다. x·y 는 확대된 사진 안에서의 시선 위치.
  */
+const F = CLIP_SECONDS * FPS;
+const SINGLE_MOVES = [
+  { z: `1+0.12*on/${F}`, x: "iw/2-(iw/zoom/2)", y: "ih/2-(ih/zoom/2)" },
+  { z: "2.0", x: `(iw-iw/zoom)*(0.15+0.25*on/${F})`, y: "(ih-ih/zoom)*0.25" },
+  { z: `1.5+0.6*on/${F}`, x: "iw/2-(iw/zoom/2)", y: "ih/2-(ih/zoom/2)" },
+  { z: "2.0", x: `(iw-iw/zoom)*(0.85-0.25*on/${F})`, y: "(ih-ih/zoom)*0.75" },
+  { z: `2.2-1.1*on/${F}`, x: "iw/2-(iw/zoom/2)", y: "ih/2-(ih/zoom/2)" },
+  { z: "1.4", x: `(iw-iw/zoom)*on/${F}`, y: "ih/2-(ih/zoom/2)" },
+];
+
+/** 근사장 상품: 윙 사진 여러 장 → 배경 컷 */
 export async function makePhotoCuts(
   own: Own,
   displayNumber: number,
   count: number,
   orientation: "portrait" | "landscape"
 ): Promise<string[]> {
+  return makeImageCuts(ownImageUrls(own), `own-${displayNumber}`, count, orientation);
+}
+
+/**
+ * 사진 URL 들 → 배경 컷 count 개 (public/assets/broll 기준 파일명). 사진이 컷보다 많으면 마지막 컷은
+ * 남은 사진을 0.5초씩 넘기는 색상·구성 몰아보기. 사진이 1장이면 SINGLE_MOVES 로 시선을 옮겨 가며
+ * count 컷을 만든다. 실패하면 빈 배열(호출부가 기존 경로로 폴백).
+ */
+export async function makeImageCuts(
+  urls: string[],
+  key: string,
+  count: number,
+  orientation: "portrait" | "landscape"
+): Promise<string[]> {
   const [W, H] = orientation === "portrait" ? [1080, 1920] : [1280, 720];
   const side = Math.min(W, H);
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `own-${displayNumber}-`));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${key}-`));
   const photos: { file: string; bg: string }[] = [];
-  for (const [i, url] of ownImageUrls(own).slice(0, 12).entries()) {
+  for (const [i, url] of urls.slice(0, 12).entries()) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) continue;
@@ -100,28 +126,36 @@ export async function makePhotoCuts(
       fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
       photos.push({ file, bg: await cornerColor(file) });
     } catch (e) {
-      console.warn(`근사장 사진 ${i} 받기 실패: ${(e as Error).message.slice(0, 80)}`);
+      console.warn(`사진 ${i} 받기 실패: ${(e as Error).message.slice(0, 80)}`);
     }
   }
   if (photos.length === 0) return [];
 
-  const clip = (p: { file: string; bg: string }, z: string, x: string, frames: number, out: string) =>
+  const clip = (p: { file: string; bg: string }, z: string, x: string, frames: number, out: string, y = "ih/2-(ih/zoom/2)") =>
     ffmpeg([
       "-loop", "1", "-i", p.file,
       "-vf",
       `scale=${side * 2}:${side * 2}:force_original_aspect_ratio=decrease,pad=${side * 2}:${side * 2}:(ow-iw)/2:(oh-ih)/2:${p.bg},` +
-        `zoompan=z='${z}':x='${x}':y='ih/2-(ih/zoom/2)':d=${frames}:s=${side}x${side}:fps=${FPS},` +
+        `zoompan=z='${z}':x='${x}':y='${y}':d=${frames}:s=${side}x${side}:fps=${FPS},` +
         `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:${p.bg},setsar=1,format=yuv420p`,
       "-frames:v", String(frames), "-r", String(FPS), "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
       out,
     ]);
 
-  const montage = photos.length > count && count > 1;
+  const single = photos.length === 1;
+  const montage = !single && photos.length > count && count > 1;
   const singles = montage ? photos.slice(0, count - 1) : photos.slice(0, count);
   const files: string[] = [];
   try {
-    singles.forEach((p, i) => {
-      const name = `own-${displayNumber}-${i}.mp4`;
+    if (single) {
+      for (let i = 0; i < count; i++) {
+        const name = `${key}-${i}.mp4`;
+        const m = SINGLE_MOVES[i % SINGLE_MOVES.length];
+        clip(photos[0], m.z, m.x, F, path.join(BROLL_DIR, name), m.y);
+        files.push(name);
+      }
+    } else singles.forEach((p, i) => {
+      const name = `${key}-${i}.mp4`;
       const m = MOVES[i % MOVES.length];
       clip(p, m.z, m.x, CLIP_SECONDS * FPS, path.join(BROLL_DIR, name));
       files.push(name);
@@ -135,12 +169,12 @@ export async function makePhotoCuts(
       });
       const list = path.join(tmp, "list.txt");
       fs.writeFileSync(list, parts.map((f) => `file '${f.replace(/\\/g, "/")}'`).join("\n"));
-      const name = `own-${displayNumber}-${singles.length}.mp4`;
+      const name = `${key}-${singles.length}.mp4`;
       ffmpeg(["-f", "concat", "-safe", "0", "-i", list, "-c", "copy", path.join(BROLL_DIR, name)]);
       files.push(name);
     }
   } catch (e) {
-    console.warn(`근사장 사진 컷 만들기 실패: ${(e as Error).message.slice(0, 200)}`);
+    console.warn(`사진 컷 만들기 실패: ${(e as Error).message.slice(0, 200)}`);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

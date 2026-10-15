@@ -32,7 +32,7 @@ import {
   selectComposition,
 } from "@remotion/renderer";
 import { supabaseAdmin } from "../src/lib/supabase";
-import { sendTelegramMessage } from "../src/lib/telegram";
+import { sendTelegramMessage, sendTelegramVideo } from "../src/lib/telegram";
 import {
   ensureDateFolder,
   uploadFileToDrive,
@@ -44,7 +44,7 @@ import {
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
-import { findOwn, inPhotoCutsArm, makePhotoCuts, PHOTO_CUTS_ORIGIN } from "../src/lib/photoCuts";
+import { findOwn, inPhotoCutsArm, makeImageCuts, makePhotoCuts, PHOTO_CUTS_ORIGIN } from "../src/lib/photoCuts";
 import { packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
@@ -305,6 +305,25 @@ async function renderVideo(
       console.log(`근사장 사진 컷 사용: ${files.join(", ")}`);
     } else {
       console.warn("근사장 사진 컷 실패 - 기존 배경 경로로 폴백");
+    }
+  }
+
+  // 파트너스 상품 '상품 사진 주인공' 컷 (2026-10-15 사장님 "추천대로 진행" - 지금은 샘플(--demo, HERO_CUTS=1)
+  // 에서만 켠다. 스톡 대신 대표 사진 1장을 시선 이동·확대 컷으로 만들어 상품이 화면을 채우게 한다.
+  if (usesBroll && !inputProps.brollFiles && process.env.HERO_CUTS === "1" && product.image_url) {
+    const files = await makeImageCuts(
+      [product.image_url],
+      `hero-${item.display_number}`,
+      BROLL_CUT_COUNT,
+      effectiveTemplate === "E" ? "landscape" : "portrait"
+    );
+    if (files.length > 0) {
+      inputProps.brollFiles = files;
+      inputProps.brollDurations = brollFileDurations(files);
+      inputProps.brollNotice = null;
+      cachedBundle = null;
+      brollOrigin = "상품 사진 여러 컷";
+      console.log(`상품 사진 컷 사용: ${files.join(", ")}`);
     }
   }
 
@@ -1527,8 +1546,20 @@ async function runDemo(): Promise<void> {
     caption_text: copy.captionText,
     template_type: "D",
   };
-  const { videoPath } = await renderVideo(demoItem, product);
+  const { videoPath, brollOrigin } = await renderVideo(demoItem, product);
   console.log(`\n=== [데모] 완료 (업로드/DB 기록 없음) ===\n${videoPath}`);
+  // 샘플을 사장님 텔레그램으로 보낸다(render-demo 워크플로 - 클라우드에서 만든 파일을 볼 방법)
+  if (process.env.DEMO_SEND_TELEGRAM === "1") {
+    try {
+      await sendTelegramVideo(
+        videoPath,
+        `🎬 샘플 (게시 안 됨) ${displayNumber}번 ${product.product_name.slice(0, 40)}\n배경: ${brollOrigin}`
+      );
+      console.log("텔레그램으로 샘플 전송 완료");
+    } catch (e) {
+      console.warn(`텔레그램 샘플 전송 실패: ${(e as Error).message}`);
+    }
+  }
 }
 
 async function main(): Promise<void> {

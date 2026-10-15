@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { requireEnv } from "./env";
 
 /** 텔레그램 메시지 전송 (기본: 허용된 chat 으로 전송) */
@@ -41,4 +43,16 @@ export async function telegramFileDownloadUrl(fileId: string): Promise<string | 
   const filePath = data.result?.file_path;
   if (!filePath) return null;
   return `https://api.telegram.org/file/bot${token}/${filePath}`;
+}
+
+/** 영상 파일 전송 (샘플 미리보기용 - 봇 업로드 한도 50MB) */
+export async function sendTelegramVideo(filePath: string, caption: string): Promise<void> {
+  const token = requireEnv("TELEGRAM_BOT_TOKEN");
+  const form = new FormData();
+  form.append("chat_id", requireEnv("TELEGRAM_ALLOWED_CHAT_ID"));
+  form.append("caption", caption.slice(0, 1000));
+  form.append("supports_streaming", "true");
+  form.append("video", new Blob([fs.readFileSync(filePath)], { type: "video/mp4" }), path.basename(filePath));
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`텔레그램 영상 전송 실패 (${res.status}): ${(await res.text()).slice(0, 200)}`);
 }

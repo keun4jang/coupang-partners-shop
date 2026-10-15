@@ -1,0 +1,112 @@
+# 샘플 렌더 (게시·DB 기록 없음) - 결과 영상을 사장님 텔레그램으로 보낸다 (2026-10-15).
+# 렌더 워커(render.yml)와 동시 실행 그룹을 나눠, 170분 상주 워커 뒤에 줄 서지 않게 한다.
+# 사용: Actions → render-demo → Run workflow (번호, 상품사진 컷 on/off)
+name: render-demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      number:
+        description: "샘플로 다시 만들 영상 번호 (예: 377)"
+        required: true
+        default: "377"
+      hero:
+        description: "상품 사진 주인공 컷 (on/off)"
+        required: true
+        default: "on"
+        type: choice
+        options: ["on", "off"]
+
+concurrency:
+  group: render-demo
+  cancel-in-progress: false
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: 워커 환경변수 확인
+        id: check
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then
+            echo "WORKER_ENV 시크릿이 없어 렌더를 건너뜁니다. (DEPLOY.md 참고)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      # 실패 알림 단계에서도 쓸 수 있도록 환경파일을 최대한 일찍 만든다
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - name: node_modules 캐시
+        if: steps.check.outputs.ready == 'true'
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true' && steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # 무료 오픈소스 음성 Supertonic (2026-10-13 - 구글·Edge 음성이 막혀 1순위로, src/lib/tts.ts).
+      # 모델(약 385MB)은 캐시해 매번 받지 않는다. 설치 실패해도 렌더는 옛 음성 경로/무음으로 계속된다.
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/supertonic-requirements.txt
+
+      - name: Supertonic 모델 캐시
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/supertonic3
+          key: supertonic3-${{ hashFiles('scripts/supertonic-requirements.txt') }}
+
+      - name: Supertonic 음성 설치
+        if: steps.check.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          pip install -q -r scripts/supertonic-requirements.txt
+          echo '{"lines":["준비"],"outDir":"/tmp/st-warmup"}' | python3 scripts/supertonic_tts.py | tail -1
+
+      - name: Remotion 브라우저 준비
+        if: steps.check.outputs.ready == 'true'
+        run: npx remotion browser ensure
+
+      # 스튜디오 소재의 중국어 자막 지우기(delogo)에 풀 필터판 ffmpeg 가 필요하다.
+      # 러너 이미지에 기본 포함이 아니므로 직접 설치한다 (없으면 지우기가 조용히 생략됨).
+      - name: ffmpeg 설치 (중국어 자막 지우기용)
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -y -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -1
+
+      - name: 샘플 렌더 + 텔레그램 전송
+        if: steps.check.outputs.ready == 'true'
+        env:
+          HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
+          DEMO_SEND_TELEGRAM: "1"
+          NUM: ${{ github.event.inputs.number }}
+        run: npx tsx worker/render-worker.ts --demo "$NUM"
