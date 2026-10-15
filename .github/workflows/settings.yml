@@ -20,6 +20,7 @@ on:
           - d_product_first
           - longform_topic_once
           - own_product_daily
+          - partner_hero_cuts
       value:
         description: "새 값 (비우면 현재 값만 조회). design_template: D 또는 E / daily_video_target: 1~12 / d_product_first: on 또는 off"
         required: false

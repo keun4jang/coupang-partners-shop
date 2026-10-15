@@ -38,6 +38,8 @@ const ALLOWED: Record<string, { check: (v: string) => boolean; hint: string }> =
   },
   // 하루에 끼워 넣을 근사장 본인 상품 편수 (src/lib/ownProducts.ts)
   own_product_daily: { check: (v) => /^[0-3]$/.test(v), hint: "0~3" },
+  // 파트너스 영상 '상품 사진 주인공' 컷 (2026-10-15). split=홀수 번호만(기본, 비교용) · all=전부 · off=끔
+  partner_hero_cuts: { check: (v) => v === "split" || v === "all" || v === "off", hint: "split, all, off 중 하나" },
 };
 
 async function main(): Promise<void> {

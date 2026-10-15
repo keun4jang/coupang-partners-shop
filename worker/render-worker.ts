@@ -315,9 +315,17 @@ async function renderVideo(
     }
   }
 
-  // 파트너스 상품 '상품 사진 주인공' 컷 (2026-10-15 사장님 "추천대로 진행" - 지금은 샘플(--demo, HERO_CUTS=1)
-  // 에서만 켠다. 스톡 대신 대표 사진 1장을 시선 이동·확대 컷으로 만들어 상품이 화면을 채우게 한다.
-  if (usesBroll && !inputProps.brollFiles && process.env.HERO_CUTS === "1" && product.image_url) {
+  // 파트너스 상품 '상품 사진 주인공' 컷 (2026-10-15 사장님: 377번 샘플 "좋아, 파트너스 영상에도 적용해").
+  // 스톡 대신 대표 사진 1장을 시선 이동·확대 컷으로 만들어 상품이 화면을 채우게 한다.
+  // app_settings.partner_hero_cuts: split(기본) = 홀수 번호만 → 짝수(스톡)와 2주 비교 / all = 전부 / off.
+  // 근사장 상품은 위의 윙 사진 컷 경로를 쓰므로 제외. HERO_CUTS=1 은 샘플(--demo)에서 강제로 켠다.
+  const heroSetting = (await getSetting("partner_hero_cuts"))?.trim() || "split";
+  const heroOn =
+    process.env.HERO_CUTS === "1" ||
+    (process.env.HERO_CUTS !== "0" &&
+      !isOwnProduct(product) &&
+      (heroSetting === "all" || (heroSetting === "split" && item.display_number % 2 === 1)));
+  if (usesBroll && !inputProps.brollFiles && heroOn && product.image_url) {
     const files = await makeImageCuts(
       [product.image_url],
       `hero-${item.display_number}`,
