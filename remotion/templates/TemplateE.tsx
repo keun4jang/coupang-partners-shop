@@ -1,5 +1,5 @@
 import React from "react";
-import { useDisclosureText } from "../components/Disclosure";
+import { useDisclosureText, useDisclosureVisible } from "../components/Disclosure";
 import {
   AbsoluteFill,
   Img,
@@ -99,6 +99,8 @@ const NumberChip: React.FC<{ displayNumber: number; label?: string }> = ({
 const DisclosureTag: React.FC = () => (
   <div
     style={{
+      // 10/26~ edges 모드: 처음·끝 3초만 보인다. 자리는 그대로 두고 투명하게(레이아웃 고정)
+      visibility: useDisclosureVisible() ? "visible" : "hidden",
       fontSize: 20,
       lineHeight: 1.3,
       color: E.sub,

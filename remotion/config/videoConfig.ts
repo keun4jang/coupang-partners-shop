@@ -412,6 +412,17 @@ export const TRUST_TEXT = "쿠팡 베스트에서 눈에 띈 살림템을 정리
 // 2026-09-27 포맷 D를 다시 쓰면서 통일 - 포맷마다 고지 문구가 다르면 어느 쪽이
 // 공식 문구인지 헷갈리고, 예전 문구("받을 수 있습니다")는 광고라는 표시도 없었다.
 // 2026-10-07 사장님 결정으로 "[광고]" 접두는 뺐다 - 고지 문장 자체는 쿠팡 정책상 필수라 유지.
+/**
+ * 짧은 화면 고지 + 처음·끝 3초 표시 (2026-10-15 사장님 "추천대로 진행").
+ * 한 번에 하나 규칙으로 2026-10-26 0시 KST 이후 렌더분부터 적용(10/19~25 는 근사장 여러 컷 비교 주간).
+ * 수수료를 받는다는 사실은 반드시 남긴다(쿠팡파트너스 고지 필수).
+ */
+export const DISCLOSURE_SHORT_TEXT = "쿠팡파트너스 활동으로 수수료를 받아요";
+export const DISCLOSURE_EDGES_START = "2026-10-26T00:00:00+09:00";
+export function disclosureEdgesOn(now: Date = new Date()): boolean {
+  return now >= new Date(DISCLOSURE_EDGES_START);
+}
+
 export const DISCLOSURE_TEXT =
   "쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다";
 

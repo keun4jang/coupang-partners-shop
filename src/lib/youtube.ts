@@ -304,6 +304,26 @@ export async function suppressAutoCaptions(videoId: string): Promise<SuppressRes
   }
 }
 
+/**
+ * 유튜브 '유료 프로모션 포함' 표시 켜기 (2026-10-15 사장님 승인, 10/26~ 파트너스 쇼츠).
+ * 시청자에게 시작 화면 라벨로 보인다. 실패해도 업로드에는 영향 없게 삼킨다.
+ */
+export async function setPaidPromotion(videoId: string): Promise<boolean> {
+  const youtube = youtubeClient();
+  if (!youtube) return false;
+  try {
+    await youtube.videos.update({
+      part: ["paidProductPlacementDetails"],
+      requestBody: { id: videoId, paidProductPlacementDetails: { hasPaidProductPlacement: true } },
+    });
+    console.log("유튜브 유료 프로모션 표시 켬:", videoId);
+    return true;
+  } catch (e) {
+    console.warn("유튜브 유료 프로모션 표시 실패(영상은 정상):", (e as Error).message.slice(0, 150));
+    return false;
+  }
+}
+
 /** 영상의 현재 설명 (없으면 null) */
 export async function getYoutubeDescription(videoId: string): Promise<string | null> {
   const youtube = youtubeClient();

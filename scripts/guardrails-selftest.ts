@@ -49,6 +49,11 @@ check(
   "Disclosure 컨텍스트 기본값이 DISCLOSURE_TEXT 가 아니다",
   /createContext<string>\(DISCLOSURE_TEXT\)/.test(read("remotion/components/Disclosure.tsx"))
 );
+// 2026-10-26~ 짧은 화면 고지도 '쿠팡파트너스'와 '수수료'는 반드시 들어 있어야 한다
+const vc = read("remotion/config/videoConfig.ts");
+const shortText = vc.match(/DISCLOSURE_SHORT_TEXT\s*=\s*"([^"]+)"/)?.[1] ?? "";
+check("짧은 화면 고지에 '쿠팡파트너스'·'수수료'가 없다", shortText.includes("쿠팡파트너스") && shortText.includes("수수료"));
+check("고지 컴포넌트에 처음·끝 표시 규칙이 없다", /EDGE_SECONDS\s*=\s*3\b/.test(read("remotion/components/Disclosure.tsx")));
 for (const t of ["TemplateE", "TemplateEUseCase"]) {
   check(`${t} 화면 고지가 useDisclosureText 를 안 쓴다`, read(`remotion/templates/${t}.tsx`).includes("useDisclosureText()"));
 }

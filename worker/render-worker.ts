@@ -41,7 +41,8 @@ import {
   driveDirectDownloadUrl,
   downloadDriveFile,
 } from "../src/lib/drive";
-import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings } from "../src/lib/youtube";
+import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings, setPaidPromotion } from "../src/lib/youtube";
+import { DISCLOSURE_SHORT_TEXT, disclosureEdgesOn } from "../remotion/config/videoConfig";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
 import { findOwn, inPhotoCutsArm, makeImageCuts, makePhotoCuts, PHOTO_CUTS_ORIGIN } from "../src/lib/photoCuts";
@@ -179,7 +180,13 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     // 배경이 없으면 라벨도 없다 - 제품 사진만 보이는 화면엔 오해의 소지가 없다.
     brollNotice: null,
     // 사장님 본인 상품은 "쿠팡파트너스 활동…" 대신 판매자 고지 (lib/ownProducts.ts)
-    disclosureText: isOwnProduct(product) ? OWN_SCREEN_DISCLOSURE : null,
+    disclosureText: isOwnProduct(product)
+      ? OWN_SCREEN_DISCLOSURE
+      : disclosureEdgesOn()
+        ? DISCLOSURE_SHORT_TEXT
+        : null,
+    // 10/26~ 처음·끝 3초만 표시 (remotion/components/Disclosure.tsx)
+    disclosureMode: disclosureEdgesOn() ? "edges" : "always",
   };
 }
 
@@ -762,6 +769,9 @@ async function publishToSns(
       // 자동자막(ASR) 억제: 빈 표준 자막 트랙을 올려 화면에 자동자막이 안 뜨게 한다.
       // (우리 영상은 자막을 이미 구워넣으므로 자동자막은 중복·오역만 됨). 실패해도 무시.
       await suppressAutoCaptions(result.videoId);
+      // 10/26~ 파트너스 상품은 유튜브 '유료 프로모션 포함' 공식 표시를 켠다(시작 화면에 작은 라벨).
+      // 본인 상품은 제3자 유료 홍보가 아니라 끄지 않고 건너뛴다. 실패해도 업로드는 유지.
+      if (disclosureEdgesOn() && !isOwnProduct(product)) await setPaidPromotion(result.videoId);
     } catch (e) {
       youtubeError = e instanceof Error ? e.message : String(e);
       console.error("유튜브 업로드 실패:", youtubeError);
