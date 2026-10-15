@@ -26,6 +26,7 @@
  * 롱폼(longform.ts)은 화면 고지가 영상 내내 있지 않아 설명란 첫 줄을 유지한다.
  */
 import { DISCLOSURE_LINE } from "./ai";
+import { FRIENDLY_DISCLOSURE_LINE } from "./policy";
 import { OWN_DISCLOSURE_LINE } from "./ownProducts";
 
 /** 사장님 본인 상품(lib/ownProducts.ts)이면 파트너스 고지 대신 판매자 고지를 쓴다 */
@@ -60,7 +61,7 @@ export function youtubeShortsDescription(
   return [
     shortProductName,
     "",
-    opts.own ? OWN_DISCLOSURE_LINE : DISCLOSURE_LINE,
+    ...(opts.own ? [OWN_DISCLOSURE_LINE] : [DISCLOSURE_LINE, FRIENDLY_DISCLOSURE_LINE]),
     "",
     `제품명·가격·상세 정보는 살림템 메모장 ${displayNumber}번에 정리했습니다.`,
     url,
@@ -85,7 +86,10 @@ export function instagramCaption(
   opts: CopyOpts = {}
 ): string {
   const disclosure = opts.own ? OWN_DISCLOSURE_LINE : DISCLOSURE_LINE;
-  let raw = (baseCaption ?? "").split(DISCLOSURE_LINE).join("").split(OWN_DISCLOSURE_LINE).join("");
+  let raw = (baseCaption ?? "")
+    .split(DISCLOSURE_LINE).join("")
+    .split(OWN_DISCLOSURE_LINE).join("")
+    .split(FRIENDLY_DISCLOSURE_LINE).join("");
   if (opts.own) raw = raw.split(PARTNER_ONLY_SENTENCE).join("");
   const lines = raw
     .replace(/\n{3,}/g, "\n\n")
@@ -100,5 +104,7 @@ export function instagramCaption(
 
   // 본문이 통째로 비어 있는 경우(문구 생성 실패)에도 최소한의 안내는 나가야 한다.
   const fallback = `프로필 첫 화면에 최근 번호 정리해 뒀어요. (${displayNumber}번)`;
-  return [body || fallback, "", disclosure, ...(tags.length ? ["", ...tags] : [])].join("\n");
+  // 파트너스는 고지 바로 아래 친근한 한 줄(2026-10-15)
+  const disclosureBlock = opts.own ? [disclosure] : [disclosure, FRIENDLY_DISCLOSURE_LINE];
+  return [body || fallback, "", ...disclosureBlock, ...(tags.length ? ["", ...tags] : [])].join("\n");
 }

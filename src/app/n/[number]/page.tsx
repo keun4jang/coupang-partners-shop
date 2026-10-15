@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { formatDisplayNumber, shortenProductName } from "@/lib/format";
 import { parseTrackingParams, shortsVariantOf, trackingQuery } from "@/lib/tracking";
-import { findPolicyIssues } from "@/lib/policy";
+import { findPolicyIssues, FRIENDLY_DISCLOSURE_LINE } from "@/lib/policy";
 import { isOwnProduct, OWN_DISCLOSURE_LINE } from "@/lib/ownProducts";
 import { APP_VERSION } from "@/lib/appVersion";
 import type { VideoItemWithProduct } from "@/types/db";
@@ -173,6 +173,9 @@ export default async function NumberPage({
         {isOwnProduct(product)
           ? OWN_DISCLOSURE_LINE
           : "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
+        {!isOwnProduct(product) && (
+          <span className="block mt-1 text-ink/60">{FRIENDLY_DISCLOSURE_LINE}</span>
+        )}
       </p>
 
       <div className="bg-card rounded-3xl border border-accent-soft shadow-sm overflow-hidden">
