@@ -1,13 +1,25 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
-import { formatDisplayNumber, shortenProductName } from "@/lib/format";
+import { shortenProductName } from "@/lib/format";
 import { parseTrackingParams, shortsVariantOf, trackingQuery } from "@/lib/tracking";
 import { findPolicyIssues, FRIENDLY_DISCLOSURE_LINE } from "@/lib/policy";
 import { isOwnProduct, OWN_DISCLOSURE_LINE } from "@/lib/ownProducts";
 import { APP_VERSION } from "@/lib/appVersion";
 import type { VideoItemWithProduct } from "@/types/db";
 import { ViewBeacon } from "./ViewBeacon";
+import { Black_Han_Sans, IBM_Plex_Sans_KR } from "next/font/google";
+
+/*
+ * 2026-10-17 디자인 개편 (사장님 "적용해" - frontend-design 스킬 기준).
+ * 예전 화면(크림 바탕·테라코타·둥근 카드+그림자)은 AI 생성 디자인의 대표 패턴이라 "AI 가 만든 것 같다"는
+ * 인상을 줬다. '살림템 메모장 = 번호로 정리'라는 주제에 맞춰 번호를 서랍 라벨 테이프처럼 사진에 붙이는
+ * 것 하나만 눈에 띄게 하고, 나머지(흰 바탕·큰 사진·왼쪽 정렬·남색 한 가지)는 조용하게 둔다.
+ * 고지 문구는 화면 맨 위 그대로(공정위 지침 - '더보기' 없이 보이는 위치).
+ */
+const tapeFont = Black_Han_Sans({ weight: "400", subsets: ["latin"], preload: false });
+const bodyFont = IBM_Plex_Sans_KR({ weight: ["400", "500", "700"], subsets: ["latin"], preload: false });
+const TAPE = "#1d3f8c";
 
 export const dynamic = "force-dynamic";
 
@@ -153,7 +165,8 @@ export default async function NumberPage({
   })}`;
 
   return (
-    <main className="max-w-lg mx-auto px-5 pb-32">
+    <div className={`bg-white min-h-screen text-[#1e1f1c] ${bodyFont.className}`}>
+    <main className="max-w-[480px] mx-auto pb-28">
       <ViewBeacon
         displayNumber={n}
         src={tracking.source}
@@ -168,104 +181,102 @@ export default async function NumberPage({
         공정위 「추천·보증 등에 관한 표시·광고 심사지침」은 표시문구가
         "더보기"를 눌러야 보이는 위치에 있으면 안 된다고 본다.
       */}
-      <p className="mt-4 mb-5 bg-accent-soft text-ink/80 text-[13px] leading-relaxed rounded-xl px-4 py-3">
+      <p className="px-5 pt-3.5 pb-3 text-[12.5px] leading-relaxed text-[#676b66] border-b border-[#d8dcda]">
         {/* 사장님 본인 상품은 수수료가 아니라 판매자 직접 판매라 고지가 다르다 (lib/ownProducts.ts) */}
         {isOwnProduct(product)
           ? OWN_DISCLOSURE_LINE
           : "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
         {!isOwnProduct(product) && (
-          <span className="block mt-1 text-ink/60">{FRIENDLY_DISCLOSURE_LINE}</span>
+          <span className="block text-[#1e1f1c]">{FRIENDLY_DISCLOSURE_LINE}</span>
         )}
       </p>
 
-      <div className="bg-card rounded-3xl border border-accent-soft shadow-sm overflow-hidden">
-        <div className="px-5 pt-5 flex items-center gap-2">
-          <span className="bg-primary text-white font-extrabold rounded-full px-3.5 py-1.5 text-lg">
-            {formatDisplayNumber(item.display_number)}
-          </span>
-          {product.source === "aliexpress" && (
-            <span className="bg-[#FFE8D6] text-[#8A4B1F] text-xs font-semibold rounded-full px-2.5 py-1">
-              해외직구 · 배송 1~2주
-            </span>
-          )}
-        </div>
-
+      {/* 사진 + 번호 라벨 테이프 (이 페이지에서 유일하게 눈에 띄는 요소) */}
+      <div className="relative bg-[#eef1f0] aspect-square flex items-center justify-center">
         {product.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.image_url}
             alt={product.product_name}
-            className="w-full aspect-square object-contain bg-white mt-4"
+            className="w-[86%] h-[86%] object-contain mix-blend-multiply"
           />
         )}
-
-        <div className="px-5 pt-4 pb-5">
-          <h1 className="font-extrabold text-lg leading-snug break-keep">
-            {shortenProductName(product.product_name, 44)}
-          </h1>
-          {product.price_text && (
-            <p className="mt-2 text-primary-dark font-extrabold text-xl">
-              {product.price_text}
-            </p>
-          )}
-          {/* 가격은 상품 수집 시점 스냅샷이라 지금과 다를 수 있다. 오인 소지를 없앤다. */}
-          <p className="text-sub text-xs mt-1">
-            영상 제작 시점 기준 가격이에요. 현재 가격은 판매 페이지에서 확인해
-            주세요.
-          </p>
-
-          {points.length > 0 && (
-            <section className="mt-5">
-              <h2 className="font-bold text-sm mb-2">영상에서 짚은 내용</h2>
-              <ul className="flex flex-col gap-2">
-                {points.map((point, i) => (
-                  <li
-                    key={i}
-                    className="flex gap-2 text-[15px] leading-relaxed text-ink/85 break-keep"
-                  >
-                    <span className="text-primary shrink-0">·</span>
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* 첫 화면 안 버튼 - 스크롤 없이 바로 닿게 카드 안에 하나 둔다 */}
-          <a
-            href={goHref}
-            rel="nofollow sponsored"
-            className="mt-6 block bg-primary hover:bg-primary-dark transition-colors text-white font-extrabold rounded-xl py-4 text-center text-base"
-          >
-            {buttonLabel}
-          </a>
+        <div
+          className={`absolute left-[18px] top-[22px] -rotate-[4deg] text-white rounded-[3px] px-4 pt-1.5 pb-1 text-[34px] tracking-[0.06em] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_0_rgba(0,0,0,0.18)] ${tapeFont.className}`}
+          style={{ background: TAPE }}
+        >
+          {item.display_number}
+          <span className="text-[15px] tracking-normal ml-0.5 opacity-85">번</span>
         </div>
+        {product.source === "aliexpress" && (
+          <span className="absolute right-4 bottom-4 bg-white text-[#1e1f1c] text-xs font-medium rounded px-2 py-1">
+            해외직구 · 배송 1~2주
+          </span>
+        )}
       </div>
 
-      <p className="text-center mt-6">
-        <Link href="/" className="text-sub text-sm underline">
-          다른 번호도 보기
-        </Link>
-      </p>
+      <div className="px-5 pt-[22px]">
+        <h1 className="text-[22px] leading-[1.4] font-bold tracking-[-0.01em] break-keep">
+          {shortenProductName(product.product_name, 44)}
+        </h1>
+        {product.price_text && (
+          <p className="mt-3 text-[20px] font-bold">{product.price_text}</p>
+        )}
+        {/* 가격은 상품 수집 시점 스냅샷이라 지금과 다를 수 있다. 오인 소지를 없앤다. */}
+        <p className="mt-1 text-[12.5px] text-[#676b66]">
+          영상 만들 때 가격이에요. 지금 가격은 판매 페이지에서 확인해 주세요.
+        </p>
 
-      <footer className="mt-10 text-center text-sub text-xs leading-relaxed">
+        {points.length > 0 && (
+          <section>
+            <h2 className="mt-7 mb-2 text-[13px] font-medium text-[#676b66]">영상에서 짚은 내용</h2>
+            <ul className="pl-3.5 border-l-[3px]" style={{ borderColor: TAPE }}>
+              {points.map((point, i) => (
+                <li key={i} className="py-1 text-[15.5px] leading-[1.65] break-keep">
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* 첫 화면 안 버튼 - 스크롤 없이 바로 닿게 하나 둔다 */}
+        <a
+          href={goHref}
+          rel="nofollow sponsored"
+          className="mt-7 block text-white font-bold text-[16.5px] rounded-md py-[17px] text-center focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#f2b705]"
+          style={{ background: TAPE }}
+        >
+          {buttonLabel}
+        </a>
+
+        <p className="text-center mt-6">
+          <Link href="/" className="text-[#676b66] text-sm underline">
+            다른 번호도 보기
+          </Link>
+        </p>
+      </div>
+
+      <footer className="mt-10 text-center text-[#676b66] text-xs leading-relaxed">
         살림템 메모장
-        <span className="block mt-2 text-sub/50">{APP_VERSION}</span>
+        <span className="block mt-2 opacity-50">{APP_VERSION}</span>
       </footer>
 
       {/*
         하단 고정 버튼 - 사진·설명을 다 읽고 내려온 사람이 다시 위로 올라가지
         않아도 되게. 문구는 위 버튼과 같은 중립 표현을 쓴다.
       */}
-      <div className="fixed bottom-0 left-0 right-0 bg-cream/95 backdrop-blur border-t border-accent-soft px-5 py-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-[#d8dcda] px-5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
         <a
           href={goHref}
           rel="nofollow sponsored"
-          className="block max-w-lg mx-auto bg-primary hover:bg-primary-dark transition-colors text-white font-extrabold rounded-xl py-3.5 text-center"
+          className="block max-w-[440px] mx-auto text-white font-bold rounded-md py-3.5 text-center focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#f2b705]"
+          style={{ background: TAPE }}
         >
           {buttonLabel}
         </a>
       </div>
     </main>
+    </div>
   );
 }
