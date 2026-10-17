@@ -130,24 +130,34 @@ export default async function NumberPage({
 
   // 아직 정리되지 않은 번호 - 막다른 404 대신 다음 행동을 안내한다
   if (!item) {
+    // 10/17 개편과 같은 말투: 아직 아무것도 안 넣은 서랍처럼 '빈 라벨'(점선 테이프)에 번호만 적어 둔다
     return (
-      <main className="max-w-lg mx-auto px-5 py-12 text-center">
-        <p className="text-5xl font-extrabold text-primary">{n}번</p>
-        <p className="font-semibold mt-4">
-          {dbReady
-            ? "이 번호는 아직 정리해두지 않았어요."
-            : "잠시 후 다시 들러주세요."}
-        </p>
-        <p className="text-sub text-sm mt-2">
-          다른 번호는 아래에서 찾아보실 수 있어요.
-        </p>
-        <Link
-          href="/"
-          className="inline-block mt-6 bg-primary text-white font-bold rounded-xl px-6 py-3"
-        >
-          전체 목록 보기
-        </Link>
-      </main>
+      <div className={`bg-white min-h-screen text-[#1e1f1c] ${bodyFont.className}`}>
+        <main className="max-w-[480px] mx-auto px-5 pt-16 pb-16">
+          <div
+            className={`inline-block -rotate-[4deg] rounded-[3px] border-2 border-dashed px-4 pt-1.5 pb-1 text-[34px] tracking-[0.06em] ${tapeFont.className}`}
+            style={{ borderColor: TAPE, color: TAPE }}
+          >
+            {n}
+            <span className="text-[15px] tracking-normal ml-0.5 opacity-85">번</span>
+          </div>
+          <h1 className="mt-7 text-[22px] leading-[1.4] font-bold tracking-[-0.01em] break-keep">
+            {dbReady ? "이 번호는 아직 정리하지 않았어요." : "잠시 후 다시 들러 주세요."}
+          </h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-[#676b66] break-keep">
+            {dbReady
+              ? "영상이 막 올라온 번호라면 조금 뒤에 채워져요. 다른 번호는 전체 목록에서 찾을 수 있어요."
+              : "목록을 불러오지 못했어요. 새로고침하거나 전체 목록에서 다시 찾아 주세요."}
+          </p>
+          <Link
+            href="/"
+            className="mt-8 block text-white font-bold text-[16.5px] rounded-md py-[17px] text-center focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#f2b705]"
+            style={{ background: TAPE }}
+          >
+            전체 목록 보기
+          </Link>
+        </main>
+      </div>
     );
   }
 
