@@ -8,18 +8,13 @@ import { isOwnProduct, OWN_DISCLOSURE_LINE } from "@/lib/ownProducts";
 import { APP_VERSION } from "@/lib/appVersion";
 import type { VideoItemWithProduct } from "@/types/db";
 import { ViewBeacon } from "./ViewBeacon";
-import { Black_Han_Sans, IBM_Plex_Sans_KR } from "next/font/google";
+import { bodyFont, tapeFont, TAPE } from "../../brand";
 
 /*
- * 2026-10-17 디자인 개편 (사장님 "적용해" - frontend-design 스킬 기준).
+ * 2026-10-17 디자인 개편 (사장님 "적용해" - frontend-design 스킬 기준). 공통 규칙은 src/app/brand.ts.
  * 예전 화면(크림 바탕·테라코타·둥근 카드+그림자)은 AI 생성 디자인의 대표 패턴이라 "AI 가 만든 것 같다"는
- * 인상을 줬다. '살림템 메모장 = 번호로 정리'라는 주제에 맞춰 번호를 서랍 라벨 테이프처럼 사진에 붙이는
- * 것 하나만 눈에 띄게 하고, 나머지(흰 바탕·큰 사진·왼쪽 정렬·남색 한 가지)는 조용하게 둔다.
- * 고지 문구는 화면 맨 위 그대로(공정위 지침 - '더보기' 없이 보이는 위치).
+ * 인상을 줬다. 고지 문구는 화면 맨 위 그대로(공정위 지침 - '더보기' 없이 보이는 위치).
  */
-const tapeFont = Black_Han_Sans({ weight: "400", subsets: ["latin"], preload: false });
-const bodyFont = IBM_Plex_Sans_KR({ weight: ["400", "500", "700"], subsets: ["latin"], preload: false });
-const TAPE = "#1d3f8c";
 
 export const dynamic = "force-dynamic";
 

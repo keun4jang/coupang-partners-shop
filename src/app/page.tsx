@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { Product, VideoItemWithProduct } from "@/types/db";
 import { supabaseAdmin } from "@/lib/supabase";
-import { formatDisplayNumber, shortenProductName } from "@/lib/format";
+import { shortenProductName } from "@/lib/format";
 import { APP_VERSION } from "@/lib/appVersion";
+import { FRIENDLY_DISCLOSURE_LINE } from "@/lib/policy";
+import { BUTTON, bodyFont, tapeFont, TAPE } from "./brand";
 
 export const dynamic = "force-dynamic";
 
@@ -57,87 +59,79 @@ function HeroCard({
   slot: "hero" | "search" | "direct";
 }) {
   const product: Product = item.products;
+  // 2026-10-17 디자인 개편: 안내 페이지(/n)와 같은 모양 - 회색 사진 칸 + 남색 번호 라벨 테이프
   return (
     <a
       href={`/api/click?videoItemId=${item.id}&slot=${slot}`}
       rel="nofollow sponsored"
-      className="block bg-card rounded-3xl overflow-hidden shadow-md border-2 border-primary/60 active:scale-[0.99] transition-transform"
+      className="block"
     >
-      <div className="bg-primary/10 px-5 py-2.5 flex items-center justify-between">
-        <span className="font-bold text-primary-dark text-sm">{label}</span>
-        <span className="bg-primary text-white text-xs font-bold rounded-full px-2.5 py-1">
-          {formatDisplayNumber(item.display_number)}
-        </span>
-      </div>
-      {/* 해외직구는 배송이 1~2주라 미리 알린다 - 모르고 사면 그게 더 나쁜 경험 */}
-      {product.source === "aliexpress" && (
-        <div className="bg-[#FFE8D6] text-[#8A4B1F] text-xs font-semibold px-5 py-1.5">
-          해외직구 · 배송 1~2주
+      <p className="px-5 mb-2 text-[13px] font-medium text-[#676b66]">{label}</p>
+      <div className="relative bg-[#eef1f0] aspect-square flex items-center justify-center">
+        {product.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image_url}
+            alt={product.product_name}
+            className="w-[86%] h-[86%] object-contain mix-blend-multiply"
+          />
+        )}
+        <div
+          className={`absolute left-[18px] top-[22px] -rotate-[4deg] text-white rounded-[3px] px-4 pt-1.5 pb-1 text-[34px] tracking-[0.06em] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_0_rgba(0,0,0,0.18)] ${tapeFont.className}`}
+          style={{ background: TAPE }}
+        >
+          {item.display_number}
+          <span className="text-[15px] tracking-normal ml-0.5 opacity-85">번</span>
         </div>
-      )}
-      {product.image_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={product.image_url}
-          alt={product.product_name}
-          className="w-full aspect-square object-cover bg-white"
-        />
-      )}
-      <div className="px-5 pt-4 pb-5">
-        <h2 className="font-extrabold text-lg leading-snug">
+        {/* 해외직구는 배송이 1~2주라 미리 알린다 - 모르고 사면 그게 더 나쁜 경험 */}
+        {product.source === "aliexpress" && (
+          <span className="absolute right-4 bottom-4 bg-white text-[#1e1f1c] text-xs font-medium rounded px-2 py-1">
+            해외직구 · 배송 1~2주
+          </span>
+        )}
+      </div>
+      <div className="px-5 pt-5">
+        <h2 className="text-[21px] leading-[1.4] font-bold tracking-[-0.01em] break-keep">
           {shortenProductName(product.product_name, 34)}
         </h2>
-        <p className="text-ink/70 text-sm mt-1.5 leading-relaxed">
-          {shortDescription(item)}
-        </p>
+        <p className="mt-2 text-[15px] leading-[1.65] text-[#45494a] break-keep">{shortDescription(item)}</p>
         {/* 버튼 문구는 "정보를 보러 간다"는 사실만 말한다.
             구매 재촉·최저가 단정 같은 표현은 쿠팡파트너스 운영정책 위반이다. */}
-        <div className="mt-4 bg-primary hover:bg-primary-dark transition-colors text-white font-extrabold rounded-xl py-3.5 text-center text-base">
-          {product.source === "aliexpress" ? "알리익스프레스" : "쿠팡"}에서 상품
-          정보 보기
+        <div className={`mt-5 py-[17px] text-[16.5px] ${BUTTON}`} style={{ background: TAPE }}>
+          {product.source === "aliexpress" ? "알리익스프레스" : "쿠팡"}에서 상품 정보 보기
         </div>
       </div>
     </a>
   );
 }
 
-/** 목록 카드: 사진 왼쪽 + 정보 오른쪽, 카드 전체가 쿠팡 링크 */
+/** 목록 한 줄: 사진 왼쪽 + 번호·이름 오른쪽, 줄 전체가 쿠팡 링크 (카드 대신 구분선) */
 function ItemCard({ item }: { item: VideoItemWithProduct }) {
   const product: Product = item.products;
   return (
     <a
       href={`/api/click?videoItemId=${item.id}&slot=list`}
       rel="nofollow sponsored"
-      className="flex gap-3 items-center bg-card rounded-2xl p-3 shadow-sm border border-accent-soft active:scale-[0.99] transition-transform"
+      className="flex gap-3.5 items-center py-3 border-b border-[#e3e6e4]"
     >
-      {product.image_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={product.image_url}
-          alt=""
-          className="w-20 h-20 rounded-xl object-cover bg-white shrink-0 border border-accent-soft"
-        />
-      ) : (
-        <div className="w-20 h-20 rounded-xl bg-accent-soft shrink-0 flex items-center justify-center text-2xl">
-          🧺
-        </div>
-      )}
+      <div className="w-[72px] h-[72px] bg-[#eef1f0] shrink-0 flex items-center justify-center">
+        {product.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={product.image_url} alt="" className="w-[88%] h-[88%] object-contain mix-blend-multiply" />
+        )}
+      </div>
       <div className="min-w-0 flex-1">
-        <span className="inline-block bg-accent-soft text-primary-dark font-semibold rounded-full px-2 py-0.5 text-[11px]">
-          {formatDisplayNumber(item.display_number)}
+        <span className={`text-[15px] tracking-[0.04em] ${tapeFont.className}`} style={{ color: TAPE }}>
+          {item.display_number}번
         </span>
         {product.source === "aliexpress" && (
-          <span className="inline-block ml-1 bg-[#FFE8D6] text-[#8A4B1F] font-semibold rounded-full px-2 py-0.5 text-[11px]">
-            해외직구
-          </span>
+          <span className="ml-1.5 text-[11px] font-medium text-[#676b66]">해외직구</span>
         )}
-        <h3 className="font-bold text-[15px] mt-1 leading-snug line-clamp-2">
+        <h3 className="text-[15px] font-medium mt-0.5 leading-snug line-clamp-2 break-keep">
           {shortenProductName(product.product_name, 30)}
         </h3>
       </div>
-      <span className="shrink-0 text-primary-dark font-extrabold text-sm">
-        정보 보기
-      </span>
+      <span className="shrink-0 whitespace-nowrap text-[13px] text-[#676b66]">정보 보기</span>
     </a>
   );
 }
@@ -168,79 +162,75 @@ export default async function Home({
   // 유입 경로가 달라 클릭 로그에서 구분해야 효과를 잴 수 있다.
   const direct = searched && s === "direct";
   const heroLabel = searched
-    ? `🔎 ${result!.display_number}번, 이 제품이에요!`
-    : "🔥 오늘의 추천 살림템";
+    ? `${result!.display_number}번, 이 제품이에요`
+    : "가장 최근에 정리한 살림템";
   const listItems = items.filter((item) => item.id !== hero?.id);
   // 지금 랜딩에 떠 있는 상품 중 알리가 하나라도 있으면 고지에 알리도 적는다
   // (없는 제휴를 표시하지도, 있는 제휴를 빠뜨리지도 않게)
   const hasAli = items.some((it) => it.products.source === "aliexpress");
 
   return (
-    <main className="max-w-lg mx-auto px-5 pb-16">
+    <div className={`bg-white min-h-screen text-[#1e1f1c] ${bodyFont.className}`}>
+    <main className="max-w-[480px] mx-auto pb-16">
       {/* 헤더 - 짧게 (히어로가 주인공) */}
-      <header className="pt-8 pb-5 text-center">
-        <h1 className="text-2xl font-extrabold tracking-tight">
+      <header className="px-5 pt-7 pb-4">
+        <h1 className="text-[24px] font-bold tracking-[-0.02em]">
           살림템 메모장{" "}
           {/* 숨은 관리자 진입 버튼 — 겉보기엔 그냥 이모지 (나만 아는 버튼) */}
-          <Link
-            href="/admin"
-            aria-hidden
-            tabIndex={-1}
-            className="cursor-default no-underline"
-          >
+          <Link href="/admin" aria-hidden tabIndex={-1} className="cursor-default no-underline">
             📝
           </Link>
         </h1>
-        <p className="text-sub mt-1.5 text-sm">
-          영상 속 제품, 여기서 바로 확인하세요.
-        </p>
+        <p className="text-[#676b66] mt-1 text-[14px]">영상 속 번호로 제품을 찾아보세요.</p>
       </header>
 
       {/*
-        대가성 고지 - 링크(히어로 카드)보다 위. 카드 전체가 제휴 링크라
+        대가성 고지 - 링크(히어로)보다 위. 히어로 전체가 제휴 링크라
         아래 푸터에만 두면 바로 누른 사람은 고지를 못 본 채 넘어간다.
         공정위 지침도 "더보기/스크롤 없이 보이는 곳"을 요구한다.
       */}
-      <p className="mb-4 bg-accent-soft text-ink/80 text-[13px] leading-relaxed rounded-xl px-4 py-3">
+      <p className="px-5 py-3 text-[12.5px] leading-relaxed text-[#676b66] border-y border-[#d8dcda]">
         {hasAli
           ? "이 사이트는 쿠팡파트너스 및 알리익스프레스 어필리에이트 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
           : "이 사이트는 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
+        <span className="block text-[#1e1f1c]">{FRIENDLY_DISCLOSURE_LINE}</span>
       </p>
 
       {!dbReady && (
-        <p className="text-center text-sub text-sm mt-6">
-          아직 준비 중이에요. 잠시 후 다시 들러주세요 🙂
+        <p className="px-5 text-[#676b66] text-[15px] mt-8">
+          목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.
         </p>
       )}
 
       {/* 번호 검색 - 최상단. 예전 영상 보고 온 분이 자기 번호로 바로 점프 */}
       {dbReady && (
-        <section className="bg-card rounded-2xl p-3.5 shadow-sm border border-accent-soft mb-4">
-          <span className="text-sm font-semibold pl-1">번호로 찾기</span>
-          <form method="GET" action="/" className="flex gap-2 items-center mt-1.5">
+        <form method="GET" action="/" className="px-5 pt-5 pb-6">
+          <label htmlFor="q" className="block text-[13px] font-medium text-[#676b66] mb-2">
+            번호로 찾기
+          </label>
+          <div className="flex gap-2 items-stretch">
             <input
+              id="q"
               type="text"
               name="q"
               inputMode="numeric"
               defaultValue={q ?? ""}
               placeholder="영상 속 번호 (예: 17)"
-              className="flex-1 min-w-0 rounded-lg border border-accent px-3 py-2 text-base bg-cream focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex-1 min-w-0 rounded-md border-2 border-dashed bg-white px-3.5 py-2.5 text-[17px] focus:outline-none focus:border-solid"
+              style={{ borderColor: TAPE }}
             />
-            <button
-              type="submit"
-              className="bg-primary hover:bg-primary-dark transition-colors text-white font-semibold rounded-lg px-3.5 py-2 text-sm shrink-0"
-            >
+            <button type="submit" className={`px-5 text-[15px] ${BUTTON}`} style={{ background: TAPE }}>
               찾기
             </button>
-          </form>
-        </section>
+          </div>
+        </form>
       )}
 
       {/* 번호 검색했는데 없는 경우 */}
       {q && dbReady && !result && (
-        <div className="bg-card rounded-2xl p-5 text-center border border-accent-soft mb-4">
-          <p className="font-semibold">{q.trim()}번은 아직 정리해두지 않았어요.</p>
-          <p className="text-sub text-sm mt-1">아래에서 다른 제품을 둘러보세요.</p>
+        <div className="px-5 pb-6">
+          <p className="font-bold text-[17px] break-keep">{q.trim()}번은 아직 정리하지 않았어요.</p>
+          <p className="text-[#676b66] text-[14px] mt-1">영상이 막 올라온 번호라면 조금 뒤에 채워져요. 아래 목록도 둘러보세요.</p>
         </div>
       )}
 
@@ -255,11 +245,11 @@ export default async function Home({
 
       {/* 최근 제품 목록 (이전 영상에서 온 방문자용) */}
       {dbReady && listItems.length > 0 && (
-        <section className="mt-7">
-          <h2 className="font-bold text-base mb-2.5 px-1">
+        <section className="mt-10 px-5">
+          <h2 className="text-[13px] font-medium text-[#676b66] pb-2 border-b-[3px]" style={{ borderColor: TAPE }}>
             다른 영상 속 제품들
           </h2>
-          <div className="flex flex-col gap-2">
+          <div>
             {listItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
@@ -268,14 +258,15 @@ export default async function Home({
       )}
 
       {/* 대가성 문구 + 버전 (수정할 때마다 자동으로 올라감) */}
-      <footer className="mt-12 text-center text-sub text-xs leading-relaxed">
+      <footer className="mt-12 px-5 text-center text-[#676b66] text-xs leading-relaxed">
         {/* 제휴처가 늘면 고지도 같이 늘어야 한다. 알리 상품이 실제로 노출될 때만
             알리를 함께 적어, 없는 제휴를 표시하지 않는다. */}
         {hasAli
           ? "쿠팡파트너스 및 알리익스프레스 어필리에이트 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다."
           : "쿠팡파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다."}
-        <span className="block mt-2 text-sub/50">{APP_VERSION}</span>
+        <span className="block mt-2 opacity-50">{APP_VERSION}</span>
       </footer>
     </main>
+    </div>
   );
 }
