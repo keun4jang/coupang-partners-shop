@@ -45,7 +45,7 @@ import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions
 import { DISCLOSURE_SHORT_TEXT, disclosureEdgesOn } from "../remotion/config/videoConfig";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
-import { findOwn, inPhotoCutsArm, makeImageCuts, makePhotoCuts, PHOTO_CUTS_ORIGIN } from "../src/lib/photoCuts";
+import { findOwn, inPhotoCutsArm, makeImageCuts, makePhotoCuts, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
 import { packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
@@ -291,7 +291,9 @@ async function renderVideo(
   // 판매자 본인 사진이라 "사용 상황 예시" 라벨은 붙이지 않는다. src/lib/photoCuts.ts 참고.
   if (
     usesBroll &&
-    inPhotoCutsArm(product, item.display_number) &&
+    // 샘플(--demo, HERO_CUTS=1)에서는 시작일 전이라도 켠다 - 운영 렌더에는 HERO_CUTS 가 없다
+    (inPhotoCutsArm(product, item.display_number) ||
+      (process.env.HERO_CUTS === "1" && inPhotoCutsArm(product, item.display_number, new Date(PHOTO_CUTS_START)))) &&
     (await getSetting("own_photo_cuts"))?.trim() !== "off"
   ) {
     const own = findOwn(product);
