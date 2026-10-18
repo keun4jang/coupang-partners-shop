@@ -287,7 +287,7 @@ async function renderVideo(
   const BROLL_CUT_COUNT = effectiveTemplate === "E" ? 3 : 6;
   let brollOrigin = "배경 없음(블러 사진)";
 
-  // 근사장 본인 상품 시험(10/19~, 홀수 번호): 윙 사진 여러 장으로 만든 컷을 배경으로 쓴다.
+  // 근사장 본인 상품(10/19~, 전부 - 10/18 사장님 "내 사진이니 많이 써도 돼"): 윙 대표·추가·상세 사진으로 만든 컷을 배경으로 쓴다.
   // 판매자 본인 사진이라 "사용 상황 예시" 라벨은 붙이지 않는다. src/lib/photoCuts.ts 참고.
   if (
     usesBroll &&

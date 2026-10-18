@@ -6,8 +6,9 @@
  * 윙에 사진이 3~12장 있으니(OWN_IMAGES) 사진마다 확대·이동을 걸어 컷으로 만든다.
  * 무료(시스템 ffmpeg - render.yml 이 설치) - 유료 AI 영상 생성은 쓰지 않는다(비용 0원 원칙).
  *
- * 시험: 10/19 이후 렌더되는 근사장 영상 중 홀수 번호만 여러 컷, 짝수는 기존 그대로.
- * broll_origin 에 PHOTO_CUTS_ORIGIN 이 남아 두 그룹을 가를 수 있다.
+ * 10/19 이후 렌더되는 근사장 영상 **전부** 여러 컷 (2026-10-18 사장님: "내 상품이라 내가 올린 사진이니
+ * 많이 이용해도 돼" - 홀짝 비교는 접었다. 하루 1편이라 홀짝으로 나누면 2주에 7편씩이라 판단이 어려웠다).
+ * 효과는 10/19 전후 비교로 본다. broll_origin 에 PHOTO_CUTS_ORIGIN 이 남는다.
  * 끄기: app_settings own_photo_cuts = off.
  */
 import { execFileSync } from "child_process";
@@ -21,15 +22,18 @@ const BROLL_DIR = path.resolve("public/assets/broll");
 export const PHOTO_CUTS_START = "2026-10-19T00:00:00+09:00";
 export const PHOTO_CUTS_ORIGIN = "근사장 사진 여러 컷";
 const FPS = 30;
+/** 세로/가로 비가 이보다 크면 상세페이지 안내 그림으로 보고 컷에서 뺀다 */
+export const TALL_LIMIT = 1.6;
 const CLIP_SECONDS = 4;
 
-/** 이 영상이 시험군(여러 컷)인가 - 근사장 상품 · 시작일 이후 · 홀수 번호 */
+/** 이 영상을 사진 여러 컷으로 만드나 - 근사장 상품 · 시작일 이후 (번호 무관, 이름은 옛 시험 때 그대로) */
 export function inPhotoCutsArm(
   product: { source_memo?: string | null },
   displayNumber: number,
   now: Date = new Date()
 ): boolean {
-  return isOwnProduct(product) && now >= new Date(PHOTO_CUTS_START) && displayNumber % 2 === 1;
+  void displayNumber;
+  return isOwnProduct(product) && now >= new Date(PHOTO_CUTS_START);
 }
 
 /** DB 상품 → OWN_PRODUCTS 항목 (상품명 또는 상품 페이지 주소의 productId 로 찾는다) */
@@ -118,12 +122,19 @@ export async function makeImageCuts(
   const side = Math.min(W, H);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${key}-`));
   const photos: { file: string; bg: string }[] = [];
-  for (const [i, url] of urls.slice(0, 12).entries()) {
+  for (const [i, url] of urls.slice(0, 16).entries()) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) continue;
       const file = path.join(tmp, `p${i}.jpg`);
       fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      // 세로로 아주 긴 그림(상세페이지 안내문 - 글씨가 빽빽하다)은 정사각 컷에서 가늘게 줄어 읽히지도 않는다 - 뺀다.
+      // 사진이 한 장뿐이면 그래도 쓴다 (빈 배경보다 낫다).
+      const { width = 1, height = 1 } = await sharp(file).metadata();
+      if (urls.length > 1 && height / width > TALL_LIMIT) {
+        console.log(`사진 ${i} 건너뜀 - 세로로 긴 안내 그림 (${width}x${height})`);
+        continue;
+      }
       photos.push({ file, bg: await cornerColor(file) });
     } catch (e) {
       console.warn(`사진 ${i} 받기 실패: ${(e as Error).message.slice(0, 80)}`);

@@ -84,8 +84,8 @@ export const OWN_PRODUCTS: Own[] = [
 /**
  * 본인 상품 추가 사진 (2026-10-12 쿠팡 윙 OPEN API 로 읽음 - scripts/wing-images.ts, 읽기만).
  * 값은 image.coupangcdn.com/image/ 뒤 경로. gallery = 대표·추가 이미지(첫 장이 대표),
- * detail = 상세페이지 이미지(영상에는 안 씀 - ownImageUrls 참고).
- * 렌더: src/lib/photoCuts.ts (10/19~ 홀수 번호 근사장 영상 배경).
+ * detail = 상세페이지 이미지 (10/18~ 영상에도 쓴다 - ownImageUrls 참고).
+ * 렌더: src/lib/photoCuts.ts (10/19~ 근사장 영상 전부 배경).
  * 윙은 허용 IP 만 받아 GitHub Actions 에서는 못 읽는다 → 상품이 바뀌면 PC 에서 다시 실행해 갱신.
  */
 export const OWN_IMAGES: Record<string, { gallery: string[]; detail: string[] }> = {
@@ -140,12 +140,13 @@ export const OWN_IMAGES: Record<string, { gallery: string[]; detail: string[] }>
 };
 
 /**
- * 본인 상품의 사진 URL 목록 (대표·추가 이미지, 없으면 대표 사진 1장).
- * 상세 이미지는 뺀다 - 413번에서 추가 이미지와 같은 사진이 주소만 달리 들어 있었고,
- * 글씨 많은 안내 그림일 수도 있다.
+ * 본인 상품의 사진 URL 목록 - 대표·추가 이미지 먼저, 그 뒤에 상세 이미지 (없으면 대표 사진 1장).
+ * 2026-10-18 사장님: "내 상품이라 내가 올린 사진이니 많이 이용해도 돼" → 상세 이미지도 쓴다.
+ * 세로로 아주 긴 안내 그림은 컷을 만들 때 저절로 빠진다 (photoCuts.ts TALL_LIMIT).
+ * 같은 주소는 한 번만 (413번은 상세 이미지에 추가 이미지와 같은 사진이 들어 있었다).
  */
 export function ownImageUrls(o: Own): string[] {
   const x = OWN_IMAGES[o.inv];
-  const paths = x?.gallery.length ? x.gallery : [o.image];
+  const paths = [...(x?.gallery.length ? x.gallery : [o.image]), ...(x?.detail ?? [])];
   return [...new Set(paths)].map((p) => `https://image.coupangcdn.com/image/${p}`);
 }
