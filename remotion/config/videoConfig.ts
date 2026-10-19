@@ -418,7 +418,8 @@ export const TRUST_TEXT = "쿠팡 베스트에서 눈에 띈 살림템을 정리
  * 수수료를 받는다는 사실은 반드시 남긴다(쿠팡파트너스 고지 필수).
  */
 export const DISCLOSURE_SHORT_TEXT = "쿠팡파트너스 활동으로 수수료를 받아요";
-export const DISCLOSURE_EDGES_START = "2026-10-26T00:00:00+09:00";
+// 2026-10-19 사장님 "추천대로" - 10/26 예정을 앞당김 (화면 고지를 완전히 빼자는 요청 대신 처음·끝 3초만)
+export const DISCLOSURE_EDGES_START = "2026-10-19T00:00:00+09:00";
 export function disclosureEdgesOn(now: Date = new Date()): boolean {
   return now >= new Date(DISCLOSURE_EDGES_START);
 }

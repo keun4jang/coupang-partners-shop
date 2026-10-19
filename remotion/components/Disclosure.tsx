@@ -55,8 +55,8 @@ export const Disclosure: React.FC = () => {
   const mode = useContext(DisclosureModeContext);
   if (!visible) return null;
   return (
-    // 상품 카드가 길어지면 이 문구와 겹쳐 흰 글씨가 크림색 카드 위에 놓여
-    // 읽히지 않는다. 반투명 어두운 배경을 깔아 어떤 화면에서도 읽히게 한다.
+    // 2026-10-19 사장님: 문장에 테두리·배경을 넣지 말자 → 상자 없이 글자만.
+    // 밝은 화면에서도 읽히도록 은은한 그림자만 깐다 (테두리 선·배경 상자는 없음).
     <div
       style={{
         position: "absolute",
@@ -76,9 +76,7 @@ export const Disclosure: React.FC = () => {
           fontSize: mode === "edges" ? Math.round(FONT_SIZES.disclosure * 0.9) : FONT_SIZES.disclosure,
           fontWeight: 500,
           fontFamily,
-          background: "rgba(35, 28, 24, 0.55)",
-          borderRadius: 999,
-          padding: "8px 20px",
+          textShadow: "0 1px 6px rgba(0, 0, 0, 0.55), 0 0 2px rgba(0, 0, 0, 0.35)",
         }}
       >
         {text}
