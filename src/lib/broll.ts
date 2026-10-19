@@ -90,7 +90,13 @@ const SEARCH_QUERY_BY_CATEGORY: Record<string, string[]> = {
  * 카테고리보다 우선 적용해 "최대한 제품과 관련있는" 배경 영상을 고른다.
  * (위에서부터 먼저 매칭되는 것을 사용)
  */
-const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
+const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string | string[]]> = [
+  // 2026-10-19 사장님: "가방 제품에 오토바이 이야기가 나오는데 뒷배경은 청소 영상" - 가방·오토바이·승마·노트·캠핑
+  // 규칙이 없어 생활템(집안일) 검색어로 떨어졌다. 근사장 본인 상품(오토바이 가방·안장 패드·가죽 노트·캠핑)을 먼저 잡는다.
+  // 캠핑을 차량·가방보다 앞에 둔다 - "SUV 트렁크 테일 텐트"가 차량 청소로, "판초 … 수납가방 포함"이 가방으로 새지 않게.
+  [/오토바이|바이크|라이딩|모터사이클/, ["motorcycle rider city", "motorbike riding road", "biker motorcycle bag"]],
+  [/승마|안장|마장/, ["horse riding saddle", "equestrian horse stable", "horse rider saddle"]],
+  [/텐트|타프|해먹|캠핑|차박|백패킹|트레킹|판초|블랭킷/, ["camping tent outdoor", "campsite tarp camping", "camping blanket outdoor"]],
   // 차량템은 맨 앞에 둔다. 뒤에 두면 "차량용 미니 청소기"가 아래 /청소기/ 규칙에
   // 먼저 걸려 집안 바닥 청소기 영상이 배경으로 깔린다(실측 확인).
   // 같은 이유로 "차량용 방향제 거치대"는 /거치대/ 에, "자동차 트렁크 정리함"은
@@ -121,15 +127,66 @@ const PRODUCT_QUERY_KEYWORDS: Array<[RegExp, string]> = [
   [/주걱|국자|뒤집개|조리도구|프라이팬|후라이팬|냄비|도마|칼/, "cooking kitchen utensils home"],
   [/드라이기|헤어/, "hair dryer bathroom vanity"],
   [/텀블러|물병|컵/, "pouring water drink kitchen"],
+  // 가방(수납가방은 빼고)·노트(노트북은 빼고)
+  [/(?<!수납)가방|백팩|메신저백|숄더백|토트백|크로스백|사이드백/, ["person carrying shoulder bag street", "leather bag closeup", "walking with backpack street"]],
+  [/노트(?!북)|다이어리|수첩|플래너/, ["writing in notebook desk", "leather journal writing", "notebook pen planning"]],
 ];
 
-/** 상품명 키워드에 맞는 구체 검색어 (없으면 null) */
-function productQuery(productName: string): string | null {
+/**
+ * 상품 맞춤 검색어로 받은 클립은 영상 설명(Pexels 주소·Pixabay 태그)에 이 단어가 있어야 쓴다.
+ * 검색 결과 뒤쪽엔 무관한 클립이 섞인다 - 가방 검색에 거실 정리 영상이 오는 식.
+ */
+const QUERY_ANCHORS: Array<[RegExp, RegExp]> = [
+  [/motorcycle|motorbike|biker/, /motorcycle|motorbike|biker|bike|rider|riding|scooter/i],
+  [/horse|equestrian/, /horse|equestrian|saddle|stable|pony|riding/i],
+  [/camping|campsite/, /camp|tent|tarp|hammock|outdoor|hiking|backpack|blanket|nature|forest/i],
+  [/bag|backpack/, /bag|backpack|purse|satchel|handbag|tote|leather/i],
+  [/notebook|journal/, /notebook|journal|diary|writing|notes|planner|pen|book/i],
+];
+function anchorFor(query: string): RegExp | null {
+  for (const [q, a] of QUERY_ANCHORS) if (q.test(query)) return a;
+  return null;
+}
+
+/** 상품명 키워드에 맞는 구체 검색어들 (없으면 빈 배열) */
+export function productQueries(productName: string): string[] {
   const name = productName ?? "";
   for (const [re, q] of PRODUCT_QUERY_KEYWORDS) {
-    if (re.test(name)) return q;
+    if (re.test(name)) return Array.isArray(q) ? q : [q];
   }
-  return null;
+  return [];
+}
+
+/**
+ * 규칙에 안 걸린 상품은 무료 Gemini 에게 상품명으로 영어 스톡 검색어 3개를 받는다.
+ * 실패하면 null (카테고리 검색어로 폴백). 상품을 실제로 쓰는 장면을 찾게 한다.
+ */
+async function aiStockQueries(productName: string): Promise<string[] | null> {
+  if (!productName) return null;
+  try {
+    const { geminiGenerateJson } = await import("./ai");
+    const r = await geminiGenerateJson<{ queries: string[] }>({
+      system:
+        "You write short English search queries for free stock video sites (Pexels, Pixabay). " +
+        "Each query: 2-5 plain English words describing a real person using or wearing this exact kind of product, " +
+        "or the product itself in its natural setting. No brand names, no Korean, no abstract mood words. " +
+        "Never describe cleaning or housework unless the product is a cleaning tool.",
+      prompt: `Product (Korean): ${productName}\nReturn 3 queries.`,
+      schema: {
+        type: "object",
+        properties: { queries: { type: "array", items: { type: "string" } } },
+        required: ["queries"],
+      },
+      temperature: 0.4,
+    });
+    const qs = (r?.queries ?? [])
+      .map((q) => q.trim().toLowerCase())
+      .filter((q) => /^[a-z ]{3,60}$/.test(q) && q.split(" ").length <= 6);
+    return qs.length ? qs.slice(0, 3) : null;
+  } catch (e) {
+    console.warn(`AI 스톡 검색어 실패: ${(e as Error).message.slice(0, 80)}`);
+    return null;
+  }
 }
 
 /** 카테고리 검색어 변형들 */
@@ -148,7 +205,7 @@ function categoryQueries(category: string): string[] {
  *  - Pixabay: 태그 매칭이라 domestic 이 "domestic cat/animal" 에 걸린다. 게다가
  *    세로 후보를 오히려 줄였다("organizing home closet" 기준 1개 → 0개).
  */
-const NON_HOME_QUERY = /\b(car|camping|outdoor|stroller)\b/;
+const NON_HOME_QUERY = /\b(car|camping|campsite|outdoor|stroller|motorcycle|motorbike|biker|horse|equestrian|street|tent)\b/;
 function domesticize(query: string): string {
   if (NON_HOME_QUERY.test(query)) return query;
   return query.includes("home") ? query : `${query} home`;
@@ -271,7 +328,12 @@ function isFoodQuery(query: string): boolean {
 }
 
 function isOutdoorQuery(query: string): boolean {
-  return /camping|outdoor|car\b/i.test(query);
+  return /camping|campsite|outdoor|car\b|motorcycle|motorbike|biker|horse|equestrian|street|tent|walking/i.test(query);
+}
+
+/** 사람이 들고·입고·타는 것이 정답인 검색어 - 인물·패션 컷 필터를 건너뛴다 */
+function isPersonQuery(query: string): boolean {
+  return /bag|backpack|rider|biker|riding|leather|walking|wearing/i.test(query);
 }
 
 /** true 면 배경 후보에서 제외 (테스트에서 직접 호출하려고 export 한다) */
@@ -285,7 +347,10 @@ export function isUnusableClip(text: string, query: string): boolean {
   // 이 예외가 없으면 청소하는 사람·설거지하는 손처럼 정작 필요한 컷까지 날아간다.
   const chore = CHORE_WORDS.test(text);
   if (!chore && !isOfficeQuery(query) && OFFICE_WORDS.test(text)) return true;
-  if (!chore && IDLE_PERSON_WORDS.test(text)) return true;
+  if (!chore && !isPersonQuery(query) && IDLE_PERSON_WORDS.test(text)) return true;
+  // 상품 맞춤 검색어면 설명에 핵심 단어가 있어야 한다 (검색 결과 뒤쪽의 무관 클립 차단)
+  const anchor = anchorFor(query);
+  if (anchor && !anchor.test(text)) return true;
   return false;
 }
 
@@ -490,9 +555,13 @@ export async function fetchStockBrolls(
   productName = "",
   orientation: StockOrientation = "portrait"
 ): Promise<StockBroll[]> {
-  // 검색어 풀: 상품명 특화 검색어(있으면) + 카테고리 변형들. 모두 생활감 보정.
-  const pq = productQuery(productName);
-  const rawQueries = [...(pq ? [pq] : []), ...categoryQueries(category)];
+  // 검색어 풀 (2026-10-19 바꿈): 상품 맞춤 검색어가 있으면 **그것만** 쓴다. 예전엔 맞춤 검색어 1개 + 카테고리 4개를
+  // 돌려서 6컷 중 대부분이 카테고리(생활템=집안일) 장면이었다 - 가방 영상에 청소 배경. 규칙에 없으면 AI 검색어,
+  // 그것도 없으면 카테고리. 모두 생활감 보정.
+  const pqs = productQueries(productName);
+  const ai = pqs.length ? null : await aiStockQueries(productName);
+  if (ai) console.log(`AI 스톡 검색어: ${ai.join(" / ")}`);
+  const rawQueries = pqs.length ? pqs : ai ?? categoryQueries(category);
   const queries = [...new Set(rawQueries.map(domesticize))];
 
   const providers = await activeProviders(orientation);
