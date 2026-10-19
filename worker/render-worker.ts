@@ -179,14 +179,15 @@ function buildProps(item: VideoItem, product: Product): ShortsProps {
     // 배경을 실제로 넣는 쪽(renderVideo)에서 소재 성격에 맞는 라벨을 채운다.
     // 배경이 없으면 라벨도 없다 - 제품 사진만 보이는 화면엔 오해의 소지가 없다.
     brollNotice: null,
-    // 사장님 본인 상품은 "쿠팡파트너스 활동…" 대신 판매자 고지 (lib/ownProducts.ts)
+    // 사장님 본인 상품은 "쿠팡파트너스 활동…" 대신 판매자 고지 (lib/ownProducts.ts) - 10/19~ 화면엔 안 띄움(disclosureMode off)
     disclosureText: isOwnProduct(product)
       ? OWN_SCREEN_DISCLOSURE
       : disclosureEdgesOn()
         ? DISCLOSURE_SHORT_TEXT
         : null,
-    // 10/26~ 처음·끝 3초만 표시 (remotion/components/Disclosure.tsx)
-    disclosureMode: disclosureEdgesOn() ? "edges" : "always",
+    // 10/26~ 처음·끝 3초만 표시 (remotion/components/Disclosure.tsx).
+    // 근사장 본인 상품은 화면 판매자 문구를 안 띄운다 (2026-10-19 사장님 "2번") - 캡션·설명의 판매자 문구는 그대로.
+    disclosureMode: isOwnProduct(product) ? "off" : disclosureEdgesOn() ? "edges" : "always",
   };
 }
 

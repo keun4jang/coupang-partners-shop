@@ -15,8 +15,10 @@ export const useDisclosureText = () => useContext(DisclosureTextContext);
  * 고지 표시 방식 (2026-10-15 사장님 "추천대로 진행", 10/26 렌더분부터):
  *  always = 영상 내내, edges = 처음 3초 + 마지막 3초만(공정위 지침의 "동영상 시작·끝 표시").
  * 쇼츠 설명란·릴스 '더보기' 안 고지는 바로 안 보이므로 영상 속 고지 자체는 없애지 않는다.
+ *  off = 표시 안 함 - **근사장 본인 상품만** (2026-10-19 사장님 "2번": 화면 판매자 문구는 빼고 캡션·설명에만).
+ *        파트너스 상품에는 절대 쓰지 않는다 (render-worker 가 본인 상품일 때만 넣는다).
  */
-export type DisclosureMode = "always" | "edges";
+export type DisclosureMode = "always" | "edges" | "off";
 export const DisclosureModeContext = createContext<DisclosureMode>("always");
 const EDGE_SECONDS = 3;
 
@@ -25,6 +27,7 @@ export function useDisclosureVisible(): boolean {
   const mode = useContext(DisclosureModeContext);
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  if (mode === "off") return false;
   if (mode !== "edges") return true;
   const edge = EDGE_SECONDS * fps;
   return frame < edge || frame >= durationInFrames - edge;

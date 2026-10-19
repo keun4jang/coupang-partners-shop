@@ -81,7 +81,7 @@ export type ShortsProps = {
    */
   disclosureText?: string | null;
   /** 고지 표시 방식 - always(영상 내내) / edges(처음·끝 3초, 2026-10-26 렌더분부터) */
-  disclosureMode?: "always" | "edges" | null;
+  disclosureMode?: "always" | "edges" | "off" | null;
 };
 
 export const defaultShortsProps: ShortsProps = {
