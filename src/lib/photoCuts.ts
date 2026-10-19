@@ -6,7 +6,8 @@
  * 윙에 사진이 3~12장 있으니(OWN_IMAGES) 사진마다 확대·이동을 걸어 컷으로 만든다.
  * 무료(시스템 ffmpeg - render.yml 이 설치) - 유료 AI 영상 생성은 쓰지 않는다(비용 0원 원칙).
  *
- * 10/19 이후 렌더되는 근사장 영상 **전부** 여러 컷 (2026-10-18 사장님: "내 상품이라 내가 올린 사진이니
+ * 2026-10-19 사장님: 사진이 배경에만 보인다 → **가운데 상품 카드에서 여러 장을 넘기고 배경은 스톡** (ownGalleryImages).
+ * 10/19 이후 렌더되는 근사장 영상 **전부** 여러 장 (2026-10-18 사장님: "내 상품이라 내가 올린 사진이니
  * 많이 이용해도 돼" - 홀짝 비교는 접었다. 하루 1편이라 홀짝으로 나누면 2주에 7편씩이라 판단이 어려웠다).
  * 효과는 10/19 전후 비교로 본다. broll_origin 에 PHOTO_CUTS_ORIGIN 이 남는다.
  * 끄기: app_settings own_photo_cuts = off.
@@ -97,7 +98,33 @@ const SINGLE_MOVES = [
   { z: "1.4", x: `(iw-iw/zoom)*on/${F}`, y: "ih/2-(ih/zoom/2)" },
 ];
 
-/** 근사장 상품: 윙 사진 여러 장 → 배경 컷 */
+/**
+ * 근사장 상품: 가운데 상품 카드에서 넘길 사진들 (2026-10-19~ 배경 컷 대신 이것을 쓴다).
+ * 사진을 받아 720px JPEG data URI 로 줄인다 (렌더 props 가 무거워지지 않게). 세로로 아주 긴 안내 그림은 뺀다.
+ */
+export async function ownGalleryImages(own: Own, max = 10): Promise<string[]> {
+  const out: string[] = [];
+  for (const url of ownImageUrls(own)) {
+    if (out.length >= max) break;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const { width = 1, height = 1 } = await sharp(buf).metadata();
+      if (height / width > TALL_LIMIT) {
+        console.log(`사진 건너뜀 - 세로로 긴 안내 그림 (${width}x${height})`);
+        continue;
+      }
+      const jpg = await sharp(buf).resize(720, 720, { fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 82 }).toBuffer();
+      out.push(`data:image/jpeg;base64,${jpg.toString("base64")}`);
+    } catch (e) {
+      console.warn(`사진 받기 실패: ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  return out;
+}
+
+/** 근사장 상품: 윙 사진 여러 장 → 배경 컷 (10/19 부터는 안 쓴다 - ownGalleryImages 로 바뀜. 셀프테스트용으로 남김) */
 export async function makePhotoCuts(
   own: Own,
   displayNumber: number,

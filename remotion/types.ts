@@ -39,6 +39,12 @@ export type ShortsProps = {
   /** CTA (예: 영상 속 제품은 17번에 정리해뒀어요) */
   ctaText: string;
   productImageUrl: string | null;
+  /**
+   * 가운데 상품 카드에서 차례로 넘겨 보여 줄 사진들 (data URI). 2장 이상이면 카드가 사진을 넘기고,
+   * 없거나 1장이면 대표 사진 한 장을 확대 구도로 바꿔 보여 준다 (2026-10-19 사장님: 근사장 상품 사진은
+   * 배경 말고 가운데 창에 여러 장 - 배경은 스톡 그대로).
+   */
+  productImages?: string[] | null;
   category: string;
   /** public/assets/broll/ 아래 B-roll 파일명. 없으면 그라디언트 모션 배경 */
   brollFile: string | null;

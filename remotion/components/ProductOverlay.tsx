@@ -35,10 +35,16 @@ export const ProductOverlay: React.FC<{
   polaroid?: boolean;
   topRatio?: number;
   widthRatio?: number;
+  /** 차례로 넘길 사진들 (2장 이상일 때만 넘긴다) */
+  images?: string[] | null;
+  /** 카드가 떠 있는 길이(프레임) - 사진 한 장당 시간을 고르게 나누는 데 쓴다 */
+  durationFrames?: number;
 }> = ({
   productName,
   productImageUrl,
   displayNumber,
+  images,
+  durationFrames,
   topRatio = LAYOUT.productCardTop,
   widthRatio = LAYOUT.productCardWidth,
 }) => {
@@ -66,6 +72,16 @@ export const ProductOverlay: React.FC<{
   const shot = shots[Math.floor(frame / Math.round(fps * 2.2)) % shots.length];
   const tx = (0.5 - shot.cx * shot.z) * 100;
   const ty = (0.5 - shot.cy * shot.z) * 100;
+
+  // 사진 여러 장 (근사장 본인 상품): 한 장씩 넘기며 천천히 다가간다. 한 장당 1.6초 이상,
+  // 카드가 떠 있는 동안 고르게 나눠 마지막 사진까지 다 보이게 한다.
+  const gallery = images && images.length > 1 ? images : null;
+  const per = gallery
+    ? Math.max(Math.round(fps * 1.6), Math.floor((durationFrames ?? fps * 20) / gallery.length))
+    : 1;
+  const gi = gallery ? Math.floor(frame / per) % gallery.length : 0;
+  const local = gallery ? (frame % per) / per : 0;
+  const galleryPop = gallery ? spring({ frame: frame % per, fps, config: { damping: 16, mass: 0.5 } }) : 1;
 
   const cardWidth = width * widthRatio;
   const label = shelfLabel(productName);
@@ -112,7 +128,19 @@ export const ProductOverlay: React.FC<{
           transform: `scale(${0.95 + pop * 0.05})`,
         }}
       >
-        {productImageUrl && !imageFailed ? (
+        {gallery ? (
+          <Img
+            key={gi}
+            src={gallery[gi]}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              background: "#FFFFFF",
+              transform: `scale(${(0.96 + galleryPop * 0.04) * (1 + local * 0.08)})`,
+            }}
+          />
+        ) : productImageUrl && !imageFailed ? (
           <Img
             src={productImageUrl}
             style={{

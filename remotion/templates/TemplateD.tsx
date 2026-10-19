@@ -95,6 +95,8 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           displayNumber={props.displayNumber}
           topRatio={0.25}
           widthRatio={0.66}
+          images={props.productImages}
+          durationFrames={ctaFrom - productFrom}
         />
       </Sequence>
 

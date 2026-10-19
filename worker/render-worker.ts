@@ -45,7 +45,7 @@ import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions
 import { DISCLOSURE_SHORT_TEXT, disclosureEdgesOn } from "../remotion/config/videoConfig";
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
-import { findOwn, inPhotoCutsArm, makeImageCuts, makePhotoCuts, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
+import { findOwn, inPhotoCutsArm, makeImageCuts, ownGalleryImages, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
 import { packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
@@ -287,43 +287,34 @@ async function renderVideo(
   const BROLL_CUT_COUNT = effectiveTemplate === "E" ? 3 : 6;
   let brollOrigin = "배경 없음(블러 사진)";
 
-  // 근사장 본인 상품(10/19~, 전부 - 10/18 사장님 "내 사진이니 많이 써도 돼"): 윙 대표·추가·상세 사진으로 만든 컷을 배경으로 쓴다.
-  // 판매자 본인 사진이라 "사용 상황 예시" 라벨은 붙이지 않는다. src/lib/photoCuts.ts 참고.
+  // 근사장 본인 상품(10/19~, 전부): 윙 대표·추가·상세 사진을 **가운데 상품 카드**에서 한 장씩 넘겨 보여 준다.
+  // 2026-10-19 사장님: "사진 여러 개가 뒷배경에만 보인다 - 가운데 창에 여러 사진, 뒤는 원래대로 스톡".
+  // 그래서 배경은 아래 스톡 경로 그대로 두고 사진은 카드(ProductOverlay images)로만 쓴다. src/lib/photoCuts.ts 참고.
+  // 샘플(--demo, HERO_CUTS=1)에서는 시작일 전이라도 켠다 - 운영 렌더에는 HERO_CUTS 가 없다.
+  let ownGallery = 0;
   if (
-    usesBroll &&
-    // 샘플(--demo, HERO_CUTS=1)에서는 시작일 전이라도 켠다 - 운영 렌더에는 HERO_CUTS 가 없다
     (inPhotoCutsArm(product, item.display_number) ||
       (process.env.HERO_CUTS === "1" && inPhotoCutsArm(product, item.display_number, new Date(PHOTO_CUTS_START)))) &&
     (await getSetting("own_photo_cuts"))?.trim() !== "off"
   ) {
     const own = findOwn(product);
-    const files = own
-      ? await makePhotoCuts(
-          own,
-          item.display_number,
-          BROLL_CUT_COUNT,
-          effectiveTemplate === "E" ? "landscape" : "portrait"
-        )
-      : [];
-    if (files.length > 0) {
-      inputProps.brollFiles = files;
-      inputProps.brollDurations = brollFileDurations(files);
-      inputProps.brollNotice = null;
-      cachedBundle = null;
-      brollOrigin = PHOTO_CUTS_ORIGIN;
-      console.log(`근사장 사진 컷 사용: ${files.join(", ")}`);
+    const imgs = own ? await ownGalleryImages(own) : [];
+    if (imgs.length > 1) {
+      inputProps.productImages = imgs;
+      ownGallery = imgs.length;
+      console.log(`근사장 사진 ${imgs.length}장 - 가운데 카드에서 넘김`);
     } else {
-      console.warn("근사장 사진 컷 실패 - 기존 배경 경로로 폴백");
+      console.warn("근사장 사진 여러 장 준비 실패 - 대표 사진 한 장으로");
     }
   }
 
   // 파트너스 상품 '상품 사진 주인공' 컷 (2026-10-15 사장님: 377번 샘플 "좋아, 파트너스 영상에도 적용해").
   // 스톡 대신 대표 사진 1장을 시선 이동·확대 컷으로 만들어 상품이 화면을 채우게 한다.
   // app_settings.partner_hero_cuts: split(기본) = 홀수 번호만 → 짝수(스톡)와 2주 비교 / all = 전부 / off.
-  // 근사장 상품은 위의 윙 사진 컷 경로를 쓰므로 제외. HERO_CUTS=1 은 샘플(--demo)에서 강제로 켠다.
+  // 근사장 상품은 배경을 스톡으로 두고 사진은 가운데 카드에 넣으므로 제외. HERO_CUTS=1 은 샘플(--demo)에서 강제로 켠다.
   const heroSetting = (await getSetting("partner_hero_cuts"))?.trim() || "split";
   const heroOn =
-    process.env.HERO_CUTS === "1" ||
+    (process.env.HERO_CUTS === "1" && !isOwnProduct(product)) ||
     (process.env.HERO_CUTS !== "0" &&
       !isOwnProduct(product) &&
       (heroSetting === "all" || (heroSetting === "split" && item.display_number % 2 === 1)));
@@ -530,6 +521,8 @@ async function renderVideo(
     inputProps: inputProps as unknown as Record<string, unknown>,
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });
+
+  if (ownGallery > 0) brollOrigin = `${brollOrigin} + ${PHOTO_CUTS_ORIGIN}(가운데 카드 ${ownGallery}장)`;
 
   return {
     videoPath,
