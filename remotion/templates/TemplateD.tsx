@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
+import { AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import type { ShortsProps } from "../types";
 import {
   COVER_FRAME_COUNT,
@@ -23,6 +23,21 @@ import { Disclosure } from "../components/Disclosure";
  * brollFile 이 없으면(키 미설정/검색 실패) 블러 상품사진 배경으로 폴백.
  * 장면 컷은 나레이션 실측 길이(props.timing)에 맞춰 움직인다.
  */
+/** 배경 흐림 + 어둡게 (0.3초에 걸쳐 들어온다) */
+const FocusBackdrop: React.FC = () => {
+  const frame = useCurrentFrame();
+  const k = interpolate(frame, [0, 9], [0, 1], { extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill
+      style={{
+        backdropFilter: `blur(${Math.round(34 * k)}px)`,
+        WebkitBackdropFilter: `blur(${Math.round(34 * k)}px)`,
+        background: `rgba(14, 15, 18, ${0.55 * k})`,
+      }}
+    />
+  );
+};
+
 export const TemplateD: React.FC<ShortsProps> = (props) => {
   const { durationInFrames } = useVideoConfig();
   const T = resolveTiming(props.timing);
@@ -89,6 +104,9 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
           (같은 상품 사진이 장면마다 다시 팝인되면 3번 전환되는 것처럼 보여서
            하나의 연속 노출로 합침 - 자막만 장점1→장점2→확인할 점으로 바뀐다) */}
       <Sequence from={productFrom} durationInFrames={ctaFrom - productFrom}>
+        {/* 카드가 떠 있는 동안 뒤 배경을 흐리고 어둡게 덮는다 - 가운데 카드에만 눈이 가게
+            (2026-10-19 사장님: "가운데 사진 나올 때는 뒤에 아무것도 안 보였으면, 블러 처리해서 가운데 집중") */}
+        <FocusBackdrop />
         <ProductOverlay
           productName={props.productName}
           productImageUrl={props.productImageUrl}
