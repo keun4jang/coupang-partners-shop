@@ -130,6 +130,20 @@ export const PALETTE = {
   badgeCoral: "#FF8A70", // 배지 코랄
 } as const;
 
+/**
+ * 2026-10-19 영상 디자인 개편 (사장님 "AI 가 만든 것 같다 · 색깔들이 촌스럽다 · 세련되게").
+ * 사이트(/n·홈·허브, src/app/brand.ts)와 같은 한 벌: 흰 종이 + 먹색 글씨 + 남색 한 가지(번호 라벨 테이프).
+ * 크림·살구·민트·코랄 파스텔 배지, 둥근 카드, 큰 그림자 같은 "자동 생성" 티 나는 장식은 쓰지 않는다.
+ */
+export const INK = {
+  paper: "#FFFFFF",
+  photoBg: "#EEF1F0",
+  ink: "#1E1F1C",
+  sub: "#676B66",
+  tape: "#1D3F8C",
+  scrim: "rgba(16, 17, 20, 0.78)",
+} as const;
+
 /** 베이지/살구톤 팔레트 (사이트와 톤 일치) */
 export const COLORS = {
   cream: PALETTE.ivory,
@@ -140,9 +154,10 @@ export const COLORS = {
   sub: PALETTE.sub,
   accent: "#F5C7A9",
   accentSoft: "#FBE9DB",
-  overlayTintTop: "rgba(63, 52, 44, 0.18)",
-  overlayTintBottom: "rgba(63, 52, 44, 0.5)",
-  subtitleShadow: "rgba(63, 52, 44, 0.32)",
+  // 10/19 개편: 갈색 틴트 → 중립 먹색 (배경 영상 색이 탁한 갈색으로 뜨던 것)
+  overlayTintTop: "rgba(16, 17, 20, 0.18)",
+  overlayTintBottom: "rgba(16, 17, 20, 0.5)",
+  subtitleShadow: "rgba(0, 0, 0, 0.4)",
 } as const;
 
 export const FONT_SIZES = {

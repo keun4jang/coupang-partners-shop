@@ -1,8 +1,7 @@
 import React from "react";
 import { spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORS, FONT_SIZES, MOTION, PALETTE } from "../config/videoConfig";
+import { COLORS, FONT_SIZES, INK, MOTION } from "../config/videoConfig";
 import { fontFamily } from "../fonts";
-import { Badge } from "./Badge";
 
 type Variant = "plain" | "bubble";
 
@@ -73,13 +72,22 @@ export const Subtitle: React.FC<{
             gap: 12,
           }}
         >
+          {/* 10/19 개편: 살구색 알약 배지 → 남색 각진 라벨 (사이트 번호 테이프와 같은 남색) */}
           {badge && (
-            <Badge
-              label={badge}
-              bg={PALETTE.softPeach}
-              color={PALETTE.brown}
-              fontSize={FONT_SIZES.tipLabel}
-            />
+            <span
+              style={{
+                background: INK.tape,
+                color: "#FFFFFF",
+                fontFamily,
+                fontWeight: 700,
+                fontSize: FONT_SIZES.tipLabel,
+                padding: "6px 16px",
+                borderRadius: 3,
+                letterSpacing: "0.02em",
+              }}
+            >
+              {badge}
+            </span>
           )}
           <div
             style={{
@@ -93,16 +101,17 @@ export const Subtitle: React.FC<{
               wordBreak: "keep-all",
               textWrap: "balance",
               color: "#FFFFFF",
-              textShadow: `0 4px 24px ${COLORS.subtitleShadow}, 0 2px 10px rgba(0,0,0,0.55), 0 0 30px rgba(0,0,0,0.28)`,
+              // 10/19 개편: 번진 후광 그림자를 줄이고 또렷한 그림자 한 겹 + 얇은 외곽선 (굵은 검정 테두리는 촌스러워 보였다)
+              textShadow: `0 3px 0 rgba(0,0,0,0.28), 0 6px 22px ${COLORS.subtitleShadow}`,
               // 배경이 밝은 컷에서 흰 자막이 묻힌다. 실측(#75 실제 게시본): 자막 밴드
               // 평균 밝기가 13% 구간 124, 26% 구간 186 으로 흰색(255)과 대비가 부족하다.
               // 그림자만으로는 부족해 모든 자막에 얇은 외곽선을 기본으로 깐다
               // (훅은 썸네일에 박히므로 아래 strong 으로 더 두껍게).
-              WebkitTextStroke: "3px rgba(0,0,0,0.8)",
+              WebkitTextStroke: "2px rgba(0,0,0,0.6)",
               paintOrder: "stroke fill" as const,
               ...(strong
                 ? {
-                    WebkitTextStroke: "8px rgba(0,0,0,0.88)",
+                    WebkitTextStroke: "4px rgba(0,0,0,0.75)",
                     lineHeight: 1.2,
                   }
                 : {}),

@@ -1,15 +1,13 @@
 import React, { useState } from "react";
 import { Img, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORS, FONT_SIZES, LAYOUT, MOTION, PALETTE } from "../config/videoConfig";
-import { fontFamily } from "../fonts";
-import { Badge } from "./Badge";
+import { FONT_SIZES, INK, LAYOUT, MOTION } from "../config/videoConfig";
+import { fontFamily, tapeFontFamily } from "../fonts";
 
 /**
- * 제품 쇼케이스 카드 (살림템 추천 감성).
- * - 따뜻한 크림 카드 + 연한 베이지 이너 보더 + 부드러운 그림자
- * - 상단: 용량/구성 배지 (예: "19L 대용량") — 상품명에서 자동 추출
- * - 중앙: 제품 이미지(디테일 컷 모션) + 뒤에 은은한 하이라이트로 떠 보이게
- * - 하단: 제품명(정보 위계 최상위) + "오늘의 살림템 N번" 코랄 배지
+ * 제품 쇼케이스 카드 (2026-10-19 개편 - 사이트 /n 과 같은 한 벌).
+ * - 흰 종이 한 장 + 회색 사진 칸(사진은 multiply 로 흰 바탕이 녹아든다)
+ * - 사진 왼쪽 위에 남색 번호 라벨 테이프 (Black Han Sans)
+ * - 아래: 상품명(왼쪽 정렬 먹색) + 작은 회색 줄(용량/구성 · 살림템 메모장)
  * props 구조는 파이프라인 호환을 위해 유지(productName/productImageUrl/displayNumber).
  */
 
@@ -86,6 +84,9 @@ export const ProductOverlay: React.FC<{
   const cardWidth = width * widthRatio;
   const label = shelfLabel(productName);
 
+  // 2026-10-19 디자인 개편 (사장님 "AI 가 만든 것 같다 · 촌스럽다 · 세련되게"):
+  // 크림 그라데이션 둥근 카드 + 민트/코랄 알약 배지 → 흰 종이 한 장 + 회색 사진 칸 + 남색 번호 라벨 테이프
+  // (사이트 /n 과 같은 한 벌). 상품명은 왼쪽 정렬 먹색. 둥둥 떠오르지 않고 짧게 올라와 멈춘다.
   return (
     <div
       style={{
@@ -93,39 +94,24 @@ export const ProductOverlay: React.FC<{
         top: height * topRatio,
         left: (width - cardWidth) / 2,
         width: cardWidth,
-        background: `linear-gradient(180deg, ${PALETTE.cardCream} 0%, #FFFDF8 100%)`,
-        borderRadius: 40,
-        padding: "26px 28px 30px",
-        boxShadow: "0 26px 60px rgba(63, 52, 44, 0.28)",
-        border: `1.5px solid ${PALETTE.warmBeige}`,
-        transform: `translateY(${(1 - rise) * 380}px) scale(${0.94 + rise * 0.06})`,
-        opacity: rise,
+        background: INK.paper,
+        borderRadius: 8,
+        padding: "20px 20px 26px",
+        boxShadow: "0 24px 50px rgba(0, 0, 0, 0.32)",
+        transform: `translateY(${(1 - rise) * 120}px)`,
+        opacity: Math.min(1, rise * 1.6),
         fontFamily,
       }}
     >
-      {/* 상단 용량/구성 배지 */}
-      <div style={{ textAlign: "center", marginBottom: 18 }}>
-        <Badge
-          label={label}
-          bg={PALETTE.sageMint}
-          color={PALETTE.brown}
-          fontSize={FONT_SIZES.volumeBadge}
-          delayFrames={4}
-        />
-      </div>
-
-      {/* 제품 이미지 - 카드 위에 떠 있는 타일 */}
+      {/* 사진 칸 */}
       <div
         style={{
           position: "relative",
           width: "100%",
           aspectRatio: "1 / 1",
-          borderRadius: 28,
           overflow: "hidden",
-          background: `radial-gradient(120% 120% at 50% 30%, #FFFFFF 0%, ${PALETTE.warmBeige} 100%)`,
-          boxShadow:
-            "0 16px 34px rgba(63,52,44,0.18), inset 0 0 0 1.5px rgba(255,255,255,0.7)",
-          transform: `scale(${0.95 + pop * 0.05})`,
+          background: INK.photoBg,
+          borderRadius: 3,
         }}
       >
         {gallery ? (
@@ -136,8 +122,8 @@ export const ProductOverlay: React.FC<{
               width: "100%",
               height: "100%",
               objectFit: "contain",
-              background: "#FFFFFF",
-              transform: `scale(${(0.96 + galleryPop * 0.04) * (1 + local * 0.08)})`,
+              mixBlendMode: "multiply",
+              transform: `scale(${(0.96 + galleryPop * 0.04) * (1 + local * 0.06)})`,
             }}
           />
         ) : productImageUrl && !imageFailed ? (
@@ -147,41 +133,56 @@ export const ProductOverlay: React.FC<{
               width: "100%",
               height: "100%",
               objectFit: "cover",
+              mixBlendMode: "multiply",
               transformOrigin: "0 0",
               transform: `translate(${tx}%, ${ty}%) scale(${shot.z})`,
             }}
             onError={() => setImageFailed(true)}
           />
-        ) : (
-          <span
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 150,
-            }}
-          >
-            🧺
-          </span>
+        ) : null}
+        {/* 사진이 여러 장이면 몇 번째인지 아래에 작은 점으로 */}
+        {gallery && (
+          <div style={{ position: "absolute", bottom: 14, left: 0, width: "100%", display: "flex", justifyContent: "center", gap: 8 }}>
+            {gallery.map((_, i) => (
+              <span key={i} style={{ width: 9, height: 9, borderRadius: 9, background: i === gi ? INK.tape : "rgba(30,31,28,0.18)" }} />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* 제품명 - 정보 위계 최상위 */}
+      {/* 번호 라벨 테이프 - 사진 왼쪽 위에 비스듬히 붙인다 */}
+      <div
+        style={{
+          position: "absolute",
+          top: 6,
+          left: -14,
+          transform: `rotate(-4deg) scale(${0.9 + pop * 0.1})`,
+          background: INK.tape,
+          color: "#FFFFFF",
+          fontFamily: tapeFontFamily,
+          fontSize: 66,
+          letterSpacing: "0.04em",
+          lineHeight: 1,
+          padding: "14px 22px 10px",
+          borderRadius: 3,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 0 rgba(0,0,0,0.2)",
+        }}
+      >
+        {displayNumber}
+        <span style={{ fontSize: "0.48em", marginLeft: "0.08em", letterSpacing: 0, opacity: 0.85 }}>번</span>
+      </div>
+
+      {/* 상품명 - 왼쪽 정렬 먹색 */}
       <div
         style={{
           marginTop: 20,
-          textAlign: "center",
-          color: PALETTE.brown,
+          color: INK.ink,
           fontWeight: 800,
-          fontSize: FONT_SIZES.productName,
-          lineHeight: 1.22,
+          fontSize: FONT_SIZES.productName * 0.82,
+          lineHeight: 1.28,
           letterSpacing: "-0.02em",
           wordBreak: "keep-all",
-          textWrap: "balance",
-          // 상품명이 길어 3줄 이상이 되면 카드가 늘어나 번호 배지·대가성 고지와
-          // 겹친다. 2줄로 잘라 카드 높이를 예측 가능하게 유지한다.
+          // 3줄 이상이면 카드가 늘어나 고지와 겹친다 - 2줄로 자른다
           display: "-webkit-box",
           WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical",
@@ -190,18 +191,8 @@ export const ProductOverlay: React.FC<{
       >
         {productName}
       </div>
-
-      {/* 번호 배지 - 이 영상이 몇 번 제품인지 알려주는 식별 표시.
-          ("링크 누르세요" 류의 클릭 유도 문구는 쿠팡파트너스 운영정책상 금지라
-           번호 안내로만 둔다) */}
-      <div style={{ textAlign: "center", marginTop: 14 }}>
-        <Badge
-          label={`오늘의 살림템 ${displayNumber}번`}
-          bg={PALETTE.badgeCoral}
-          color="#FFFFFF"
-          fontSize={FONT_SIZES.numberBadge}
-          delayFrames={10}
-        />
+      <div style={{ marginTop: 10, color: INK.sub, fontSize: 28, fontWeight: 500 }}>
+        {label === "살림템 추천" ? "살림템 메모장" : `${label} · 살림템 메모장`}
       </div>
     </div>
   );

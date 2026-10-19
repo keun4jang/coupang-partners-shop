@@ -7,12 +7,12 @@ import {
   useVideoConfig,
 } from "remotion";
 import {
-  COLORS,
+  INK,
   MOTION,
   ctaNumberFontSize,
   ctaTemplate,
 } from "../config/videoConfig";
-import { fontFamily } from "../fonts";
+import { fontFamily, tapeFontFamily } from "../fonts";
 
 /**
  * 마지막 CTA 화면: 큰 번호 + 문장 한 줄.
@@ -44,92 +44,74 @@ export const CtaScene: React.FC<{
     config: { damping: MOTION.springDamping },
   });
 
+  // 2026-10-19 개편: 살구색 동그라미 + 앱 아이콘 같은 타일 → 회색 사진 칸 위 남색 번호 라벨 테이프 (사이트와 같은 한 벌)
   return (
     <AbsoluteFill
       style={{
-        background: "rgba(63, 52, 44, 0.72)",
+        background: INK.scrim,
         alignItems: "center",
         justifyContent: "center",
         fontFamily,
       }}
     >
-      <div style={{ position: "relative" }}>
+      <div
+        style={{
+          position: "relative",
+          width: 420,
+          height: 420,
+          background: INK.photoBg,
+          borderRadius: 4,
+          boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+          transform: `translateY(${(1 - pop) * 60}px)`,
+          opacity: Math.min(1, pop * 1.6),
+        }}
+      >
+        {productImageUrl && !imageFailed && (
+          <Img
+            src={productImageUrl}
+            style={{ width: "100%", height: "100%", objectFit: "contain", mixBlendMode: "multiply" }}
+            onError={() => setImageFailed(true)}
+          />
+        )}
+        {/* 숫자와 "번"은 한 덩어리 - 줄바꿈하지 않는다 */}
         <div
           style={{
-            width: 380,
-            height: 380,
-            borderRadius: "50%",
-            background: COLORS.cream,
-            border: `14px solid ${COLORS.accent}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 20px 80px rgba(0,0,0,0.35)",
-            transform: `scale(${0.6 + pop * 0.4})`,
-            opacity: pop,
+            position: "absolute",
+            left: -36,
+            top: -40,
+            transform: `rotate(-4deg) scale(${0.85 + pop * 0.15})`,
+            background: INK.tape,
+            color: "#FFFFFF",
+            fontFamily: tapeFontFamily,
+            fontSize: Math.round(ctaNumberFontSize(displayNumber) * 0.8),
+            lineHeight: 1,
+            letterSpacing: "0.04em",
+            whiteSpace: "nowrap",
+            padding: "18px 30px 12px",
+            borderRadius: 4,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 0 rgba(0,0,0,0.22)",
           }}
         >
-          {/* 숫자와 "번"을 한 덩어리로 두되 절대 줄바꿈시키지 않는다.
-              107번부터 원(안지름 352px) 밖으로 "번"이 삐져나갔다 - 두 자리까지는
-              맞았지만 세 자리가 되며 폭이 넘쳤다. 자릿수에 맞춰 크기를 줄인다. */}
-          <span
-            style={{
-              color: COLORS.primaryDark,
-              fontWeight: 900,
-              fontSize: ctaNumberFontSize(displayNumber),
-              whiteSpace: "nowrap",
-              lineHeight: 1,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {displayNumber}
-            <span style={{ fontSize: "0.55em", marginLeft: "0.04em" }}>번</span>
-          </span>
+          {displayNumber}
+          <span style={{ fontSize: "0.46em", marginLeft: "0.08em", letterSpacing: 0, opacity: 0.85 }}>번</span>
         </div>
-
-        {/* 제품 사진 - 번호 원 오른쪽 아래에 겹치는 작은 타일.
-            없거나 로드 실패하면 조용히 생략한다(번호 원만 남는 예전 화면과 동일). */}
-        {productImageUrl && !imageFailed && (
-          <div
-            style={{
-              position: "absolute",
-              right: -18,
-              bottom: -18,
-              width: 148,
-              height: 148,
-              borderRadius: 28,
-              overflow: "hidden",
-              background: "#FFFFFF",
-              border: "6px solid #FFFFFF",
-              boxShadow: "0 12px 30px rgba(0,0,0,0.35)",
-              transform: `scale(${0.6 + pop * 0.4})`,
-              opacity: pop,
-            }}
-          >
-            <Img
-              src={productImageUrl}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              onError={() => setImageFailed(true)}
-            />
-          </div>
-        )}
       </div>
 
       {/* 나레이션과 동일한 문장 한 줄 */}
       <div
         style={{
-          marginTop: 56,
-          width: "86%",
+          marginTop: 64,
+          width: "84%",
           textAlign: "center",
           color: "#FFFFFF",
           fontWeight: 800,
-          fontSize: 48,
-          lineHeight: 1.4,
+          fontSize: 46,
+          lineHeight: 1.42,
+          letterSpacing: "-0.01em",
           wordBreak: "keep-all",
           textWrap: "balance",
-          transform: `translateY(${(1 - textIn) * 40}px)`,
+          transform: `translateY(${(1 - textIn) * 24}px)`,
           opacity: textIn,
-          textShadow: "0 2px 12px rgba(0,0,0,0.4)",
         }}
       >
         {ctaText ?? ctaTemplate(displayNumber)}

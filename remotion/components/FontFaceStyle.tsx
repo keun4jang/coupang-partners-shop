@@ -1,6 +1,6 @@
 import React from "react";
 import { staticFile } from "remotion";
-import { EDITORIAL_FONT_NAME, FONT_NAME } from "../fonts";
+import { EDITORIAL_FONT_NAME, FONT_NAME, TAPE_FONT_NAME } from "../fonts";
 
 const NOTO_WEIGHTS = ["400", "700", "900"] as const;
 
@@ -19,6 +19,14 @@ const PRETENDARD_WEIGHTS: ReadonlyArray<readonly [string, string]> = [
 export const FontFaceStyle: React.FC = () => (
   <style>
     {[
+      `
+      @font-face {
+        font-family: '${TAPE_FONT_NAME}';
+        src: url('${staticFile("fonts/BlackHanSans-400.woff2")}') format('woff2');
+        font-weight: 400;
+        font-display: block;
+      }
+    `,
       ...NOTO_WEIGHTS.map(
         (weight) => `
       @font-face {

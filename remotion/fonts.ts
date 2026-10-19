@@ -14,3 +14,10 @@ export const fontFamily = `'${FONT_NAME}', 'Noto Sans KR', 'Apple SD Gothic Neo'
 export const EDITORIAL_FONT_NAME = "Pretendard";
 
 export const editorialFontFamily = `'${EDITORIAL_FONT_NAME}', '${FONT_NAME}', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`;
+
+/**
+ * 번호 라벨 테이프 글꼴 - Black Han Sans (OFL, google/fonts). 사이트(/n·홈·허브)의 남색 번호 테이프와 같은 글꼴.
+ * 2026-10-19 영상 디자인 개편(사장님 "색깔들이 촌스러워, 세련되게"). public/fonts/BlackHanSans-400.woff2 (한글·숫자만 남긴 부분 글꼴).
+ */
+export const TAPE_FONT_NAME = "BlackHanSans";
+export const tapeFontFamily = `'${TAPE_FONT_NAME}', '${FONT_NAME}', sans-serif`;
