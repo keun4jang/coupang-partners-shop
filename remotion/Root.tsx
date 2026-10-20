@@ -9,6 +9,7 @@ import { TemplateD } from "./templates/TemplateD";
 import { TemplateE } from "./templates/TemplateE";
 import { TemplateEUseCase } from "./templates/TemplateEUseCase";
 import { withDisclosureText } from "./components/Disclosure";
+import { TemplateTip, TipProps, defaultTipProps, tipDurationSeconds } from "./templates/TemplateTip";
 import {
   TOP10_FPS,
   TOP10_HEIGHT,
@@ -35,6 +36,11 @@ const TemplateDWithDisclosure = withDisclosureText(TemplateD);
 const TemplateEWithDisclosure = withDisclosureText(TemplateE);
 const TemplateEUseCaseWithDisclosure = withDisclosureText(TemplateEUseCase);
 
+/** 살림 정보 쇼츠 - 나레이션 장면 길이 합 */
+const tipMetadata: CalculateMetadataFunction<TipProps> = ({ props }) => ({
+  durationInFrames: Math.max(1, Math.round(tipDurationSeconds(props) * VIDEO.fps)),
+});
+
 const defaultTop10Props: Top10Props = { categoryLabel: "생활템", items: [] };
 
 export const RemotionRoot: React.FC = () => {
@@ -59,6 +65,16 @@ export const RemotionRoot: React.FC = () => {
         id="TemplateEUseCase"
         component={TemplateEUseCaseWithDisclosure}
         {...shared}
+      />
+      <Composition
+        id="TemplateTip"
+        component={TemplateTip}
+        width={VIDEO.width}
+        height={VIDEO.height}
+        fps={VIDEO.fps}
+        durationInFrames={Math.round(tipDurationSeconds(defaultTipProps) * VIDEO.fps)}
+        defaultProps={defaultTipProps}
+        calculateMetadata={tipMetadata}
       />
       <Composition
         id="TemplateTop10"

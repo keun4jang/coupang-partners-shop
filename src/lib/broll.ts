@@ -562,7 +562,22 @@ export async function fetchStockBrolls(
   const ai = pqs.length ? null : await aiStockQueries(productName);
   if (ai) console.log(`AI 스톡 검색어: ${ai.join(" / ")}`);
   const rawQueries = pqs.length ? pqs : ai ?? categoryQueries(category);
+  return fetchStockBrollsByQueries(rawQueries, displayNumber, count, orientation, productName || category);
+}
+
+/**
+ * 정해진 검색어들로 스톡 클립 여러 개 (살림 정보 쇼츠처럼 검색어를 따로 정한 경우 - 2026-10-20).
+ * 검색어는 생활감 보정(domesticize)을 거친다.
+ */
+export async function fetchStockBrollsByQueries(
+  rawQueries: string[],
+  displayNumber: number,
+  count: number,
+  orientation: StockOrientation = "portrait",
+  label = ""
+): Promise<StockBroll[]> {
   const queries = [...new Set(rawQueries.map(domesticize))];
+  const productName = label;
 
   const providers = await activeProviders(orientation);
   if (providers.length === 0) {
@@ -572,7 +587,7 @@ export async function fetchStockBrolls(
   console.log(
     `스톡 검색어 ${queries.length}종 × 제공자 ${providers
       .map((p) => p.name)
-      .join("+")} (상품: ${productName || category})`
+      .join("+")} (대상: ${productName})`
   );
 
   const out: StockBroll[] = [];

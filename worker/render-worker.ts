@@ -79,7 +79,8 @@ import {
 import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
-import { fetchStockBrolls } from "../src/lib/broll";
+import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
+import { TIP_TOPICS, generateTip, pickTopic, shortTopic } from "../src/lib/tips";
 import {
   brollFileDurations,
   deleteFootageFiles,
@@ -1576,7 +1577,80 @@ async function runDemo(): Promise<void> {
   }
 }
 
+/**
+ * 살림 정보 쇼츠 샘플 (2026-10-20 사장님 "추천대로 진행" - 정보 4 + 상품 2). 게시·DB 기록 없음.
+ * 사용: `tsx worker/render-worker.ts --tip-demo [주제 번호|주제 글]` (없으면 오늘 날짜로 고른다)
+ */
+async function runTipDemo(): Promise<void> {
+  const arg = process.argv.slice(process.argv.indexOf("--tip-demo") + 1).find((a) => !a.startsWith("--")) ?? "";
+  const day = Math.floor(Date.now() / 86_400_000);
+  const topic = /^\d+$/.test(arg)
+    ? TIP_TOPICS[Number(arg) % TIP_TOPICS.length]
+    : TIP_TOPICS.find((t) => arg && t.topic.includes(arg)) ?? pickTopic(day);
+  console.log(`\n=== [정보 샘플] ${topic.topic} (${topic.group}) ===`);
+  const tip = await generateTip(topic);
+  if (!tip) throw new Error("정보 대본을 만들지 못했습니다 (안전 검사 3회 반려 또는 Gemini 실패)");
+  console.log(`  훅: ${tip.hook}`);
+  tip.steps.forEach((st, i) => console.log(`  ${i + 1}. ${st.title} - ${st.detail}`));
+  console.log(`  마무리: ${tip.outro}\n  배경 검색어: ${tip.stockQueries.join(" / ")}`);
+
+  const clips = tip.stockQueries.length
+    ? await fetchStockBrollsByQueries(tip.stockQueries, day, tip.steps.length + 2, "portrait", tip.topic)
+    : [];
+  const brollFiles = clips.map((c) => c.file);
+
+  const lines = [tip.hook, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro];
+  const narr = await generateNarration(lines);
+  const segments = lines.map((_, i) => {
+    const sec = narr?.[i]?.seconds ?? 0;
+    return Math.max(i === 0 || i === lines.length - 1 ? 2.6 : 3.4, sec + 0.5);
+  });
+  const inputProps = {
+    topic: shortTopic(tip.topic),
+    hook: tip.hook,
+    steps: tip.steps,
+    outro: tip.outro,
+    brollFiles: brollFiles.length ? brollFiles : null,
+    brollDurations: brollFiles.length ? brollFileDurations(brollFiles) : null,
+    narration: narr ? narr.map((l) => l?.uri ?? null) : null,
+    segments,
+  };
+  const serveUrl = await getBundle();
+  const composition = await selectComposition({
+    serveUrl,
+    id: "TemplateTip",
+    inputProps,
+    browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
+  });
+  const outDir = path.join(RENDER_DIR, "tips");
+  fs.mkdirSync(outDir, { recursive: true });
+  const videoPath = path.join(outDir, `tip-${day}-${TIP_TOPICS.indexOf(topic)}.mp4`);
+  const total = segments.reduce((a, b) => a + b, 0);
+  console.log(`렌더링 시작: TemplateTip · ${total.toFixed(1)}초 · 배경 ${brollFiles.length}개 → ${videoPath}`);
+  await renderMedia({
+    composition,
+    serveUrl,
+    codec: "h264",
+    outputLocation: videoPath,
+    inputProps,
+    browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
+  });
+  console.log(`\n=== [정보 샘플] 완료 (업로드/DB 기록 없음) ===\n${videoPath}`);
+  if (process.env.DEMO_SEND_TELEGRAM === "1") {
+    try {
+      await sendTelegramVideo(videoPath, `📒 정보 영상 샘플 (게시 안 됨)\n${tip.topic}\n${total.toFixed(0)}초 · 단계 ${tip.steps.length}개`);
+      console.log("텔레그램으로 샘플 전송 완료");
+    } catch (e) {
+      console.warn(`텔레그램 샘플 전송 실패: ${(e as Error).message}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes("--tip-demo")) {
+    await runTipDemo();
+    return;
+  }
   if (process.argv.includes("--demo")) {
     await runDemo();
     return;

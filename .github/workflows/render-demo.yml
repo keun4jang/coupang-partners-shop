@@ -10,6 +10,16 @@ on:
         description: "샘플로 다시 만들 영상 번호 (예: 377)"
         required: true
         default: "377"
+      mode:
+        description: "샘플 종류 - product(상품 영상) / tip(살림 정보 영상, 번호 칸은 무시)"
+        required: false
+        default: "product"
+        type: choice
+        options: ["product", "tip"]
+      topic:
+        description: "(tip 일 때) 주제 번호 또는 주제 글 일부 - 비우면 오늘 날짜로 고름"
+        required: false
+        default: ""
       hero:
         description: "상품 사진 주인공 컷 (on/off)"
         required: true
@@ -109,4 +119,11 @@ jobs:
           HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
           DEMO_SEND_TELEGRAM: "1"
           NUM: ${{ github.event.inputs.number }}
-        run: npx tsx worker/render-worker.ts --demo "$NUM"
+          MODE: ${{ github.event.inputs.mode }}
+          TOPIC: ${{ github.event.inputs.topic }}
+        run: |
+          if [ "$MODE" = "tip" ]; then
+            npx tsx worker/render-worker.ts --tip-demo "$TOPIC"
+          else
+            npx tsx worker/render-worker.ts --demo "$NUM"
+          fi
