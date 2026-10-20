@@ -102,13 +102,16 @@ export function checkTipSafety(t: Pick<TipScript, "hook" | "steps" | "outro">): 
   const all = [t.hook, ...t.steps.flatMap((s) => [s.title, s.detail]), t.outro].join("\n");
   const issues = [...findPolicyIssues(all)];
   if (CHEM.test(all) && MIX.test(all)) issues.push("약품 섞기 언급");
-  if (/락스|염소|표백제|암모니아|차아염소산/.test(all)) issues.push("강한 약품 언급");
+  if (/락스|염소|표백제|암모니아|차아염소산|과탄산/.test(all)) issues.push("강한 약품 언급");
+  // 몸·건강 원리로 설명하면 확인 못 한 건강 주장이 된다 (10/20 샘플: "혈류가 지나가는 발목")
+  if (/혈류|혈관|혈액|호르몬|신진대사|면역|체내|독소|해독/.test(all)) issues.push("건강 원리 설명");
   if (STATS.test(all)) issues.push("통계·퍼센트");
   if (SELL.test(all)) issues.push("구매·상품 권유");
   if (t.steps.length < 3 || t.steps.length > 4) issues.push("단계 수(3~4)");
   for (const s of t.steps) {
     if (!s.title || s.title.length > 16) issues.push("단계 제목 길이");
-    if (!s.detail || s.detail.length < 10 || s.detail.length > 46) issues.push("단계 설명 길이");
+    // 짧고 빠르게 (10/20 사장님 "길지 않아도 유익하게" - 첫 샘플이 42초로 길었다)
+    if (!s.detail || s.detail.length < 10 || s.detail.length > 38) issues.push("단계 설명 길이");
   }
   if (t.hook.length > 34) issues.push("훅 길이");
   return [...new Set(issues)];
@@ -118,12 +121,13 @@ const SYSTEM = `너는 한국 살림 정보 쇼츠의 대본 작가다. 30~40대
 규칙:
 - 주어진 주제 하나만 다룬다. 집에서 오늘 바로 따라 할 수 있는 구체적인 행동으로 쓴다 (막연한 말 금지: "깨끗이 관리해요" 같은 말 X).
 - 각 단계에는 "왜 그런지" 이유가 짧게 들어가야 한다. 근거 없는 수치·퍼센트·"연구 결과" 금지.
-- 락스·표백제·암모니아 같은 강한 약품, 약품 섞기는 아예 다루지 않는다. 식초·베이킹소다·구연산도 다른 것과 섞는 방법은 쓰지 않는다.
+- 락스·표백제·과탄산소다·암모니아 같은 강한 약품, 약품 섞기는 아예 다루지 않는다. 식초·베이킹소다·구연산도 다른 것과 섞는 방법은 쓰지 않는다.
+- 몸·건강 원리(혈류, 혈액, 면역, 호르몬 등)로 이유를 대지 않는다. 이유는 물건·공기·물기·온도처럼 눈에 보이는 것으로 댄다.
 - 효능·건강 표현 금지: 살균, 항균, 세균, 바이러스, 예방, 치료, 면역, 숙면 같은 말을 쓰지 않는다 ("막는다", "줄인다"로 쓴다).
 - 상품·브랜드·구매 권유·링크 언급 금지. 정보만 준다.
 - 말투는 친근한 존댓말 "~해요". "~잖아요" 같은 상투어를 반복하지 않는다.
 - hook: 34자 이하, 시청자가 겪는 문제를 콕 집는 한 문장.
-- steps: 3~4개. title 16자 이하(행동), detail 12~46자(구체적인 방법 + 짧은 이유).
+- steps: 3개(꼭 필요할 때만 4개). title 16자 이하(행동), detail 12~38자(구체적인 방법 + 짧은 이유). 영상 전체가 30초 안팎이 되게 짧게.
 - outro: 30자 이하, 정리 한 줄 (클릭·구독 재촉 금지).
 - stockQueries: 영어 2~5단어 검색어 3개. 이 주제의 실제 행동 장면 (예: "folding towels laundry", "hanging clothes to dry").`;
 

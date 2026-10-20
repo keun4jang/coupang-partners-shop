@@ -28,6 +28,8 @@ bad({ hook: "세균 99% 없애는 빨래법" }, "효능·통계");
 bad({ outro: "쿠팡에서 이 제품을 구매해 보세요" }, "상품 권유");
 bad({ hook: "수건 냄새, 연구 결과로 밝혀진 방법" }, "근거 없는 연구 결과");
 bad({ steps: ok.steps.slice(0, 2) }, "단계 2개");
+bad({ steps: [...ok.steps.slice(0, 2), { title: "발목 감싸기", detail: "혈류가 지나가는 발목을 감싸면 따뜻해요" }] }, "건강 원리 설명");
+bad({ steps: [...ok.steps.slice(0, 2), { title: "과탄산 쓰기", detail: "유연제 대신 과탄산소다를 넣어 빨아요" }] }, "과탄산소다 권유");
 check("주제 이름에 정책 금지어 없음", TIP_TOPICS.every((t) => findPolicyIssues(t.topic).length === 0));
 check("계절 주제 고르기 - 10월은 가을·사계절만", topicsFor(new Date("2026-10-20")).every((t) => !t.season || t.season === "fall"));
 check("날마다 다른 주제", pickTopic(1).topic !== pickTopic(2).topic);
