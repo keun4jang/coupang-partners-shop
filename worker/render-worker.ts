@@ -46,6 +46,7 @@ import { DISCLOSURE_SHORT_TEXT, disclosureEdgesOn } from "../remotion/config/vid
 import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
 import { findOwn, inPhotoCutsArm, makeImageCuts, ownGalleryImages, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
+import { cutoutProduct } from "../src/lib/cutout";
 import { packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
@@ -438,6 +439,20 @@ async function renderVideo(
       inputProps.brollDurations = null;
       inputProps.brollNotice = null;
       brollOrigin = "배경 없음(클립 파일 없음)";
+    }
+  }
+
+  // 장면 합성 (2026-10-20 사장님 "완전 자동으로, 사진 한 장으론 역부족" → 제안 A "추천대로 진행"):
+  // 대표 사진을 누끼 떠서 인트로 동안 배경 스톡 장면 위에 올린다. 배경이 스톡일 때만(상품 사진 컷이면 겹쳐 보여 뺀다).
+  // 지금은 샘플 전용 - SCENE_CUTOUT=1(render-demo) 또는 app_settings scene_cutout=on 일 때만. 운영 적용은 사장님 확인 뒤.
+  const cutoutOn =
+    process.env.SCENE_CUTOUT === "1" ||
+    (process.env.SCENE_CUTOUT !== "0" && (await getSetting("scene_cutout"))?.trim() === "on");
+  if (cutoutOn && effectiveTemplate === "D" && inputProps.brollFiles?.length && !brollOrigin.startsWith("상품 사진") && product.image_url) {
+    const cut = await cutoutProduct(product.image_url);
+    if (cut) {
+      inputProps.productCutout = cut.dataUri;
+      brollOrigin += " + 상품 누끼 장면 합성";
     }
   }
 

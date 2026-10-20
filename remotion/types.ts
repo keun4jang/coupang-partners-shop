@@ -45,6 +45,11 @@ export type ShortsProps = {
    * 배경 말고 가운데 창에 여러 장 - 배경은 스톡 그대로).
    */
   productImages?: string[] | null;
+  /**
+   * 누끼 뜬 상품 사진 (PNG data URI). 있으면 인트로(후킹·공감) 동안 배경 스톡 장면 위에 상품을 올려 합성한다
+   * (2026-10-20 제안 A "추천대로 진행" - src/lib/cutout.ts, remotion/components/ProductInScene.tsx).
+   */
+  productCutout?: string | null;
   category: string;
   /** public/assets/broll/ 아래 B-roll 파일명. 없으면 그라디언트 모션 배경 */
   brollFile: string | null;

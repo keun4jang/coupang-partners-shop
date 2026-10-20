@@ -15,6 +15,7 @@ import { CtaScene } from "../components/CtaScene";
 import { Narration } from "../components/Narration";
 import { CoverFrame } from "../components/CoverFrame";
 import { Disclosure } from "../components/Disclosure";
+import { ProductInScene } from "../components/ProductInScene";
 
 /**
  * Template D: 실사용 영상형
@@ -74,6 +75,13 @@ export const TemplateD: React.FC<ShortsProps> = (props) => {
             : props.productImageUrl
         }
       />
+
+      {/* 장면 합성: 상품 카드가 뜨기 전까지 누끼 상품을 배경 장면 위에 올린다 (2026-10-20 제안 A) */}
+      {props.productCutout && productFrom > COVER_FRAME_COUNT + 15 && (
+        <Sequence from={COVER_FRAME_COUNT} durationInFrames={productFrom - COVER_FRAME_COUNT}>
+          <ProductInScene src={props.productCutout} durationFrames={productFrom - COVER_FRAME_COUNT} />
+        </Sequence>
+      )}
 
       {/* 인트로: 후킹(타겟 호명)+공감 두 문장이 한 화면에 순서대로 쌓임 */}
       <Sequence durationInFrames={f(productFirst ? T.hook.to : T.empathy.to)}>

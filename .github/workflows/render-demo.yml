@@ -26,6 +26,12 @@ on:
         default: "on"
         type: choice
         options: ["on", "off"]
+      cutout:
+        description: "상품 누끼 장면 합성 (on/off) - 켜면 사진 컷 대신 스톡 배경 위에 상품을 올린다"
+        required: false
+        default: "off"
+        type: choice
+        options: ["on", "off"]
 
 concurrency:
   group: render-demo
@@ -118,6 +124,7 @@ jobs:
         env:
           HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
           DEMO_SEND_TELEGRAM: "1"
+          SCENE_CUTOUT: ${{ github.event.inputs.cutout == 'on' && '1' || '0' }}
           NUM: ${{ github.event.inputs.number }}
           MODE: ${{ github.event.inputs.mode }}
           TOPIC: ${{ github.event.inputs.topic }}
