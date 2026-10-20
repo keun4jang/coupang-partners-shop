@@ -72,8 +72,9 @@ async function findByNumber(q: string): Promise<VideoItemWithProduct | null> {
 }
 
 /**
- * 그리드 카드: 회색 사진 칸 + 남색 번호 라벨, 아래 제품명/가격. 카드 전체가 /n/[번호] 링크.
+ * 그리드 카드: 회색 사진 칸 + 남색 번호 라벨, 아래 제품명. 카드 전체가 /n/[번호] 링크.
  * 2026-10-17 디자인 개편: 홈(/)·안내 페이지(/n)와 같은 모양 (그림자·둥근 카드 없음).
+ * 2026-10-20 사장님 "가격을 미리 다 적어놓으면 안 누른다": 목록에서는 가격을 빼고, 눌러서 들어간 안내 페이지(/n)에서만 보인다.
  */
 function HubCard({
   item,
@@ -107,9 +108,6 @@ function HubCard({
         <h3 className="font-medium text-[14px] leading-snug line-clamp-2 break-keep">
           {shortenProductName(product.product_name, 28)}
         </h3>
-        {product.price_text && (
-          <p className="font-bold text-[14px] mt-1">{product.price_text}</p>
-        )}
       </div>
     </Link>
   );
