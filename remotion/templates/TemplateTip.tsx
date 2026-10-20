@@ -67,9 +67,9 @@ const Dim: React.FC<{ strength: number }> = ({ strength }) => {
   );
 };
 
-/** 맨 위 작은 꼬리표 - 이 채널의 "살림 메모" 묶음이라는 표시 */
-const Label: React.FC<{ text: string }> = ({ text }) => (
-  <div style={{ position: "absolute", top: 180, left: 0, width: "100%", display: "flex", justifyContent: "center" }}>
+/** 꼬리표 - 이 채널의 "살림 메모" 묶음이라는 표시. 가운데 글·카드 바로 위에 붙인다 (10/20 사장님 "글자랑 가운데랑 더 가깝게") */
+const Label: React.FC<{ text: string; gap: number }> = ({ text, gap }) => (
+  <div style={{ marginBottom: gap, display: "flex", justifyContent: "center" }}>
     <span
       style={{
         background: INK.tape,
@@ -92,8 +92,8 @@ const Hook: React.FC<{ text: string; topic: string }> = ({ text, topic }) => {
   const { fps } = useVideoConfig();
   const pop = spring({ frame, fps, config: { damping: 16 } });
   return (
-    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      <Label text={`살림 메모 · ${topic}`} />
+    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
+      <Label text={`살림 메모 · ${topic}`} gap={44} />
       <div
         style={{
           width: "84%",
@@ -125,8 +125,9 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
   const rise = spring({ frame, fps, config: { damping: 18 } });
   const cardW = width * 0.88;
   return (
-    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      <Label text={`살림 메모 · ${topic}`} />
+    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
+      {/* 번호 테이프가 카드 위로 34px 튀어나오므로 그만큼 더 띄운다 */}
+      <Label text={`살림 메모 · ${topic}`} gap={78} />
       <div
         style={{
           position: "relative",
