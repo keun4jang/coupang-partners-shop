@@ -69,15 +69,15 @@ const Dim: React.FC<{ strength: number }> = ({ strength }) => {
 
 /** 맨 위 작은 꼬리표 - 이 채널의 "살림 메모" 묶음이라는 표시 */
 const Label: React.FC<{ text: string }> = ({ text }) => (
-  <div style={{ position: "absolute", top: 210, left: 0, width: "100%", display: "flex", justifyContent: "center" }}>
+  <div style={{ position: "absolute", top: 180, left: 0, width: "100%", display: "flex", justifyContent: "center" }}>
     <span
       style={{
         background: INK.tape,
         color: "#FFFFFF",
         fontFamily,
-        fontWeight: 700,
-        fontSize: 32,
-        padding: "8px 20px",
+        fontWeight: 800,
+        fontSize: 50,
+        padding: "14px 30px",
         borderRadius: 3,
         letterSpacing: "0.03em",
       }}
@@ -101,8 +101,8 @@ const Hook: React.FC<{ text: string; topic: string }> = ({ text, topic }) => {
           color: "#FFFFFF",
           fontFamily,
           fontWeight: 900,
-          fontSize: 70,
-          lineHeight: 1.28,
+          fontSize: 82,
+          lineHeight: 1.26,
           letterSpacing: "-0.02em",
           wordBreak: "keep-all",
           textWrap: "balance",
@@ -123,7 +123,7 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
   const rise = spring({ frame, fps, config: { damping: 18 } });
-  const cardW = width * 0.82;
+  const cardW = width * 0.88;
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
       <Label text={`살림 메모 · ${topic}`} />
@@ -133,7 +133,7 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
           width: cardW,
           background: INK.paper,
           borderRadius: 8,
-          padding: "86px 48px 52px",
+          padding: "100px 50px 60px",
           boxShadow: "0 24px 50px rgba(0,0,0,0.35)",
           transform: `translateY(${(1 - rise) * 90}px)`,
           opacity: Math.min(1, rise * 1.6),
@@ -159,15 +159,15 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
         >
           {n}
         </div>
-        <div style={{ position: "absolute", top: 26, right: 34, color: INK.sub, fontSize: 30, fontWeight: 500 }}>
+        <div style={{ position: "absolute", top: 28, right: 36, color: INK.sub, fontSize: 38, fontWeight: 500 }}>
           {n} / {total}
         </div>
         <div
           style={{
             color: INK.ink,
             fontWeight: 900,
-            fontSize: 72,
-            lineHeight: 1.2,
+            fontSize: 86,
+            lineHeight: 1.18,
             letterSpacing: "-0.02em",
             wordBreak: "keep-all",
           }}
@@ -176,10 +176,10 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
         </div>
         <div
           style={{
-            marginTop: 22,
+            marginTop: 26,
             color: "#3F423E",
-            fontWeight: 500,
-            fontSize: 47,
+            fontWeight: 600,
+            fontSize: 56,
             lineHeight: 1.48,
             wordBreak: "keep-all",
           }}
@@ -203,8 +203,8 @@ const Outro: React.FC<{ text: string }> = ({ text }) => {
           textAlign: "center",
           color: "#FFFFFF",
           fontWeight: 800,
-          fontSize: 54,
-          lineHeight: 1.4,
+          fontSize: 64,
+          lineHeight: 1.36,
           wordBreak: "keep-all",
           textWrap: "balance",
           textShadow: "0 3px 0 rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.45)",
@@ -219,7 +219,7 @@ const Outro: React.FC<{ text: string }> = ({ text }) => {
           marginTop: 48,
           color: "rgba(255,255,255,0.85)",
           fontFamily: tapeFontFamily,
-          fontSize: 44,
+          fontSize: 50,
           letterSpacing: "0.04em",
           opacity: pop,
         }}
