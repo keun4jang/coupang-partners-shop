@@ -1597,6 +1597,27 @@ async function runDemo(): Promise<void> {
  * 살림 정보 쇼츠 샘플 (2026-10-20 사장님 "추천대로 진행" - 정보 4 + 상품 2). 게시·DB 기록 없음.
  * 사용: `tsx worker/render-worker.ts --tip-demo [주제 번호|주제 글]` (없으면 오늘 날짜로 고른다)
  */
+/**
+ * 정보 대본 전수 점검 (2026-10-21 사장님 "유용한 정보들은 이상 없는지 확인"): 37개 주제 대본을 렌더 없이 한 번에 뽑아
+ * 로그에 TIPJSON 줄로 남긴다 → Claude 가 사실관계를 검수해 검수본(src/lib/tipScripts.ts)으로 고정한다.
+ * 사용: `tsx worker/render-worker.ts --tip-check`
+ */
+async function runTipCheck(): Promise<void> {
+  let ok = 0;
+  for (const [i, t] of TIP_TOPICS.entries()) {
+    const tip = await generateTip(t);
+    if (tip) {
+      ok++;
+      console.log(`TIPJSON ${JSON.stringify({ i, ...tip })}`);
+    } else {
+      console.log(`TIPFAIL ${i} ${t.topic}`);
+    }
+    // 무료 등급 분당 호출 한도를 넘지 않게 쉰다
+    await new Promise((r) => setTimeout(r, 6_000));
+  }
+  console.log(`\n=== 정보 대본 점검: ${ok}/${TIP_TOPICS.length} 생성 ===`);
+}
+
 async function runTipDemo(): Promise<void> {
   const arg = process.argv.slice(process.argv.indexOf("--tip-demo") + 1).find((a) => !a.startsWith("--")) ?? "";
   const day = Math.floor(Date.now() / 86_400_000);
@@ -1663,6 +1684,10 @@ async function runTipDemo(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes("--tip-check")) {
+    await runTipCheck();
+    return;
+  }
   if (process.argv.includes("--tip-demo")) {
     await runTipDemo();
     return;

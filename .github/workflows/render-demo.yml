@@ -11,11 +11,11 @@ on:
         required: true
         default: "377"
       mode:
-        description: "샘플 종류 - product(상품 영상) / tip(살림 정보 영상, 번호 칸은 무시)"
+        description: "샘플 종류 - product(상품 영상) / tip(살림 정보 영상, 번호 칸은 무시) / tipcheck(정보 대본 37개 전수 점검, 렌더 없음)"
         required: false
         default: "product"
         type: choice
-        options: ["product", "tip"]
+        options: ["product", "tip", "tipcheck"]
       topic:
         description: "(tip 일 때) 주제 번호 또는 주제 글 일부 - 비우면 오늘 날짜로 고름"
         required: false
@@ -129,7 +129,9 @@ jobs:
           MODE: ${{ github.event.inputs.mode }}
           TOPIC: ${{ github.event.inputs.topic }}
         run: |
-          if [ "$MODE" = "tip" ]; then
+          if [ "$MODE" = "tipcheck" ]; then
+            npx tsx worker/render-worker.ts --tip-check
+          elif [ "$MODE" = "tip" ]; then
             npx tsx worker/render-worker.ts --tip-demo "$TOPIC"
           else
             npx tsx worker/render-worker.ts --demo "$NUM"
