@@ -47,7 +47,7 @@ export type ShortsProps = {
   productImages?: string[] | null;
   /**
    * 누끼 뜬 상품 사진 (PNG data URI). 있으면 인트로(후킹·공감) 동안 배경 스톡 장면 위에 상품을 올려 합성한다
-   * (2026-10-20 제안 A "추천대로 진행" - src/lib/cutout.ts, remotion/components/ProductInScene.tsx).
+   * (2026-10-20 제안 A "추천대로 진행", 10/21 샘플 승인 후 운영 켬 - src/lib/cutout.ts, remotion/components/ProductInScene.tsx).
    */
   productCutout?: string | null;
   category: string;

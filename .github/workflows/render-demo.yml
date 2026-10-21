@@ -27,9 +27,9 @@ on:
         type: choice
         options: ["on", "off"]
       cutout:
-        description: "상품 누끼 장면 합성 (on/off) - 켜면 사진 컷 대신 스톡 배경 위에 상품을 올린다"
+        description: "상품 누끼 장면 합성 (on/off) - 스톡 배경일 때 인트로에 상품을 올린다 (10/21 운영 기본 켬)"
         required: false
-        default: "off"
+        default: "on"
         type: choice
         options: ["on", "off"]
 
