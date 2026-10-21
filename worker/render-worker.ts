@@ -81,7 +81,7 @@ import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
-import { TIP_TOPICS, generateTip, pickTopic, shortTopic } from "../src/lib/tips";
+import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
 import {
   brollFileDurations,
   deleteFootageFiles,
@@ -1598,14 +1598,14 @@ async function runDemo(): Promise<void> {
  * 사용: `tsx worker/render-worker.ts --tip-demo [주제 번호|주제 글]` (없으면 오늘 날짜로 고른다)
  */
 /**
- * 정보 대본 전수 점검 (2026-10-21 사장님 "유용한 정보들은 이상 없는지 확인"): 37개 주제 대본을 렌더 없이 한 번에 뽑아
- * 로그에 TIPJSON 줄로 남긴다 → Claude 가 사실관계를 검수해 검수본(src/lib/tipScripts.ts)으로 고정한다.
+ * AI 초안 뽑기 (2026-10-21 사장님 "유용한 정보들은 이상 없는지 확인"): 주제별 Gemini 초안을 렌더 없이 로그에 TIPJSON 줄로 남긴다.
+ * 영상에는 쓰지 않는다 - Claude 가 사실 확인 후 검수본(src/lib/tipScripts.ts)으로 옮길 때만 참고한다.
  * 사용: `tsx worker/render-worker.ts --tip-check`
  */
 async function runTipCheck(): Promise<void> {
   let ok = 0;
   for (const [i, t] of TIP_TOPICS.entries()) {
-    const tip = await generateTip(t);
+    const tip = await generateTipDraft(t);
     if (tip) {
       ok++;
       console.log(`TIPJSON ${JSON.stringify({ i, ...tip })}`);

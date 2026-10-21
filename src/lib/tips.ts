@@ -3,13 +3,15 @@
  * "영상이 길지는 않아도 되는데 내용이 유익해야 함").
  *
  * - 주제는 아래 TIP_TOPICS 안에서만 고른다 (AI 가 마음대로 주제를 정하지 않게 - 위험하거나 엉뚱한 정보 차단).
- * - 글은 무료 Gemini 가 쓴다: 훅(질문) 1줄 + 단계 3~4개(제목·설명) + 마무리 1줄 + 배경 스톡 검색어.
+ * - 글은 검수본(src/lib/tipScripts.ts)만 쓴다 (2026-10-21~ - AI 초안은 사실 오류가 많아 영상에 쓰지 않는다).
+ *   형식: 훅(질문) 1줄 + 단계 3~4개(제목·설명) + 마무리 1줄 + 배경 스톡 검색어.
  * - 안전 검사(checkTipSafety): 세제·약품 섞기, 효능·건강 주장, 통계·퍼센트, 정책 금지어, 상품·구매 권유가 있으면 버리고 다시 쓴다.
  *   세 번 다 걸리면 null - 그날 정보 영상은 건너뛴다 (잘못된 정보 한 편이 채널 신뢰를 무너뜨린다).
  * 상품·링크가 없으므로 광고 고지가 필요 없다.
  */
 import { geminiGenerateJson } from "./ai";
 import { findPolicyIssues } from "./policy";
+import { reviewedTip } from "./tipScripts";
 
 export type TipTopic = {
   topic: string;
@@ -149,8 +151,30 @@ const SCHEMA = {
   required: ["hook", "steps", "outro", "stockQueries"],
 };
 
-/** 주제 하나로 대본을 만든다. 안전 검사에 세 번 걸리면 null. */
+/**
+ * 주제 하나의 대본 - **검수본(src/lib/tipScripts.ts)만** 쓴다 (2026-10-21 사장님 "유용한 정보들은 이상 없는지 확인" →
+ * AI 초안 29개 중 10개 넘게 사실이 틀려서). 검수본이 없거나 안전 검사에 걸리면 null - 그 주제는 건너뛴다.
+ */
 export async function generateTip(t: TipTopic): Promise<TipScript | null> {
+  const r = reviewedTip(t.topic);
+  if (!r) {
+    console.warn(`정보 대본: 검수본 없음 - ${t.topic} 건너뜀`);
+    return null;
+  }
+  const tip: TipScript = { ...r, group: t.group };
+  const issues = checkTipSafety(tip);
+  if (issues.length) {
+    console.warn(`정보 대본: 검수본이 안전 검사에 걸림(${issues.join(", ")}) - ${t.topic} 건너뜀`);
+    return null;
+  }
+  return tip;
+}
+
+/**
+ * AI(무료 Gemini) 초안 - **영상에는 쓰지 않는다.** 새 주제를 넣을 때 초안을 뽑아(render-demo tipcheck)
+ * Claude 가 사실 확인 후 tipScripts.ts 에 옮겨 적는 용도. 안전 검사에 세 번 걸리면 null.
+ */
+export async function generateTipDraft(t: TipTopic): Promise<TipScript | null> {
   let feedback = "";
   for (let attempt = 1; attempt <= 3; attempt++) {
     const r = await geminiGenerateJson<Omit<TipScript, "topic" | "group">>({

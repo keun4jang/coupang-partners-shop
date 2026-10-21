@@ -4,6 +4,7 @@
  */
 import { TIP_TOPICS, checkTipSafety, pickTopic, topicsFor } from "../src/lib/tips";
 import { findPolicyIssues } from "../src/lib/policy";
+import { TIP_SCRIPTS } from "../src/lib/tipScripts";
 
 let fail = 0;
 const check = (label: string, ok: boolean) => {
@@ -33,5 +34,18 @@ bad({ steps: [...ok.steps.slice(0, 2), { title: "과탄산 쓰기", detail: "유
 check("주제 이름에 정책 금지어 없음", TIP_TOPICS.every((t) => findPolicyIssues(t.topic).length === 0));
 check("계절 주제 고르기 - 10월은 가을·사계절만", topicsFor(new Date("2026-10-20")).every((t) => !t.season || t.season === "fall"));
 check("날마다 다른 주제", pickTopic(1).topic !== pickTopic(2).topic);
+// 검수본 (2026-10-21): 모든 주제에 검수본이 있고, 하나하나 안전 검사·길이 기준을 통과해야 한다
+for (const t of TIP_TOPICS) {
+  const r = TIP_SCRIPTS.find((x) => x.topic === t.topic);
+  if (!r) {
+    check(`검수본 있음 - ${t.topic}`, false);
+    continue;
+  }
+  const issues = checkTipSafety(r);
+  if (r.outro.length > 30) issues.push(`마무리 길이 ${r.outro.length}`);
+  if (r.stockQueries.length < 2) issues.push("배경 검색어 부족");
+  if (issues.length) check(`검수본 ${t.topic}: ${issues.join(", ")}`, false);
+}
+check(`검수본 ${TIP_SCRIPTS.length}개 · 주제 ${TIP_TOPICS.length}개 짝 맞음`, TIP_SCRIPTS.length === TIP_TOPICS.length);
 console.log(fail ? `❌ ${fail}건 실패` : "✅ 전부 통과");
 process.exit(fail ? 1 : 0);
