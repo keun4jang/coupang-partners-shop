@@ -33,6 +33,7 @@ const top10Metadata: CalculateMetadataFunction<Top10Props> = ({ props }) => ({
 
 // 하단 고지 문구를 props.disclosureText 로 바꿀 수 있게 감싼다 (사장님 본인 상품 = 판매자 고지)
 const TemplateDWithDisclosure = withDisclosureText(TemplateD);
+const TemplateTipWithDisclosure = withDisclosureText(TemplateTip);
 const TemplateEWithDisclosure = withDisclosureText(TemplateE);
 const TemplateEUseCaseWithDisclosure = withDisclosureText(TemplateEUseCase);
 
@@ -68,7 +69,7 @@ export const RemotionRoot: React.FC = () => {
       />
       <Composition
         id="TemplateTip"
-        component={TemplateTip}
+        component={TemplateTipWithDisclosure}
         width={VIDEO.width}
         height={VIDEO.height}
         fps={VIDEO.fps}

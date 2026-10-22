@@ -5,6 +5,7 @@
 import { TIP_TOPICS, checkTipSafety, pickTopic, topicsFor } from "../src/lib/tips";
 import { findPolicyIssues } from "../src/lib/policy";
 import { TIP_SCRIPTS } from "../src/lib/tipScripts";
+import { matchTipTopicByRule } from "../src/lib/tipMatch";
 
 let fail = 0;
 const check = (label: string, ok: boolean) => {
@@ -47,5 +48,19 @@ for (const t of TIP_TOPICS) {
   if (issues.length) check(`검수본 ${t.topic}: ${issues.join(", ")}`, false);
 }
 check(`검수본 ${TIP_SCRIPTS.length}개 · 주제 ${TIP_TOPICS.length}개 짝 맞음`, TIP_SCRIPTS.length === TIP_TOPICS.length);
+// 상품 → 꿀팁 주제 규칙 (2026-10-22)
+const expect: [string, string | null][] = [
+  ["텐트형 해먹 타프 일체형", "타프 바람에 덜 흔들리게 치는 요령"],
+  ["아오란 각도조절 경량 접이식 캠핑 의자 세트", "캠핑 첫날 짐 싸는 순서"],
+  ["자석선풍기", "빨래 빨리 마르게 너는 요령"],
+  ["욕실 수건 걸이 2단", "작은 욕실 수납 늘리는 요령"],
+  ["이불 압축팩 대형 5매", "계절 옷 바꿀 때 보관 순서"],
+  ["호텔 수건 40수 10장", "수건 냄새 안 나게 빠는 순서"],
+  ["전동 타일 줄눈제거기", null],
+];
+for (const [name, want] of expect) {
+  const got = matchTipTopicByRule(name)?.topic ?? null;
+  check(`주제 규칙: ${name} → ${got ?? "없음"}`, got === want);
+}
 console.log(fail ? `❌ ${fail}건 실패` : "✅ 전부 통과");
 process.exit(fail ? 1 : 0);

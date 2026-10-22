@@ -82,6 +82,7 @@ import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
 import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
+import { matchTipTopic } from "../src/lib/tipMatch";
 import {
   brollFileDurations,
   deleteFootageFiles,
@@ -1562,6 +1563,25 @@ async function runDemo(): Promise<void> {
   const product = row.products;
   const displayNumber = row.display_number;
   console.log(`\n=== [데모] ${formatDisplayNumber(displayNumber)} ${product.product_name} ===`);
+  if (process.env.TIP_FORMAT === "1") {
+    const r = await renderTipProductVideo(row, product);
+    if (r) {
+      console.log(`\n=== [데모] 꿀팁+상품 완료 (업로드/DB 기록 없음) ===\n${r.videoPath}`);
+      if (process.env.DEMO_SEND_TELEGRAM === "1") {
+        try {
+          await sendTelegramVideo(
+            r.videoPath,
+            `🎬 꿀팁+상품 샘플 (게시 안 됨) ${displayNumber}번 ${product.product_name.slice(0, 40)}\n꿀팁: ${r.tipTopic} · ${r.seconds.toFixed(0)}초`
+          );
+          console.log("텔레그램으로 샘플 전송 완료");
+        } catch (e) {
+          console.warn(`텔레그램 샘플 전송 실패: ${(e as Error).message}`);
+        }
+      }
+      return;
+    }
+    console.log("어울리는 꿀팁 주제가 없어 예전 상품 영상으로 만듭니다");
+  }
   console.log("새 대본 생성 중(Gemini)...");
   const copy = await generateVideoCopy(product, displayNumber, "D");
   console.log("대본:");
@@ -1591,6 +1611,73 @@ async function runDemo(): Promise<void> {
       console.warn(`텔레그램 샘플 전송 실패: ${(e as Error).message}`);
     }
   }
+}
+
+/**
+ * 꿀팁 + 상품 마무리 영상 (2026-10-22 사장님: "모든 영상을 처음엔 상품 관련 생활 꿀팁, 마지막에 아주 짧게 상품 사진이랑 번호만.
+ * 계정을 유용한 정보 얻는 곳으로 만들어 사람을 모으자").
+ * 꿀팁은 검수본(tipScripts.ts)에서만 - 상품에 어울리는 주제가 없으면 null (호출부가 예전 상품 영상으로 만든다).
+ */
+async function renderTipProductVideo(
+  item: VideoItem,
+  product: Product
+): Promise<{ videoPath: string; brollOrigin: string; tipTopic: string; seconds: number } | null> {
+  const match = await matchTipTopic(product.product_name, product.category);
+  if (!match) return null;
+  const tip = await generateTip(match.topic);
+  if (!tip) return null;
+  console.log(`꿀팁 주제: ${tip.topic} (${match.how})`);
+  const n = item.display_number;
+  const own = isOwnProduct(product);
+  const ctaText = `관련 물건은 ${n}번에 정리해 뒀어요`;
+  const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
+
+  const clips = tip.stockQueries.length
+    ? await fetchStockBrollsByQueries(tip.stockQueries, n, tip.steps.length + 2, "portrait", tip.topic)
+    : [];
+  const brollFiles = clips.map((c) => c.file);
+  const lines = [tip.hook, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaText];
+  const narr = await generateNarration(lines);
+  const segments = lines.map((_, i) => {
+    const sec = narr?.[i]?.seconds ?? 0;
+    const min = i === 0 || i === lines.length - 2 ? 2.6 : i === lines.length - 1 ? 3.2 : 3.4;
+    return Math.max(min, sec + 0.5);
+  });
+  const inputProps = {
+    topic: shortTopic(tip.topic),
+    hook: tip.hook,
+    steps: tip.steps,
+    outro: tip.outro,
+    brollFiles: brollFiles.length ? brollFiles : null,
+    brollDurations: brollFiles.length ? brollFileDurations(brollFiles) : null,
+    narration: narr ? narr.map((l) => l?.uri ?? null) : null,
+    segments,
+    product: { displayNumber: n, imageUrl, ctaText },
+    // 고지: 파트너스는 처음·끝 3초 짧은 문구, 본인 상품은 화면에 안 띄움(캡션·설명에만) - TemplateD 와 같은 규칙
+    disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
+    disclosureMode: own ? "off" : disclosureEdgesOn() ? "edges" : "always",
+  };
+  const serveUrl = await getBundle();
+  const composition = await selectComposition({
+    serveUrl,
+    id: "TemplateTip",
+    inputProps,
+    browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
+  });
+  const outDir = path.join(RENDER_DIR, `${n}_tip`);
+  fs.mkdirSync(outDir, { recursive: true });
+  const videoPath = path.join(outDir, `${n}번_꿀팁.mp4`);
+  const seconds = segments.reduce((a, b) => a + b, 0);
+  console.log(`렌더링 시작: TemplateTip(꿀팁+상품) · ${seconds.toFixed(1)}초 · 배경 ${brollFiles.length}개 → ${videoPath}`);
+  await renderMedia({
+    composition,
+    serveUrl,
+    codec: "h264",
+    outputLocation: videoPath,
+    inputProps,
+    browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
+  });
+  return { videoPath, brollOrigin: `꿀팁 스톡(${tip.stockQueries.join(" / ")})`, tipTopic: tip.topic, seconds };
 }
 
 /**

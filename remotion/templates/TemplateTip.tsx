@@ -4,6 +4,8 @@ import { Background } from "../components/Background";
 import { Narration } from "../components/Narration";
 import { INK, VIDEO } from "../config/videoConfig";
 import { fontFamily, tapeFontFamily } from "../fonts";
+import { CtaScene } from "../components/CtaScene";
+import { Disclosure, type DisclosureMode } from "../components/Disclosure";
 
 /**
  * 살림 정보 쇼츠 (2026-10-20 사장님 "추천대로 진행": 하루 6편을 정보 4 + 상품 2 로).
@@ -12,6 +14,10 @@ import { fontFamily, tapeFontFamily } from "../fonts";
  * 화면: 배경 스톡(흐리고 어둡게) 위에 - 첫 장면 질문(훅) → 단계 카드(남색 번호 테이프 + 제목 + 설명) → 마무리 한 줄.
  * 디자인은 상품 영상과 같은 한 벌(흰 종이 카드 · 먹색 · 남색 번호 테이프, videoConfig INK).
  * 장면 길이는 나레이션 길이(segments, 초)를 그대로 따른다.
+ *
+ * 꿀팁 + 상품 마무리 (2026-10-22 사장님: "처음엔 상품 관련 생활 꿀팁, 마지막에 아주 짧게 상품 사진이랑 번호만 -
+ * 계정을 유용한 정보 얻는 곳으로 만들어 사람을 모으자"): product 가 있으면 마무리 뒤에 상품 사진+번호 화면(CtaScene)을
+ * 한 장면 붙인다. 이때만 하단 고지(Disclosure)를 띄운다 - 파트너스는 처음·끝 3초, 본인 상품은 off(캡션에만).
  */
 export type TipStep = { title: string; detail: string };
 
@@ -24,8 +30,12 @@ export type TipProps = {
   brollDurations?: number[] | null;
   /** [훅, 단계1..N, 마무리] 나레이션 (data URI) */
   narration?: (string | null)[] | null;
-  /** [훅, 단계1..N, 마무리] 장면 길이(초) */
+  /** [훅, 단계1..N, 마무리(, 상품)] 장면 길이(초) */
   segments?: number[] | null;
+  /** 꿀팁 + 상품 마무리 영상이면 마지막 상품 화면 (없으면 순수 정보 영상 - 고지 없음) */
+  product?: { displayNumber: number; imageUrl: string | null; ctaText: string } | null;
+  disclosureText?: string | null;
+  disclosureMode?: DisclosureMode | null;
 };
 
 export const defaultTipProps: TipProps = {
@@ -45,8 +55,9 @@ export const defaultTipProps: TipProps = {
 
 /** 나레이션이 없을 때 장면 길이 (초) */
 export function tipSegments(p: TipProps): number[] {
-  if (p.segments && p.segments.length === p.steps.length + 2) return p.segments;
-  return [3, ...p.steps.map(() => 4.2), 3];
+  const n = p.steps.length + (p.product ? 3 : 2);
+  if (p.segments && p.segments.length === n) return p.segments;
+  return [3, ...p.steps.map(() => 4.2), 3, ...(p.product ? [3.4] : [])];
 }
 
 export function tipDurationSeconds(p: TipProps): number {
@@ -241,7 +252,8 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
     acc += s;
   }
   const f = (s: number) => Math.round(s * fps);
-  const last = seg.length - 1;
+  const outroIdx = props.steps.length + 1;
+  const productIdx = props.product ? outroIdx + 1 : -1;
   return (
     <AbsoluteFill style={{ background: "#111214" }}>
       <Background
@@ -265,11 +277,23 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
           <Narration src={props.narration?.[i + 1]} />
         </Sequence>
       ))}
-      <Sequence from={f(starts[last])} durationInFrames={f(seg[last])}>
+      <Sequence from={f(starts[outroIdx])} durationInFrames={f(seg[outroIdx])}>
         <Dim strength={0.8} />
         <Outro text={props.outro} />
-        <Narration src={props.narration?.[last]} />
+        <Narration src={props.narration?.[outroIdx]} />
       </Sequence>
+      {/* 상품 마무리: 사진 + 번호만 짧게 */}
+      {props.product && (
+        <Sequence from={f(starts[productIdx])} durationInFrames={f(seg[productIdx])}>
+          <CtaScene
+            displayNumber={props.product.displayNumber}
+            ctaText={props.product.ctaText}
+            productImageUrl={props.product.imageUrl}
+          />
+          <Narration src={props.narration?.[productIdx]} />
+        </Sequence>
+      )}
+      {props.product && <Disclosure />}
     </AbsoluteFill>
   );
 };

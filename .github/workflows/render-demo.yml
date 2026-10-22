@@ -26,6 +26,12 @@ on:
         default: "on"
         type: choice
         options: ["on", "off"]
+      tipformat:
+        description: "(product 일 때) 꿀팁 + 상품 마무리 형식 (on/off) - 상품에 어울리는 검수본 꿀팁 → 마지막에 상품 사진·번호"
+        required: false
+        default: "off"
+        type: choice
+        options: ["on", "off"]
       cutout:
         description: "상품 누끼 장면 합성 (on/off) - 스톡 배경일 때 인트로에 상품을 올린다 (10/21 운영 기본 켬)"
         required: false
@@ -124,6 +130,7 @@ jobs:
         env:
           HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
           DEMO_SEND_TELEGRAM: "1"
+          TIP_FORMAT: ${{ github.event.inputs.tipformat == 'on' && '1' || '0' }}
           SCENE_CUTOUT: ${{ github.event.inputs.cutout == 'on' && '1' || '0' }}
           NUM: ${{ github.event.inputs.number }}
           MODE: ${{ github.event.inputs.mode }}
