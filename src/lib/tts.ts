@@ -191,8 +191,8 @@ async function synthesizeLineGoogle(
  * 끄기: TTS_ENGINE=legacy (구글 → Edge 옛 경로만).
  */
 const SUPERTONIC_VOICE = "M1";
-/** 사장님이 들은 샘플과 같은 속도 */
-const SUPERTONIC_SPEED = 1.15;
+/** 말 속도 - 10/13 승인 샘플 1.15 → 2026-10-22 사장님 "말 속도 살짝 빠르게" 1.25 (약 9% 빠르게, 모든 영상 공통) */
+const SUPERTONIC_SPEED = 1.25;
 
 function synthesizeSupertonic(lines: string[]): (NarrationLine | null)[] | null {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "supertonic-"));

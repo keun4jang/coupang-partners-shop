@@ -4,7 +4,7 @@
 구글 TTS(결제 필요)·Edge 무료 음성(403 차단)이 10/12 부터 막혀 사장님 승인으로 1순위 음성이 됐다.
 비용 0원 - 렌더 서버 CPU 에서 직접 돈다. 코드 MIT · 모델 OpenRAIL-M(사람 사칭·기만 용도 금지).
 
-입력(stdin JSON): {"lines": ["...", ...], "outDir": "...", "voice": "M1", "speed": 1.15}
+입력(stdin JSON): {"lines": ["...", ...], "outDir": "...", "voice": "M1", "speed": 1.25}
 출력(stdout 마지막 줄 JSON): {"files": ["...mp3" | null, ...], "seconds": [float | null, ...]}
 빈 줄은 null. 한 줄이 실패해도 나머지는 계속한다.
 """
@@ -20,7 +20,7 @@ def main() -> None:
 
     tts = TTS()
     style = tts.get_voice_style(req.get("voice") or "M1")
-    speed = float(req.get("speed") or 1.15)
+    speed = float(req.get("speed") or 1.25)
     out_dir = req["outDir"]
     os.makedirs(out_dir, exist_ok=True)
     files, seconds = [], []
