@@ -5,6 +5,7 @@ import { Narration } from "../components/Narration";
 import { INK, VIDEO } from "../config/videoConfig";
 import { fontFamily, tapeFontFamily } from "../fonts";
 import { CtaScene } from "../components/CtaScene";
+import { PhraseLines } from "../components/phraseBreak";
 import { Disclosure, type DisclosureMode } from "../components/Disclosure";
 
 /**
@@ -125,7 +126,7 @@ const Hook: React.FC<{ text: string; topic: string }> = ({ text, topic }) => {
           opacity: Math.min(1, pop * 1.5),
         }}
       >
-        {text}
+        <PhraseLines text={text} />
       </div>
     </AbsoluteFill>
   );
@@ -183,9 +184,10 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
             lineHeight: 1.18,
             letterSpacing: "-0.02em",
             wordBreak: "keep-all",
+            textWrap: "balance",
           }}
         >
-          {step.title}
+          <PhraseLines text={step.title} />
         </div>
         <div
           style={{
@@ -195,9 +197,10 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
             fontSize: 56,
             lineHeight: 1.48,
             wordBreak: "keep-all",
+            textWrap: "balance",
           }}
         >
-          {step.detail}
+          <PhraseLines text={step.detail} />
         </div>
       </div>
     </AbsoluteFill>
@@ -225,7 +228,7 @@ const Outro: React.FC<{ text: string }> = ({ text }) => {
           transform: `translateY(${(1 - pop) * 30}px)`,
         }}
       >
-        {text}
+        <PhraseLines text={text} />
       </div>
       <div
         style={{
