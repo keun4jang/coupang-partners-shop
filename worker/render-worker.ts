@@ -83,6 +83,8 @@ import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
 import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
 import { matchTipTopic } from "../src/lib/tipMatch";
+/** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
+const TIP_OPENER = "오늘의 살림 꿀팁";
 import {
   brollFileDurations,
   deleteFootageFiles,
@@ -1636,7 +1638,7 @@ async function renderTipProductVideo(
     ? await fetchStockBrollsByQueries(tip.stockQueries, n, tip.steps.length + 2, "portrait", tip.topic)
     : [];
   const brollFiles = clips.map((c) => c.file);
-  const lines = [tip.hook, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaText];
+  const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaText];
   const narr = await generateNarration(lines);
   const segments = lines.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;
@@ -1723,7 +1725,7 @@ async function runTipDemo(): Promise<void> {
     : [];
   const brollFiles = clips.map((c) => c.file);
 
-  const lines = [tip.hook, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro];
+  const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro];
   const narr = await generateNarration(lines);
   const segments = lines.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;

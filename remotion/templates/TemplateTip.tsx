@@ -104,7 +104,8 @@ const Hook: React.FC<{ text: string; topic: string }> = ({ text, topic }) => {
   const pop = spring({ frame, fps, config: { damping: 16 } });
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
-      <Label text={`살림 메모 · ${topic}`} gap={44} />
+      {/* 첫 화면은 "오늘의 살림 꿀팁"으로 연다 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을 해야") - 나레이션도 같은 말로 시작 */}
+      <Label text="오늘의 살림 꿀팁" gap={44} />
       <div
         style={{
           width: "84%",
@@ -138,7 +139,7 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
       {/* 번호 테이프가 카드 위로 34px 튀어나오므로 그만큼 더 띄운다 */}
-      <Label text={`살림 메모 · ${topic}`} gap={78} />
+      <Label text={`오늘의 꿀팁 · ${topic}`} gap={78} />
       <div
         style={{
           position: "relative",
