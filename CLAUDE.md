@@ -6,7 +6,8 @@
 
 ## 사업과 파이프라인
 - 쿠팡파트너스 제휴 수익 + 사장님(쿠팡 판매자 '근사장') 본인 상품 판매. 목표 월 1,000만원.
-- 흐름: 스카우트(상품 수집) → 큐잉(하루 6편) → 렌더(Remotion, 포맷 D/E) → 유튜브 쇼츠 '살림템'
+- 흐름: 스카우트(상품 수집) → 큐잉(하루 6편) → 렌더(Remotion - 2026-10-22~ "오늘의 살림 꿀팁 + 마지막에 상품 사진·번호" 형식이 1순위,
+  꿀팁은 검수본 src/lib/tipScripts.ts 만, 어울리는 주제가 없으면 포맷 D) → 유튜브 쇼츠 '살림템'
   (UC1qy3ODOkWehfjAADaqdQ8g) + 인스타 @momitemmom 업로드 → 랜딩 /n/{번호} → /go/{번호} → 쿠팡.
 - 실행 위치: GitHub Actions(render·scout·metrics·diag·settings), Vercel(momitemmom.vercel.app),
   Supabase(DB·app_settings). **Claude 구독과 무관하게 계속 돈다.** 비밀값은 GitHub Secrets·

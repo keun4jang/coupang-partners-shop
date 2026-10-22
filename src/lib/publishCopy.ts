@@ -108,3 +108,55 @@ export function instagramCaption(
   const disclosureBlock = opts.own ? [disclosure] : [disclosure, FRIENDLY_DISCLOSURE_LINE];
   return [body || fallback, "", ...disclosureBlock, ...(tags.length ? ["", ...tags] : [])].join("\n");
 }
+
+/**
+ * 꿀팁 + 상품 마무리 영상의 문구 (2026-10-22 사장님 "이대로 해" - 계정을 유용한 정보 얻는 곳으로).
+ * 제목·설명·캡션도 상품이 아니라 꿀팁이 앞에 선다. 고지 구조는 그대로: 첫 줄은 본문, 고지 전문은 그 바로 뒤에 한 번.
+ */
+export type TipCopy = { topic: string; hook: string; steps: { title: string; detail: string }[]; outro: string };
+
+export function youtubeTipTitle(tip: TipCopy): string {
+  return `${tip.topic} | 오늘의 살림 꿀팁 #Shorts`;
+}
+
+export function youtubeTipDescription(
+  displayNumber: number,
+  shortProductName: string,
+  tip: TipCopy,
+  variant: ShortsVariant = "classic",
+  opts: CopyOpts = {}
+): string {
+  const url = landingUrl(displayNumber, {
+    source: "youtube_shorts",
+    channel: "youtube",
+    templateVariant: variant,
+  });
+  return [
+    `${tip.topic} - ${tip.hook}`,
+    "",
+    ...(opts.own ? [OWN_DISCLOSURE_LINE] : [DISCLOSURE_LINE, FRIENDLY_DISCLOSURE_LINE]),
+    "",
+    ...tip.steps.map((s, i) => `${i + 1}. ${s.title} - ${s.detail}`),
+    "",
+    tip.outro,
+    "",
+    `영상 끝에 나온 물건(${shortProductName})은 살림템 메모장 ${displayNumber}번에 정리했습니다.`,
+    url,
+    "",
+    opts.own ? "#Shorts #살림꿀팁 #살림템" : "#Shorts #살림꿀팁 #생활꿀팁 #살림템",
+  ].join("\n");
+}
+
+/** 인스타·페북 캡션 본문 (instagramCaption 에 넣으면 고지가 본문 바로 뒤에 붙는다) */
+export function tipCaptionBody(displayNumber: number, tip: TipCopy): string {
+  return [
+    `오늘의 살림 꿀팁 - ${tip.topic}`,
+    "",
+    tip.hook,
+    ...tip.steps.map((s, i) => `${i + 1}. ${s.title}`),
+    "",
+    `관련 물건은 ${displayNumber}번에 정리해 뒀어요.`,
+    "",
+    "#살림꿀팁 #생활꿀팁 #살림템",
+  ].join("\n");
+}

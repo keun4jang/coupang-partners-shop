@@ -43,7 +43,8 @@ import {
 } from "../src/lib/drive";
 import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions, loadYoutubeCredsFromSettings, setPaidPromotion } from "../src/lib/youtube";
 import { DISCLOSURE_SHORT_TEXT, disclosureEdgesOn } from "../remotion/config/videoConfig";
-import { instagramCaption, youtubeShortsDescription } from "../src/lib/publishCopy";
+import { instagramCaption, tipCaptionBody, youtubeShortsDescription, youtubeTipDescription, youtubeTipTitle } from "../src/lib/publishCopy";
+import { reviewedTip } from "../src/lib/tipScripts";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
 import { findOwn, inPhotoCutsArm, makeImageCuts, ownGalleryImages, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
 import { cutoutProduct } from "../src/lib/cutout";
@@ -85,6 +86,12 @@ import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from
 import { matchTipTopic } from "../src/lib/tipMatch";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
 const TIP_OPENER = "오늘의 살림 꿀팁";
+/** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
+const TIP_ORIGIN_TAG = "꿀팁:";
+function tipTopicOf(brollOrigin: string | null | undefined): string | null {
+  const i = brollOrigin?.lastIndexOf(TIP_ORIGIN_TAG) ?? -1;
+  return i >= 0 ? brollOrigin!.slice(i + TIP_ORIGIN_TAG.length).trim() || null : null;
+}
 import {
   brollFileDurations,
   deleteFootageFiles,
@@ -704,20 +711,24 @@ async function publishToSns(
   // ensureSubLink 도 coupang_partner_url 이 비어 있으면 호출 없이 건너뛰지만, 명시적으로 막는다.
   const own = isOwnProduct(product);
   if (!own) await ensureSubLink(item.id);
-  const snsCaption = instagramCaption(captionText, item.display_number, { own });
+  // 꿀팁 + 상품 마무리 영상이면 제목·설명·캡션도 꿀팁 중심 (2026-10-22). 검수본에서 다시 읽는다.
+  const tipTopic = tipTopicOf(item.broll_origin);
+  const tipCopy = tipTopic ? reviewedTip(tipTopic) : null;
+  const snsCaption = instagramCaption(
+    tipCopy ? tipCaptionBody(item.display_number, tipCopy) : captionText,
+    item.display_number,
+    { own }
+  );
   // 판매자 상품명에 붙은 마케팅 문구는 지우고 내보낸다(차단이 아니라 정화 -
   // policy.ts stripBannedFromProductName 주석 참고). 이게 없으면 "쿠팡특가 …"
   // 같은 이름 하나 때문에 렌더까지 끝낸 영상이 발행 직전에 통째로 막힌다.
   const shortName = shortenProductName(
     stripBannedFromProductName(product.product_name)
   );
-  const ytTitle = youtubeTitle(item.display_number, shortName);
-  const ytDescription = youtubeShortsDescription(
-    item.display_number,
-    shortName,
-    shortsVariantOf(item),
-    { own }
-  );
+  const ytTitle = tipCopy ? youtubeTipTitle(tipCopy) : youtubeTitle(item.display_number, shortName);
+  const ytDescription = tipCopy
+    ? youtubeTipDescription(item.display_number, shortName, tipCopy, shortsVariantOf(item), { own })
+    : youtubeShortsDescription(item.display_number, shortName, shortsVariantOf(item), { own });
 
   // 발행 직전 정책 검사.
   //
@@ -784,7 +795,7 @@ async function publishToSns(
         localPath: videoPath,
         title: ytTitle,
         description: ytDescription,
-        tags: ["살림템", "생활템", "쿠팡추천템", "Shorts"],
+        tags: tipCopy ? ["살림꿀팁", "생활꿀팁", "살림템", "Shorts"] : ["살림템", "생활템", "쿠팡추천템", "Shorts"],
         thumbnailPath,
       });
       youtubeUrl = result.url;
@@ -877,10 +888,21 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
       item = await fillVideoCopy(item, product);
     }
 
-    const { videoPath, thumbnailPath, brollOrigin, brollFiles } = await renderVideo(
-      item,
-      product
-    );
+    // 꿀팁 + 상품 마무리 형식 (2026-10-22 사장님 "이대로 해"): 상품에 어울리는 검수본 꿀팁이 있으면 그걸로 만든다.
+    // 어울리는 주제가 없거나 실패하면 예전 상품 소개 영상(renderVideo). 끄기: app_settings tip_format = off.
+    let tipRendered: Awaited<ReturnType<typeof renderTipProductVideo>> = null;
+    if (process.env.TIP_FORMAT !== "0" && (await getSetting("tip_format"))?.trim() !== "off") {
+      try {
+        tipRendered = await renderTipProductVideo(item, product);
+      } catch (e) {
+        console.warn(`꿀팁 형식 렌더 실패 - 예전 상품 영상으로: ${(e as Error).message.slice(0, 160)}`);
+      }
+    }
+    const { videoPath, thumbnailPath, brollOrigin, brollFiles } = tipRendered
+      ? { videoPath: tipRendered.videoPath, thumbnailPath: undefined, brollOrigin: tipRendered.brollOrigin, brollFiles: tipRendered.brollFiles }
+      : await renderVideo(item, product);
+    // 발행 단계가 꿀팁 주제를 읽을 수 있게 (즉시 발행은 DB 기록 전이라 여기서 넘긴다)
+    item = { ...item, broll_origin: brollOrigin };
     const captionText = item.caption_text ?? "";
 
     let driveVideoUrl: string | null = null;
@@ -1623,7 +1645,7 @@ async function runDemo(): Promise<void> {
 async function renderTipProductVideo(
   item: VideoItem,
   product: Product
-): Promise<{ videoPath: string; brollOrigin: string; tipTopic: string; seconds: number } | null> {
+): Promise<{ videoPath: string; brollOrigin: string; brollFiles: string[]; tipTopic: string; seconds: number } | null> {
   const match = await matchTipTopic(product.product_name, product.category);
   if (!match) return null;
   const tip = await generateTip(match.topic);
@@ -1637,7 +1659,10 @@ async function renderTipProductVideo(
   const clips = tip.stockQueries.length
     ? await fetchStockBrollsByQueries(tip.stockQueries, n, tip.steps.length + 2, "portrait", tip.topic)
     : [];
-  const brollFiles = clips.map((c) => c.file);
+  // 실제로 받아진 파일만 쓰고, 새 클립이 번들에 들어가게 캐시를 비운다 (운영 워커는 여러 편을 이어서 렌더한다 -
+  // 없는 파일이 섞이면 렌더가 통째로 멈춘다)
+  const brollFiles = existingBrollFiles(clips.map((c) => c.file));
+  if (brollFiles.length) cachedBundle = null;
   const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaText];
   const narr = await generateNarration(lines);
   const segments = lines.map((_, i) => {
@@ -1679,7 +1704,14 @@ async function renderTipProductVideo(
     inputProps,
     browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
   });
-  return { videoPath, brollOrigin: `꿀팁 스톡(${tip.stockQueries.join(" / ")})`, tipTopic: tip.topic, seconds };
+  // broll_origin 끝의 "꿀팁:주제" 를 발행 단계(publishToSns)가 읽어 제목·설명·캡션을 꿀팁 중심으로 만든다 (DB 칸 추가 없이)
+  return {
+    videoPath,
+    brollOrigin: `꿀팁 스톡(${tip.stockQueries.join(" / ")}) ${TIP_ORIGIN_TAG}${tip.topic}`,
+    brollFiles,
+    tipTopic: tip.topic,
+    seconds,
+  };
 }
 
 /**

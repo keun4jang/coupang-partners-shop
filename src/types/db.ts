@@ -88,6 +88,8 @@ export interface VideoItem {
    * (20260930_video_sub_link.sql) 전이거나 아직 발급 전이면 비어 있다.
    */
   coupang_sub_url?: string | null;
+  /** 배경 출처 기록 (supabase/schema.sql). 꿀팁 형식이면 끝에 "꿀팁:주제" - 발행 단계가 꿀팁용 제목·설명을 만든다 (2026-10-22) */
+  broll_origin?: string | null;
   error_message: string | null;
   created_at: string;
   updated_at: string;
