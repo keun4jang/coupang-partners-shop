@@ -34,7 +34,7 @@ export type TipProps = {
   /** [훅, 단계1..N, 마무리(, 상품)] 장면 길이(초) */
   segments?: number[] | null;
   /** 꿀팁 + 상품 마무리 영상이면 마지막 상품 화면 (없으면 순수 정보 영상 - 고지 없음) */
-  product?: { displayNumber: number; imageUrl: string | null; ctaText: string } | null;
+  product?: { displayNumber: number; imageUrl: string | null; ctaText: string; heading?: string | null } | null;
   disclosureText?: string | null;
   disclosureMode?: DisclosureMode | null;
 };
@@ -293,6 +293,7 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
             displayNumber={props.product.displayNumber}
             ctaText={props.product.ctaText}
             productImageUrl={props.product.imageUrl}
+            heading={props.product.heading}
           />
           <Narration src={props.narration?.[productIdx]} />
         </Sequence>

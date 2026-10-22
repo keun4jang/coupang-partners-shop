@@ -28,7 +28,9 @@ export const CtaScene: React.FC<{
   /** CTA 문장 - 나레이션과 같은 문장. 없으면 ctaTemplate 로 생성 */
   ctaText?: string;
   productImageUrl?: string | null;
-}> = ({ displayNumber, ctaText, productImageUrl }) => {
+  /** 사진 위 소개 줄 - "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님: 상품이 띡 나오기보다 어떤 분께 필요한 물건인지) */
+  heading?: string | null;
+}> = ({ displayNumber, ctaText, productImageUrl, heading }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -54,6 +56,27 @@ export const CtaScene: React.FC<{
         fontFamily,
       }}
     >
+      {heading && (
+        <div
+          style={{
+            marginBottom: 110,
+            width: "86%",
+            textAlign: "center",
+            color: "#FFFFFF",
+            fontWeight: 800,
+            fontSize: 54,
+            lineHeight: 1.32,
+            letterSpacing: "-0.02em",
+            wordBreak: "keep-all",
+            textWrap: "balance",
+            textShadow: "0 3px 0 rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.45)",
+            transform: `translateY(${(1 - pop) * 30}px)`,
+            opacity: Math.min(1, pop * 1.5),
+          }}
+        >
+          {heading}
+        </div>
+      )}
       <div
         style={{
           position: "relative",

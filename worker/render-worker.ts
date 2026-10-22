@@ -88,6 +88,12 @@ import { matchTipTopic } from "../src/lib/tipMatch";
 const TIP_OPENER = "오늘의 살림 꿀팁";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
 const TIP_ORIGIN_TAG = "꿀팁:";
+/** "캠핑 자주 가는 분께" → "캠핑 자주 가는 분께 필요한 물건" (누구에게 줄이 없거나 "~께"로 안 끝나면 null) */
+function tipProductHeading(hookText: string | null | undefined): string | null {
+  const who = unpackHookText(hookText).forWho;
+  if (!who || !/께$/.test(who)) return null;
+  return `${who} 필요한 물건`;
+}
 function tipTopicOf(brollOrigin: string | null | undefined): string | null {
   const i = brollOrigin?.lastIndexOf(TIP_ORIGIN_TAG) ?? -1;
   return i >= 0 ? brollOrigin!.slice(i + TIP_ORIGIN_TAG.length).trim() || null : null;
@@ -715,7 +721,7 @@ async function publishToSns(
   const tipTopic = tipTopicOf(item.broll_origin);
   const tipCopy = tipTopic ? reviewedTip(tipTopic) : null;
   const snsCaption = instagramCaption(
-    tipCopy ? tipCaptionBody(item.display_number, tipCopy) : captionText,
+    tipCopy ? tipCaptionBody(item.display_number, tipCopy, tipProductHeading(item.hook_text)) : captionText,
     item.display_number,
     { own }
   );
@@ -1653,7 +1659,11 @@ async function renderTipProductVideo(
   console.log(`꿀팁 주제: ${tip.topic} (${match.how})`);
   const n = item.display_number;
   const own = isOwnProduct(product);
-  const ctaText = `관련 물건은 ${n}번에 정리해 뒀어요`;
+  // 마지막 상품 소개: "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님 "상품이 띡 나오기보다 어떤 분한테 필요한 상품인지").
+  // 상품 문구 만들 때 같이 만든 '누구에게' 줄(hook_text 첫 줄, 정책 검사 거침)을 쓴다. 없으면 예전 문장.
+  const heading = tipProductHeading(item.hook_text);
+  const ctaText = heading ? `${n}번에 정리해 뒀어요` : `관련 물건은 ${n}번에 정리해 뒀어요`;
+  const ctaSpoken = heading ? `${heading}, ${ctaText}` : ctaText;
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
 
   const clips = tip.stockQueries.length
@@ -1663,7 +1673,7 @@ async function renderTipProductVideo(
   // 없는 파일이 섞이면 렌더가 통째로 멈춘다)
   const brollFiles = existingBrollFiles(clips.map((c) => c.file));
   if (brollFiles.length) cachedBundle = null;
-  const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaText];
+  const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaSpoken];
   const narr = await generateNarration(lines);
   const segments = lines.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;
@@ -1679,7 +1689,7 @@ async function renderTipProductVideo(
     brollDurations: brollFiles.length ? brollFileDurations(brollFiles) : null,
     narration: narr ? narr.map((l) => l?.uri ?? null) : null,
     segments,
-    product: { displayNumber: n, imageUrl, ctaText },
+    product: { displayNumber: n, imageUrl, ctaText, heading },
     // 고지: 파트너스는 처음·끝 3초 짧은 문구, 본인 상품은 화면에 안 띄움(캡션·설명에만) - TemplateD 와 같은 규칙
     disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
     disclosureMode: own ? "off" : disclosureEdgesOn() ? "edges" : "always",

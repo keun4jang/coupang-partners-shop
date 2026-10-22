@@ -148,14 +148,14 @@ export function youtubeTipDescription(
 }
 
 /** 인스타·페북 캡션 본문 (instagramCaption 에 넣으면 고지가 본문 바로 뒤에 붙는다) */
-export function tipCaptionBody(displayNumber: number, tip: TipCopy): string {
+export function tipCaptionBody(displayNumber: number, tip: TipCopy, heading?: string | null): string {
   return [
     `오늘의 살림 꿀팁 - ${tip.topic}`,
     "",
     tip.hook,
     ...tip.steps.map((s, i) => `${i + 1}. ${s.title}`),
     "",
-    `관련 물건은 ${displayNumber}번에 정리해 뒀어요.`,
+    heading ? `${heading}은 ${displayNumber}번에 정리해 뒀어요.` : `관련 물건은 ${displayNumber}번에 정리해 뒀어요.`,
     "",
     "#살림꿀팁 #생활꿀팁 #살림템",
   ].join("\n");
