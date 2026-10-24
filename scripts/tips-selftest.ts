@@ -5,7 +5,8 @@
 import { TIP_TOPICS, checkTipSafety, pickTopic, topicsFor } from "../src/lib/tips";
 import { findPolicyIssues } from "../src/lib/policy";
 import { TIP_SCRIPTS } from "../src/lib/tipScripts";
-import { matchTipTopicByRule } from "../src/lib/tipMatch";
+import { matchTipTopicByRule, matchTipTopicsByRule } from "../src/lib/tipMatch";
+import { OWN_PRODUCTS } from "../src/lib/ownProducts";
 
 let fail = 0;
 const check = (label: string, ok: boolean) => {
@@ -50,7 +51,11 @@ for (const t of TIP_TOPICS) {
 check(`검수본 ${TIP_SCRIPTS.length}개 · 주제 ${TIP_TOPICS.length}개 짝 맞음`, TIP_SCRIPTS.length === TIP_TOPICS.length);
 // 상품 → 꿀팁 주제 규칙 (2026-10-22)
 const expect: [string, string | null][] = [
-  ["텐트형 해먹 타프 일체형", "타프 바람에 덜 흔들리게 치는 요령"],
+  ["텐트형 해먹 타프 일체형", "해먹 편하게 치는 요령"],
+  ["20D 나일론 스퀘어 타프 3x3", "타프 바람에 덜 흔들리게 치는 요령"],
+  ["승마 안장 패드 퀼팅 종합마장 안장깔개", "승마 안장 패드 관리하는 법"],
+  ["소가죽 A5 노트 커버 세트 빈티지 가죽 다이어리", "새 가죽 노트 커버 길들이는 법"],
+  ["왁스 캔버스 오토바이 가방 빈티지 가죽 벨트 메신저백", "오토바이 가방 달기 전 확인할 것"],
   ["아오란 각도조절 경량 접이식 캠핑 의자 세트", "캠핑 첫날 짐 싸는 순서"],
   ["자석선풍기", "빨래 빨리 마르게 너는 요령"],
   ["욕실 수건 걸이 2단", "작은 욕실 수납 늘리는 요령"],
@@ -62,5 +67,11 @@ for (const [name, want] of expect) {
   const got = matchTipTopicByRule(name)?.topic ?? null;
   check(`주제 규칙: ${name} → ${got ?? "없음"}`, got === want);
 }
+// 근사장 상품은 전부 꿀팁 후보가 있어야 하고, 타프류는 다시 나올 때 바꿔 쓸 후보가 2개 이상 (2026-10-24)
+for (const o of OWN_PRODUCTS) {
+  const n = matchTipTopicsByRule(o.name).length;
+  check(`근사장 상품 꿀팁 후보 ${n}개 - ${o.name.slice(0, 24)}`, n >= 1);
+}
+check("타프류는 후보 2개 이상", matchTipTopicsByRule("해먹 모기장 타프 세트").length >= 2);
 console.log(fail ? `❌ ${fail}건 실패` : "✅ 전부 통과");
 process.exit(fail ? 1 : 0);

@@ -60,6 +60,19 @@ export const TIP_TOPICS: TipTopic[] = [
   { topic: "겨울 난방비 아끼는 집안 습관", season: "winter", group: "계절" },
   { topic: "환절기 이불 바꾸는 순서", season: "fall", group: "계절" },
   { topic: "봄맞이 대청소 순서", season: "spring", group: "계절" },
+  // 2026-10-24 사장님 "상품은 또 나와도 내용을 바꾸면 돼" - 근사장 상품(캠핑·가죽·오토바이·승마)이 다시 나올 때 꿀팁을 돌려쓰려고 추가
+  { topic: "해먹 편하게 치는 요령", group: "캠핑" },
+  { topic: "타프 치기 좋은 자리 고르는 법", group: "캠핑" },
+  { topic: "비 올 때 타프 치는 요령", group: "캠핑" },
+  { topic: "캠핑장 벌레 덜 꼬이게 하는 법", group: "캠핑" },
+  { topic: "텐트 안 습기 덜 차게 하는 법", group: "캠핑" },
+  { topic: "백패킹 배낭 가볍게 싸는 요령", group: "캠핑" },
+  { topic: "캠핑 담요 오래 쓰는 보관법", group: "캠핑" },
+  { topic: "차박 트렁크 공간 넓게 쓰는 법", group: "캠핑" },
+  { topic: "가죽 가방 오래 쓰는 관리법", group: "정리" },
+  { topic: "새 가죽 노트 커버 길들이는 법", group: "정리" },
+  { topic: "오토바이 가방 달기 전 확인할 것", group: "정리" },
+  { topic: "승마 안장 패드 관리하는 법", group: "세탁" },
 ];
 
 export type TipScript = {

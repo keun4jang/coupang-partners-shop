@@ -426,6 +426,139 @@ export const TIP_SCRIPTS: ReviewedTip[] = [
     outro: "하루에 한 공간씩 나눠서 해요",
     stockQueries: ["spring cleaning home", "cleaning window", "decluttering room"],
   },
+  // ── 2026-10-24 추가 (근사장 상품용 - 같은 상품이 다시 나올 때 꿀팁을 돌려쓴다) ──
+  {
+    topic: "해먹 편하게 치는 요령",
+    hook: "해먹, 누우면 몸이 접혀서 불편하죠?",
+    steps: [
+      { title: "나무 간격 먼저 보기", detail: "해먹 길이보다 조금 넓은 두 나무를 골라요" },
+      { title: "줄은 처지게 걸기", detail: "팽팽하게 당기면 몸이 더 접혀서 불편해요" },
+      { title: "대각선으로 눕기", detail: "비스듬히 누우면 몸이 펴지고 평평해져요" },
+    ],
+    outro: "나무엔 넓은 끈을 써서 껍질을 지켜요",
+    stockQueries: ["hammock camping forest", "hammock between trees", "relaxing in hammock"],
+  },
+  {
+    topic: "타프 치기 좋은 자리 고르는 법",
+    hook: "타프 칠 자리, 아무 데나 고르면 고생해요",
+    steps: [
+      { title: "움푹한 곳 피하기", detail: "비가 오면 물이 고여 바닥이 젖어요" },
+      { title: "머리 위 나뭇가지 보기", detail: "마른 가지는 바람에 떨어질 수 있어요" },
+      { title: "바람 방향 확인하기", detail: "바람 오는 쪽을 낮게 쳐야 덜 흔들려요" },
+    ],
+    outro: "도착하면 먼저 한 바퀴 둘러봐요",
+    stockQueries: ["camping site forest", "setting up tarp camping", "camping tarp shade"],
+  },
+  {
+    topic: "비 올 때 타프 치는 요령",
+    hook: "캠핑 중 비 소식, 타프 치는 법이 달라요",
+    steps: [
+      { title: "한쪽을 낮게 기울이기", detail: "물이 한쪽으로 흘러 지붕에 고이지 않아요" },
+      { title: "줄에 짧은 끈 매기", detail: "줄 타고 흐르는 물이 끈에서 떨어져요" },
+      { title: "젖으면 줄 다시 조이기", detail: "젖은 천과 줄은 늘어나 처지기 쉬워요" },
+    ],
+    outro: "바람까지 세면 무리하지 말고 걷어요",
+    stockQueries: ["camping in rain", "rain tarp camping", "tent rain drops"],
+  },
+  {
+    topic: "캠핑장 벌레 덜 꼬이게 하는 법",
+    hook: "캠핑장 벌레, 자리부터 다르게 잡아요",
+    steps: [
+      { title: "고인 물에서 떨어지기", detail: "고인 물 근처는 모기가 많이 모여요" },
+      { title: "음식은 바로 닫기", detail: "음식 냄새가 벌레를 불러 모아요" },
+      { title: "조명은 자리와 멀리", detail: "불빛에 벌레가 모이니 앉는 곳과 떨어뜨려요" },
+    ],
+    outro: "해 질 녘엔 긴 옷이 편해요",
+    stockQueries: ["camping evening lantern", "camping site lake", "camping food table"],
+  },
+  {
+    topic: "텐트 안 습기 덜 차게 하는 법",
+    hook: "아침에 텐트 안이 축축했던 적 있죠?",
+    steps: [
+      { title: "환기구는 열어 두기", detail: "숨에서 나온 습기가 빠져나갈 길이 생겨요" },
+      { title: "젖은 옷은 밖에 두기", detail: "텐트 안에서 말리면 습기가 더 차요" },
+      { title: "바닥에 방수포 깔기", detail: "땅에서 올라오는 물기와 냉기를 막아요" },
+    ],
+    outro: "방수포는 텐트보다 작게 깔아요",
+    stockQueries: ["camping tent morning", "inside camping tent", "tent camping forest"],
+  },
+  {
+    topic: "백패킹 배낭 가볍게 싸는 요령",
+    hook: "백패킹 배낭, 메자마자 어깨가 아프죠?",
+    steps: [
+      { title: "무거운 짐은 등 쪽에", detail: "무게가 몸에 붙어야 덜 흔들리고 덜 힘들어요" },
+      { title: "두 가지로 쓰는 물건", detail: "트레킹폴로 세우는 텐트면 폴대를 안 챙겨요" },
+      { title: "자주 쓰는 건 바깥에", detail: "물과 간식은 배낭을 안 열고 꺼내요" },
+    ],
+    outro: "다 싸고 한 번 메고 걸어 봐요",
+    stockQueries: ["backpacking hiking trail", "hiking backpack mountain", "packing backpack camping"],
+  },
+  {
+    topic: "캠핑 담요 오래 쓰는 보관법",
+    hook: "캠핑 담요, 보관하다 보면 냄새가 배죠?",
+    steps: [
+      { title: "다 말린 뒤 넣기", detail: "이슬 맞은 담요는 펼쳐 말려야 냄새가 안 배요" },
+      { title: "세탁은 라벨대로", detail: "충전재가 뭉치지 않게 라벨 방법을 따라요" },
+      { title: "오래 눌러 두지 않기", detail: "계속 압축해 두면 덜 부풀어 덜 따뜻해요" },
+    ],
+    outro: "집에선 수납가방 밖에 느슨하게 둬요",
+    stockQueries: ["camping blanket", "folding blanket", "campfire blanket night"],
+  },
+  {
+    topic: "차박 트렁크 공간 넓게 쓰는 법",
+    hook: "차박할 때 트렁크가 금방 꽉 차죠?",
+    steps: [
+      { title: "잘 자리부터 정하기", detail: "누울 곳을 먼저 비우고 짐은 둘레에 둬요" },
+      { title: "짐은 상자에 나눠 담기", detail: "종류별로 담으면 꺼낼 때 다 안 뒤져요" },
+      { title: "젖은 건 차 밖에", detail: "차 안에 두면 습기가 차서 창이 흐려져요" },
+    ],
+    outro: "자주 꺼낼 짐은 문 쪽에 둬요",
+    stockQueries: ["car camping trunk", "suv camping", "car camping night"],
+  },
+  {
+    topic: "가죽 가방 오래 쓰는 관리법",
+    hook: "가죽 가방, 비 맞고 나서 얼룩졌나요?",
+    steps: [
+      { title: "젖으면 그늘에서 말리기", detail: "드라이기나 햇볕에 말리면 가죽이 뻣뻣해져요" },
+      { title: "속을 채워 보관하기", detail: "종이를 넣어 두면 모양이 안 무너져요" },
+      { title: "비닐 대신 천 주머니", detail: "비닐에 넣으면 습기가 차서 얼룩이 생겨요" },
+    ],
+    outro: "손질 방법은 라벨 안내부터 봐요",
+    stockQueries: ["leather bag", "vintage leather bag", "leather messenger bag"],
+  },
+  {
+    topic: "새 가죽 노트 커버 길들이는 법",
+    hook: "새 가죽 커버, 처음엔 뻣뻣하죠?",
+    steps: [
+      { title: "자주 손으로 쓰기", detail: "손의 온기와 유분으로 가죽이 부드러워져요" },
+      { title: "물기는 바로 닦기", detail: "물방울이 마르면 얼룩으로 남아요" },
+      { title: "창가 햇볕 피하기", detail: "오래 빛을 받으면 색이 바래요" },
+    ],
+    outro: "쓸수록 생기는 주름이 가죽의 멋이에요",
+    stockQueries: ["leather notebook", "writing in journal", "leather journal desk"],
+  },
+  {
+    topic: "오토바이 가방 달기 전 확인할 것",
+    hook: "오토바이 가방, 달리다 흔들려 불안했죠?",
+    steps: [
+      { title: "좌우 무게 맞추기", detail: "한쪽만 무거우면 차체가 기울어 위험해요" },
+      { title: "고정끈 다시 조이기", detail: "출발 전과 쉴 때 느슨해졌는지 봐요" },
+      { title: "머플러와 거리 두기", detail: "배기관 열에 가방이 닿으면 상해요" },
+    ],
+    outro: "무거운 짐은 낮고 몸 가까이 실어요",
+    stockQueries: ["motorcycle travel", "motorcycle saddlebags", "motorcycle road trip"],
+  },
+  {
+    topic: "승마 안장 패드 관리하는 법",
+    hook: "안장 패드, 땀에 젖은 채 두고 있나요?",
+    steps: [
+      { title: "타고 나면 바로 펼치기", detail: "땀에 젖은 채 접어 두면 냄새가 배요" },
+      { title: "털은 솔로 먼저 털기", detail: "말털을 털고 빨아야 세탁기에 덜 남아요" },
+      { title: "그늘에서 말리기", detail: "햇볕에 오래 두면 색이 바래고 천이 상해요" },
+    ],
+    outro: "패드가 여러 장이면 번갈아 써요",
+    stockQueries: ["horse riding", "horse saddle", "equestrian stable"],
+  },
 ];
 
 /** 주제 → 검수본 (없으면 null - 그 주제는 영상을 만들지 않는다) */

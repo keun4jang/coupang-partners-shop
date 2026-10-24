@@ -83,7 +83,7 @@ import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
 import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
-import { matchTipTopic } from "../src/lib/tipMatch";
+import { matchTipTopics } from "../src/lib/tipMatch";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
 const TIP_OPENER = "오늘의 살림 꿀팁";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
@@ -1652,11 +1652,31 @@ async function renderTipProductVideo(
   item: VideoItem,
   product: Product
 ): Promise<{ videoPath: string; brollOrigin: string; brollFiles: string[]; tipTopic: string; seconds: number } | null> {
-  const match = await matchTipTopic(product.product_name, product.category);
-  if (!match) return null;
-  const tip = await generateTip(match.topic);
+  const match = await matchTipTopics(product.product_name, product.category);
+  if (!match.topics.length) return null;
+  // 같은 상품이 다시 나오면 꿀팁을 바꾼다 (2026-10-24 사장님 "상품은 또 나와도 내용을 바꾸면 돼"):
+  // 이 상품의 지난 영상들이 쓴 꿀팁(broll_origin 끝 "꿀팁:주제")을 세어 가장 덜 쓴 후보를 고른다 (같으면 잘 맞는 순).
+  const used = new Map<string, number>();
+  try {
+    const { data } = await supabaseAdmin()
+      .from("video_items")
+      .select("broll_origin")
+      .eq("product_id", product.id)
+      .neq("id", item.id);
+    for (const r of (data ?? []) as { broll_origin: string | null }[]) {
+      const t = tipTopicOf(r.broll_origin);
+      if (t) used.set(t, (used.get(t) ?? 0) + 1);
+    }
+  } catch (e) {
+    console.warn(`지난 꿀팁 조회 실패(무시): ${(e as Error).message.slice(0, 80)}`);
+  }
+  const pick = [...match.topics].sort((a, b) => (used.get(a.topic) ?? 0) - (used.get(b.topic) ?? 0))[0];
+  const tip = await generateTip(pick);
   if (!tip) return null;
-  console.log(`꿀팁 주제: ${tip.topic} (${match.how})`);
+  console.log(
+    `꿀팁 주제: ${tip.topic} (${match.how}; 후보 ${match.topics.length}개` +
+      `${used.size ? `, 이 상품 지난 꿀팁 ${[...used.entries()].map(([t, c]) => `${t}×${c}`).join(" / ")}` : ""})`
+  );
   const n = item.display_number;
   const own = isOwnProduct(product);
   // 마지막 상품 소개: "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님 "상품이 띡 나오기보다 어떤 분한테 필요한 상품인지").
