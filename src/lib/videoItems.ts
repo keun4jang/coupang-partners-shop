@@ -200,9 +200,12 @@ export async function ensureOwnProducts(): Promise<{ added: number; updated: num
 
 /**
  * 오늘 끼워 넣을 본인 상품. 하루 own_product_daily(기본 1, 0~3)편까지,
- * 영상이 적게 만들어진 상품부터 돌아가며 고른다(12개뿐이라 반복된다).
+ * 영상이 적게 만들어진 상품부터 돌아가며 고른다(12개뿐이라 반복된다 - 최근 7일 안에 올린 상품은 건너뜀).
  * 본인 상품은 status=paused 라 일반 선정에는 섞이지 않는다.
  */
+/** 같은 본인 상품을 다시 올리기까지 최소 간격 (일) */
+const OWN_REPEAT_GAP_DAYS = 7;
+
 async function pickOwnProductsForToday(startOfDay: Date, room: number): Promise<Product[]> {
   const raw = Number((await getSetting("own_product_daily"))?.trim());
   const daily = Number.isFinite(raw) && raw >= 0 && raw <= 3 ? Math.floor(raw) : OWN_DAILY_DEFAULT;
@@ -232,8 +235,16 @@ async function pickOwnProductsForToday(startOfDay: Date, room: number): Promise<
   if (want <= 0) return [];
 
   const count = new Map<string, number>();
-  for (const r of rows) count.set(r.product_id, (count.get(r.product_id) ?? 0) + 1);
+  const last = new Map<string, string>();
+  for (const r of rows) {
+    count.set(r.product_id, (count.get(r.product_id) ?? 0) + 1);
+    if ((last.get(r.product_id) ?? "") < r.created_at) last.set(r.product_id, r.created_at);
+  }
+  // 예전에 홍보한 상품도 다시 올린다 - 단, 최근 OWN_REPEAT_GAP_DAYS 일 안에 올린 상품은 건너뛴다
+  // (2026-10-24 사장님 "과거에 홍보했던 물건 또 해도 돼, 시간이 많이 지난 거라면")
+  const cutoff = new Date(startOfDay.getTime() - OWN_REPEAT_GAP_DAYS * 86_400_000).toISOString();
   return ownProducts
+    .filter((p) => (last.get(p.id) ?? "") < cutoff)
     .sort(
       (a, b) =>
         (count.get(a.id) ?? 0) - (count.get(b.id) ?? 0) ||
