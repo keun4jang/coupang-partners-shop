@@ -559,6 +559,194 @@ export const TIP_SCRIPTS: ReviewedTip[] = [
     outro: "패드가 여러 장이면 번갈아 써요",
     stockQueries: ["horse riding", "horse saddle", "equestrian stable"],
   },
+  // ── 2026-10-26 추가 (사장님 "주제 추가해 여러 가지로" - 생활 상식·겨울 대비·안전·주방) ──
+  {
+    topic: "세탁 라벨 기호 읽는 법",
+    hook: "옷 안쪽 세탁 기호, 무슨 뜻인지 아세요?",
+    steps: [
+      { title: "물통 그림은 물세탁", detail: "물통 안에 손이 그려져 있으면 손세탁만 해요" },
+      { title: "X 표시는 하지 말기", detail: "물통에 X가 있으면 물세탁하지 말라는 뜻이에요" },
+      { title: "다리미 점은 온도", detail: "점이 많을수록 높은 온도까지 다려도 돼요" },
+    ],
+    outro: "헷갈리면 라벨을 사진 찍어 두고 비교해요",
+    stockQueries: ["clothes care label", "laundry folding clothes", "washing machine laundry"],
+  },
+  {
+    topic: "옷 보풀 덜 생기게 하는 법",
+    hook: "몇 번 빨았는데 옷에 보풀이 생겼나요?",
+    steps: [
+      { title: "뒤집어서 빨기", detail: "겉면이 덜 비벼져서 보풀이 덜 생겨요" },
+      { title: "세탁망에 넣기", detail: "다른 옷과 덜 부딪혀 표면이 덜 상해요" },
+      { title: "수건과 따로 빨기", detail: "수건 보풀이 옷에 달라붙지 않아요" },
+    ],
+    outro: "생긴 보풀은 당기지 말고 잘라 내요",
+    stockQueries: ["sweater laundry", "washing machine clothes", "folding sweaters"],
+  },
+  {
+    topic: "소비기한과 유통기한 차이",
+    hook: "소비기한, 유통기한이랑 뭐가 다를까요?",
+    steps: [
+      { title: "2023년부터 소비기한", detail: "대부분 식품에 유통기한 대신 소비기한을 적어요" },
+      { title: "먹어도 되는 기한", detail: "보관법을 지켰을 때 먹어도 되는 날까지예요" },
+      { title: "보관 방법이 먼저", detail: "냉장 식품을 밖에 두면 기한이 소용없어요" },
+    ],
+    outro: "기한이 지난 건 아까워도 버려요",
+    stockQueries: ["grocery food package", "refrigerator food", "supermarket shelf"],
+  },
+  {
+    topic: "녹인 고기 다시 얼리지 않는 이유",
+    hook: "녹인 고기, 남으면 다시 얼려도 될까요?",
+    steps: [
+      { title: "한 번 쓸 만큼 얼리기", detail: "처음부터 나눠 얼리면 다시 얼릴 일이 없어요" },
+      { title: "냉장실에서 녹이기", detail: "실온에 두면 겉부터 빨리 상해요" },
+      { title: "다시 얼리면 맛 손해", detail: "녹을 때 육즙이 빠져서 퍽퍽해져요" },
+    ],
+    outro: "녹인 고기는 그날 다 익혀 먹어요",
+    stockQueries: ["raw meat kitchen", "freezer food", "cooking meat pan"],
+  },
+  {
+    topic: "전자레인지에 넣으면 안 되는 그릇",
+    hook: "전자레인지, 아무 그릇이나 넣으면 위험해요",
+    steps: [
+      { title: "금속·금테 그릇 빼기", detail: "불꽃이 튀어서 그릇과 기기가 상해요" },
+      { title: "전용 표시 확인하기", detail: "전자레인지용 표시가 있는 용기만 써요" },
+      { title: "밀폐 뚜껑은 열기", detail: "김이 빠질 틈이 없으면 터질 수 있어요" },
+    ],
+    outro: "쓰기 전에 용기 바닥 표시를 봐요",
+    stockQueries: ["microwave kitchen", "heating food microwave", "kitchen containers"],
+  },
+  {
+    topic: "냄비 눌어붙었을 때 닦는 순서",
+    hook: "냄비 바닥 탄 자국, 힘으로 긁고 있나요?",
+    steps: [
+      { title: "물 붓고 불리기", detail: "따뜻한 물을 부어 두면 탄 자국이 불어요" },
+      { title: "한 번 끓여 떼기", detail: "물을 끓이면 눌은 게 잘 떨어져요" },
+      { title: "부드러운 수세미로", detail: "쇠수세미는 냄비 표면에 흠집을 내요" },
+    ],
+    outro: "코팅 냄비는 센 불을 피해요",
+    stockQueries: ["washing pot kitchen", "cooking pot stove", "dish washing sink"],
+  },
+  {
+    topic: "주방 칼 오래 쓰는 법",
+    hook: "산 지 얼마 안 된 칼, 벌써 무뎌졌나요?",
+    steps: [
+      { title: "쓰고 바로 닦아 말리기", detail: "물기가 남으면 녹이 슬어요" },
+      { title: "유리 도마 피하기", detail: "단단한 바닥은 칼날을 빨리 무디게 해요" },
+      { title: "칼은 따로 보관하기", detail: "다른 도구와 부딪히면 날이 상해요" },
+    ],
+    outro: "식기세척기보다 손으로 씻어요",
+    stockQueries: ["kitchen knife cutting", "chopping vegetables", "kitchen knife board"],
+  },
+  {
+    topic: "텀블러 냄새 안 배게 쓰는 법",
+    hook: "텀블러 뚜껑에서 쉰내 나지 않나요?",
+    steps: [
+      { title: "쓰고 바로 헹구기", detail: "음료가 마르면서 냄새가 배요" },
+      { title: "고무 패킹까지 빼서 씻기", detail: "냄새는 뚜껑 고무 패킹에 많이 남아요" },
+      { title: "뚜껑 열고 말리기", detail: "닫은 채 두면 물기가 남아 냄새가 나요" },
+    ],
+    outro: "넣을 음료는 사용법부터 확인해요",
+    stockQueries: ["tumbler coffee", "washing bottle sink", "travel mug"],
+  },
+  {
+    topic: "헷갈리는 분리배출 정리",
+    hook: "분리배출, 이건 어디에 버려야 할까요?",
+    steps: [
+      { title: "영수증은 일반쓰레기", detail: "감열지라 종이로 재활용이 안 돼요" },
+      { title: "기름 묻은 용기는 헹구기", detail: "씻어도 안 지워지면 일반쓰레기로 버려요" },
+      { title: "깨진 유리는 감싸기", detail: "신문지로 싸서 종량제 봉투에 넣어요" },
+    ],
+    outro: "지역마다 달라서 안내문도 봐요",
+    stockQueries: ["recycling bins", "sorting recycling", "kitchen trash"],
+  },
+  {
+    topic: "멀티탭 안전하게 쓰는 법",
+    hook: "멀티탭에 멀티탭, 꽂아 쓰고 있나요?",
+    steps: [
+      { title: "멀티탭끼리 잇지 않기", detail: "이어 꽂으면 전기가 몰려 뜨거워질 수 있어요" },
+      { title: "플러그 먼지 닦기", detail: "틈에 쌓인 먼지가 열을 받으면 위험해요" },
+      { title: "히터는 벽 콘센트에", detail: "전기를 많이 쓰는 기기는 따로 꽂아요" },
+    ],
+    outro: "뜨겁거나 탄 냄새가 나면 바로 뽑아요",
+    stockQueries: ["power strip plugs", "electrical outlet", "unplugging cord"],
+  },
+  {
+    topic: "보조배터리 오래 쓰는 법",
+    hook: "보조배터리, 금방 닳는 느낌 들죠?",
+    steps: [
+      { title: "뜨거운 곳 피하기", detail: "햇볕 드는 차 안에 두면 배터리가 상해요" },
+      { title: "바닥까지 쓰지 않기", detail: "다 떨어지기 전에 충전하는 게 좋아요" },
+      { title: "부푼 건 쓰지 않기", detail: "부풀어 오르면 바로 쓰지 말고 따로 버려요" },
+    ],
+    outro: "버릴 땐 폐건전지 수거함에 넣어요",
+    stockQueries: ["power bank charging phone", "charging smartphone", "phone battery"],
+  },
+  {
+    topic: "우산 오래 쓰는 법",
+    hook: "우산, 쓰고 나서 바로 접어 두나요?",
+    steps: [
+      { title: "펼쳐서 말리기", detail: "접은 채 두면 살이 녹슬고 냄새가 나요" },
+      { title: "물기 털고 접기", detail: "물기를 털어야 천이 덜 상해요" },
+      { title: "바람 쪽으로 기울이기", detail: "바람을 정면으로 받아야 덜 뒤집혀요" },
+    ],
+    outro: "다 마르면 묶어서 보관해요",
+    stockQueries: ["umbrella rain street", "wet umbrella", "rainy day"],
+  },
+  {
+    topic: "자동차 실내 정리 요령",
+    hook: "차 안, 금방 어수선해지죠?",
+    steps: [
+      { title: "쓰레기는 그날 비우기", detail: "차 안에 두면 냄새가 금방 배요" },
+      { title: "트렁크 짐은 고정하기", detail: "굴러다니는 짐이 소리와 흠집을 만들어요" },
+      { title: "여름엔 라이터 빼기", detail: "뜨거운 차 안에선 터질 수 있어요" },
+    ],
+    outro: "운전석 발밑엔 아무것도 두지 마세요",
+    stockQueries: ["car interior", "car trunk organizing", "driving car"],
+  },
+  {
+    topic: "하수구 덜 막히게 하는 습관",
+    hook: "욕실 배수구, 물이 천천히 빠지나요?",
+    steps: [
+      { title: "머리카락은 바로 걷기", detail: "배수구에 쌓이면 막힘이 시작돼요" },
+      { title: "거름망 씌우기", detail: "찌꺼기를 걸러야 배관까지 안 내려가요" },
+      { title: "기름은 닦아서 버리기", detail: "배관에 굳으면 물길을 막아요" },
+    ],
+    outro: "물이 고이기 시작하면 바로 손봐요",
+    stockQueries: ["bathroom drain", "shower drain water", "cleaning bathroom"],
+  },
+  {
+    topic: "가습기 깨끗하게 쓰는 습관",
+    hook: "가습기 물, 며칠씩 채워 두고 있나요?",
+    steps: [
+      { title: "물은 매일 새로 갈기", detail: "고인 물은 금방 탁해지고 냄새가 나요" },
+      { title: "통은 비워서 말리기", detail: "물기가 남으면 물때가 끼기 쉬워요" },
+      { title: "세척은 설명서대로", detail: "기기마다 분해와 세척 방법이 달라요" },
+    ],
+    outro: "가습기는 얼굴과 조금 떨어뜨려 둬요",
+    stockQueries: ["humidifier room", "bedroom humidifier", "water tank cleaning"],
+  },
+  {
+    topic: "겨울 수도 동파 막는 법",
+    hook: "한파 예보가 있으면 동파부터 막아요",
+    steps: [
+      { title: "물을 조금 틀어 두기", detail: "물이 흐르면 배관이 잘 얼지 않아요" },
+      { title: "계량기함 틈 막기", detail: "헌 옷으로 채우면 찬바람이 덜 들어와요" },
+      { title: "외출 때도 보일러 켜기", detail: "외출 모드로 두면 배관이 덜 얼어요" },
+    ],
+    outro: "얼었으면 미지근한 물로 천천히 녹여요",
+    stockQueries: ["winter frozen pipe", "faucet water dripping", "snow house winter"],
+  },
+  {
+    topic: "전기장판 안전하게 쓰는 법",
+    hook: "전기장판, 접어서 쓰고 있지 않나요?",
+    steps: [
+      { title: "접어서 쓰지 않기", detail: "접힌 곳에 열이 몰려 열선이 상해요" },
+      { title: "무거운 것 올리지 않기", detail: "눌린 자리 열선이 상할 수 있어요" },
+      { title: "타이머 맞춰 두기", detail: "잠든 뒤 꺼지게 하면 켜 둔 시간이 줄어요" },
+    ],
+    outro: "보관할 땐 둥글게 말아 둬요",
+    stockQueries: ["cozy bed winter", "electric blanket bed", "bedroom winter"],
+  },
 ];
 
 /** 주제 → 검수본 (없으면 null - 그 주제는 영상을 만들지 않는다) */

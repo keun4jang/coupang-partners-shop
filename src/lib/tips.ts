@@ -73,6 +73,24 @@ export const TIP_TOPICS: TipTopic[] = [
   { topic: "새 가죽 노트 커버 길들이는 법", group: "정리" },
   { topic: "오토바이 가방 달기 전 확인할 것", group: "정리" },
   { topic: "승마 안장 패드 관리하는 법", group: "세탁" },
+  // 2026-10-26 사장님 "주제 추가해 여러 가지로" - 생활 상식·겨울 대비·안전·주방
+  { topic: "세탁 라벨 기호 읽는 법", group: "세탁" },
+  { topic: "옷 보풀 덜 생기게 하는 법", group: "세탁" },
+  { topic: "소비기한과 유통기한 차이", group: "주방" },
+  { topic: "녹인 고기 다시 얼리지 않는 이유", group: "주방" },
+  { topic: "전자레인지에 넣으면 안 되는 그릇", group: "주방" },
+  { topic: "냄비 눌어붙었을 때 닦는 순서", group: "주방" },
+  { topic: "주방 칼 오래 쓰는 법", group: "주방" },
+  { topic: "텀블러 냄새 안 배게 쓰는 법", group: "주방" },
+  { topic: "헷갈리는 분리배출 정리", group: "자취" },
+  { topic: "멀티탭 안전하게 쓰는 법", group: "자취" },
+  { topic: "보조배터리 오래 쓰는 법", group: "자취" },
+  { topic: "우산 오래 쓰는 법", group: "자취" },
+  { topic: "자동차 실내 정리 요령", group: "정리" },
+  { topic: "하수구 덜 막히게 하는 습관", group: "청소" },
+  { topic: "가습기 깨끗하게 쓰는 습관", season: "fall", group: "계절" },
+  { topic: "겨울 수도 동파 막는 법", season: "winter", group: "계절" },
+  { topic: "전기장판 안전하게 쓰는 법", season: "winter", group: "계절" },
 ];
 
 export type TipScript = {

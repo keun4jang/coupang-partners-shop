@@ -84,6 +84,7 @@ import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
 import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
 import { matchTipTopics } from "../src/lib/tipMatch";
+import { selectProductsForVideos } from "../src/lib/productSelector";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
 const TIP_OPENER = "오늘의 살림 꿀팁";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
@@ -879,6 +880,38 @@ async function publishToSns(
   return { youtubeUrl, youtubeError, instagramUrl, instagramError, facebookUrl, facebookError };
 }
 
+/**
+ * 꿀팁 주제가 안 맞는 상품을 꿀팁이 맞는 다른 상품으로 바꾼다 (2026-10-26 사장님 "정보 전달이 앞에 나오는 릴스만").
+ * - 안 맞은 파트너스 상품은 status=paused + source_memo 에 [꿀팁없음] 을 남겨 다시 뽑히지 않게 한다.
+ * - 같은 번호(아직 어디에도 안 올라감)의 상품을 바꾸고 문구를 비워 pending 으로 되돌린다 → 워커가 다음 차례에 새 상품으로 만든다.
+ * 수동 요청·본인 상품은 바꾸지 않는다(false → 호출부가 실패로 남김).
+ */
+async function swapToTipProduct(item: VideoItem, product: Product): Promise<boolean> {
+  if (item.manual || isOwnProduct(product)) return false;
+  const db = supabaseAdmin();
+  const memo = `${product.source_memo ?? ""} [꿀팁없음 ${new Date().toISOString().slice(0, 10)}]`.trim();
+  const { error: pErr } = await db.from("products").update({ status: "paused", source_memo: memo }).eq("id", product.id);
+  if (pErr) {
+    console.warn(`꿀팁 없는 상품 빼기 실패: ${pErr.message.slice(0, 100)}`);
+    return false;
+  }
+  const [alt] = await selectProductsForVideos(1);
+  if (!alt) {
+    console.warn("바꿔 넣을 상품이 없음 (재고 부족)");
+    return false;
+  }
+  const { error } = await db
+    .from("video_items")
+    .update({ product_id: alt.id, hook_text: null, script_text: null, caption_text: null, video_status: "pending", error_message: null })
+    .eq("id", item.id);
+  if (error) {
+    console.warn(`상품 바꾸기 실패: ${error.message.slice(0, 100)}`);
+    return false;
+  }
+  console.log(`꿀팁 주제 없음: ${product.product_name.slice(0, 30)} 빼고 → ${alt.product_name.slice(0, 30)} 로 교체`);
+  return true;
+}
+
 async function processItem(row: VideoItemWithProduct): Promise<void> {
   const db = supabaseAdmin();
   const product = row.products;
@@ -896,12 +929,19 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
 
     // 꿀팁 + 상품 마무리 형식 (2026-10-22 사장님 "이대로 해"): 상품에 어울리는 검수본 꿀팁이 있으면 그걸로 만든다.
     // 어울리는 주제가 없거나 실패하면 예전 상품 소개 영상(renderVideo). 끄기: app_settings tip_format = off.
+    // 2026-10-26 사장님 "상품만 설명하는 릴스는 이제 만들지 말고, 무조건 정보 전달이 앞부분에 나오는 릴스만":
+    // 꿀팁 주제가 안 맞으면 예전 상품 소개 영상(포맷 D)으로 만들지 않는다 - 그 상품은 빼고 같은 번호를 꿀팁이 맞는 다른 상품으로 바꾼다.
+    // 꿀팁 렌더 자체가 실패하면 실패로 남긴다(상품 소개 영상으로 대신 내보내지 않음). 끄기 스위치(tip_format=off)일 때만 예전 영상.
+    const tipOn = process.env.TIP_FORMAT !== "0" && (await getSetting("tip_format"))?.trim() !== "off";
     let tipRendered: Awaited<ReturnType<typeof renderTipProductVideo>> = null;
-    if (process.env.TIP_FORMAT !== "0" && (await getSetting("tip_format"))?.trim() !== "off") {
-      try {
-        tipRendered = await renderTipProductVideo(item, product);
-      } catch (e) {
-        console.warn(`꿀팁 형식 렌더 실패 - 예전 상품 영상으로: ${(e as Error).message.slice(0, 160)}`);
+    if (tipOn) {
+      tipRendered = await renderTipProductVideo(item, product);
+      if (!tipRendered) {
+        if (await swapToTipProduct(item, product)) {
+          console.log(`=== ${number} 꿀팁 주제 없음 → 다른 상품으로 바꿔 다시 대기 ===`);
+          return;
+        }
+        throw new Error("정보 꿀팁 주제가 맞지 않아 만들지 않음 (상품 소개만 하는 영상은 만들지 않는다 - 2026-10-26 사장님)");
       }
     }
     const { videoPath, thumbnailPath, brollOrigin, brollFiles } = tipRendered

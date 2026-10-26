@@ -1,4 +1,5 @@
 import { offBrandReason } from "./appeal";
+import { matchTipTopicsByRule } from "./tipMatch";
 import type { Product } from "@/types/db";
 import { supabaseAdmin } from "./supabase";
 import { appealScore, searchabilityPenalty, spamTitleReason } from "./appeal";
@@ -341,6 +342,10 @@ export async function selectProductsForVideos(
     (products as Product[]).filter((p) => !usedProductIds.has(p.id) && p.image_url)
   );
   if (fresh.length === 0) return [];
+  // 꿀팁 주제가 규칙으로 바로 맞는 상품을 먼저 쓴다 (2026-10-26 사장님 "정보 전달이 앞에 나오는 릴스만" -
+  // 안 맞는 상품은 렌더 때 다른 상품으로 바뀌므로 처음부터 맞는 걸 고르는 게 낫다). 모자라면 나머지도 쓴다(AI 가 주제를 고를 수 있음).
+  const tipReady = fresh.filter((p) => matchTipTopicsByRule(p.product_name).length > 0);
+  if (tipReady.length >= count) fresh.splice(0, fresh.length, ...tipReady);
 
   fresh.sort((a, b) => {
     const scoreDiff = score(b) - score(a);
