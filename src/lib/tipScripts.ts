@@ -747,6 +747,17 @@ export const TIP_SCRIPTS: ReviewedTip[] = [
     outro: "보관할 땐 둥글게 말아 둬요",
     stockQueries: ["cozy bed winter", "electric blanket bed", "bedroom winter"],
   },
+  {
+    topic: "책상 밑 전선 정리하는 법",
+    hook: "책상 밑 전선, 발에 걸리고 먼지 쌓이죠?",
+    steps: [
+      { title: "멀티탭은 바닥에서 띄우기", detail: "책상 밑에 붙이면 발에 덜 걸리고 먼지도 덜 쌓여요" },
+      { title: "남는 선은 묶어 두기", detail: "길게 늘어진 선을 묶으면 덜 엉켜요" },
+      { title: "플러그에 이름표 붙이기", detail: "뽑을 때 어떤 기기인지 바로 알아요" },
+    ],
+    outro: "바닥이 비면 청소도 쉬워져요",
+    stockQueries: ["desk cable management", "home office desk", "power strip cables"],
+  },
 ];
 
 /** 주제 → 검수본 (없으면 null - 그 주제는 영상을 만들지 않는다) */

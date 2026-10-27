@@ -91,6 +91,7 @@ export const TIP_TOPICS: TipTopic[] = [
   { topic: "가습기 깨끗하게 쓰는 습관", season: "fall", group: "계절" },
   { topic: "겨울 수도 동파 막는 법", season: "winter", group: "계절" },
   { topic: "전기장판 안전하게 쓰는 법", season: "winter", group: "계절" },
+  { topic: "책상 밑 전선 정리하는 법", group: "정리" },
 ];
 
 export type TipScript = {

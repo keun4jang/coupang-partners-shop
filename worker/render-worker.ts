@@ -83,7 +83,7 @@ import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
 import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
-import { matchTipTopics } from "../src/lib/tipMatch";
+import { matchTipTopics, tipFitsProduct } from "../src/lib/tipMatch";
 import { selectProductsForVideos } from "../src/lib/productSelector";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
 const TIP_OPENER = "오늘의 살림 꿀팁";
@@ -1710,9 +1710,24 @@ async function renderTipProductVideo(
   } catch (e) {
     console.warn(`지난 꿀팁 조회 실패(무시): ${(e as Error).message.slice(0, 80)}`);
   }
-  const pick = [...match.topics].sort((a, b) => (used.get(a.topic) ?? 0) - (used.get(b.topic) ?? 0))[0];
-  const tip = await generateTip(pick);
-  if (!tip) return null;
+  // 덜 쓴 순으로 후보를 보며, 꿀팁과 상품이 정말 이어지는지(tipFitsProduct 4점 이상) 확인한 첫 후보를 쓴다 (2026-10-27 사장님
+  // "상품이랑 앞부분 내용이랑 너무 상관없는데?"). 다 안 맞으면 null → 호출부가 이 상품을 빼고 다른 상품으로 바꾼다. 확인은 최대 3번.
+  const ordered = [...match.topics].sort((a, b) => (used.get(a.topic) ?? 0) - (used.get(b.topic) ?? 0)).slice(0, 3);
+  let tip: Awaited<ReturnType<typeof generateTip>> = null;
+  for (const cand of ordered) {
+    const t = await generateTip(cand);
+    if (!t) continue;
+    const fit = await tipFitsProduct(product.product_name, t, match.how === "낱말 규칙");
+    console.log(`꿀팁 어울림 검사: ${t.topic} → ${fit.score ?? "?"}점 ${fit.ok ? "통과" : "탈락"} (${fit.reason})`);
+    if (fit.ok) {
+      tip = t;
+      break;
+    }
+  }
+  if (!tip) {
+    console.log("꿀팁 주제: 상품과 제대로 이어지는 꿀팁 없음");
+    return null;
+  }
   console.log(
     `꿀팁 주제: ${tip.topic} (${match.how}; 후보 ${match.topics.length}개` +
       `${used.size ? `, 이 상품 지난 꿀팁 ${[...used.entries()].map(([t, c]) => `${t}×${c}`).join(" / ")}` : ""})`

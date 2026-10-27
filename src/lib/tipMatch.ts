@@ -55,6 +55,8 @@ const RULES: [RegExp, string[]][] = [
   [/물기\s*제거|스퀴지|수전|욕실\s*청소/, ["욕실 물때 덜 생기게 하는 습관"]],
   [/창틀|방충망|창문\s*청소/, ["창틀 먼지 쉽게 닦는 순서"]],
   [/먼지떨이|극세사|물걸레|밀대|청소포/, ["먼지 덜 쌓이게 하는 집안 습관"]],
+  // 멀티탭 "거치대·정리함"은 안전 수칙이 아니라 전선 정리 물건이다 (10/27 사장님 지적)
+  [/(멀티탭|전선|케이블|콘센트)\s*(거치대|정리|수납|홀더|박스|커버)|선\s*정리/, ["책상 밑 전선 정리하는 법"]],
   [/멀티탭|콘센트/, ["멀티탭 안전하게 쓰는 법", "자취방 전기요금 아끼는 습관"]],
   [/타이머/, ["자취방 전기요금 아끼는 습관"]],
   // 2026-10-26 생활 상식·겨울 대비·안전·주방 주제
@@ -122,4 +124,35 @@ export async function matchTipTopics(productName: string, category?: string | nu
     .map((i) => TIP_TOPICS[i]);
   if (!topics.length) console.log(`꿀팁 주제: 어울리는 주제 없음 (${r?.reason?.slice(0, 60) ?? "Gemini 응답 없음"})`);
   return { topics, how: topics.length ? `Gemini 선택 - ${r!.reason.slice(0, 60)}` : "없음" };
+}
+
+/**
+ * 꿀팁과 상품이 정말 이어지는지 점수로 본다 (2026-10-27 사장님 "상품이랑 앞부분 내용이랑 너무 상관없는데?" -
+ * 442번 멀티탭 '거치대'에 '멀티탭 안전하게 쓰기' 꿀팁이 붙었다: 이름의 낱말만 같고 쓰임새가 달랐다).
+ * 무료 Gemini 가 "꿀팁 단계 중에 이 물건(같은 종류)을 실제로 쓰는가"를 1~5점으로 매긴다. 4점 이상만 통과.
+ * Gemini 응답이 없으면 규칙으로 고른 주제는 통과(규칙은 사람이 쓴 것), AI 로 고른 주제는 불통과.
+ */
+export async function tipFitsProduct(
+  productName: string,
+  tip: { topic: string; hook: string; steps: { title: string; detail: string }[] },
+  byRule: boolean
+): Promise<{ ok: boolean; score: number | null; reason: string }> {
+  const r = await geminiGenerateJson<{ score: number; reason: string }>({
+    system:
+      "너는 살림 쇼츠 편집자다. 영상 앞부분은 생활 꿀팁, 마지막에 상품 하나가 나온다. " +
+      "시청자가 꿀팁을 다 보고 그 상품을 보면 '아, 이 꿀팁에 쓰는 물건이구나'라고 바로 느끼는지 1~5점으로 매겨라. " +
+      "5: 꿀팁 단계에서 이 물건(같은 종류)을 직접 쓴다. 4: 꿀팁의 문제를 이 물건이 바로 해결한다. " +
+      "3 이하: 낱말만 겹치거나(예: 멀티탭 거치대 ↔ 멀티탭 안전 수칙) 쓰임새가 다르다. 엄격하게 매겨라.",
+    prompt: `상품: ${productName}\n\n꿀팁 주제: ${tip.topic}\n질문: ${tip.hook}\n${tip.steps
+      .map((s, i) => `${i + 1}. ${s.title} - ${s.detail}`)
+      .join("\n")}\n\n점수(1~5)와 짧은 이유.`,
+    schema: {
+      type: "object",
+      properties: { score: { type: "integer" }, reason: { type: "string" } },
+      required: ["score", "reason"],
+    },
+    temperature: 0,
+  });
+  if (!r || !Number.isFinite(r.score)) return { ok: byRule, score: null, reason: "Gemini 응답 없음" };
+  return { ok: r.score >= 4, score: r.score, reason: (r.reason ?? "").slice(0, 80) };
 }
