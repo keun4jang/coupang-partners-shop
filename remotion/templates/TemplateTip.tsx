@@ -5,7 +5,7 @@ import { Narration } from "../components/Narration";
 import { INK, VIDEO } from "../config/videoConfig";
 import { fontFamily, tapeFontFamily } from "../fonts";
 import { CtaScene } from "../components/CtaScene";
-import { splitPhrase } from "../components/phraseBreak";
+import { breakTier, gluedNext, splitPhrase } from "../components/phraseBreak";
 import { Disclosure, type DisclosureMode } from "../components/Disclosure";
 
 /**
@@ -87,7 +87,7 @@ const Shade: React.FC<{ hook?: boolean }> = ({ hook }) => (
   <AbsoluteFill
     style={{
       background: hook
-        ? "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 16%, rgba(10,10,12,0.55) 40%, rgba(10,10,12,0.72) 70%, rgba(10,10,12,0.8) 100%)"
+        ? "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 16%, rgba(10,10,12,0.62) 34%, rgba(10,10,12,0.74) 70%, rgba(10,10,12,0.8) 100%)"
         : "linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.04) 14%, rgba(0,0,0,0.04) 40%, rgba(10,10,12,0.78) 56%, rgba(10,10,12,0.9) 100%)",
     }}
   />
@@ -155,58 +155,77 @@ const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
   );
 };
 
-/** 설명 문장을 나레이션에 맞춰 2~3단어씩 (지금 말하는 단어 노랑). 시점은 글자 수 비율로 어림한다. */
-const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number }> = ({ text, startFrame, endFrame }) => {
-  const frame = useCurrentFrame();
+/**
+ * 설명 문장 자막 - 뜻이 끊기는 자리(쉼표·이어 주는 말끝·조사 뒤)에서 2~3어절(최대 12자)씩 묶어 차례로 (2026-10-28 아트디렉터 재검토).
+ * 한 낱말만 남는 묶음은 앞 묶음에 붙이고, 한 묶음은 최소 14프레임 보인다. 노랑은 묶음 안 가장 긴 낱말(대개 핵심 명사) 하나만.
+ * 시점은 글자 수 비율로 어림한다.
+ */
+export function captionChunks(text: string): string[][] {
   const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length || frame < startFrame) return null;
-  // 단어 묶음: 최대 3단어·12자
-  const chunks: number[][] = [];
-  let cur: number[] = [];
-  let len = 0;
-  words.forEach((w, i) => {
-    if (cur.length && (cur.length >= 3 || len + w.length > 12)) {
+  const chunks: string[][] = [];
+  let cur: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    cur.push(words[i]);
+    const len = cur.join(" ").length;
+    const nextLen = i + 1 < words.length ? len + 1 + words[i + 1].length : 0;
+    const goodBreak = breakTier(words[i], words[i + 1]) > 0 && cur.length >= 2;
+    // 붙어 다니는 말(쌓아 '두면')이 다음이면 한 낱말 더 데려간다 (14자까지)
+    if (i < words.length - 1 && gluedNext(words[i + 1]) && nextLen <= 14) continue;
+    if (i === words.length - 1 || cur.length >= 3 || nextLen > 12 || goodBreak) {
       chunks.push(cur);
       cur = [];
-      len = 0;
-    }
-    cur.push(i);
-    len += w.length;
-  });
-  if (cur.length) chunks.push(cur);
-  const total = words.reduce((a, w) => a + w.length + 1, 0);
-  const p = Math.min(0.999, (frame - startFrame) / Math.max(1, endFrame - startFrame));
-  let acc = 0;
-  let wi = words.length - 1;
-  for (let i = 0; i < words.length; i++) {
-    acc += words[i].length + 1;
-    if (acc / total > p) {
-      wi = i;
-      break;
     }
   }
-  const chunk = chunks.find((c) => c.includes(wi)) ?? chunks[chunks.length - 1];
+  // 한 낱말짜리 묶음은 앞에 붙인다
+  for (let i = chunks.length - 1; i > 0; i--) {
+    if (chunks[i].length === 1) {
+      chunks[i - 1] = [...chunks[i - 1], ...chunks[i]];
+      chunks.splice(i, 1);
+    }
+  }
+  return chunks;
+}
+
+const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number; bottomPx: number }> = ({ text, startFrame, endFrame, bottomPx }) => {
+  const frame = useCurrentFrame();
+  const chunks = captionChunks(text);
+  if (!chunks.length || frame < startFrame) return null;
+  const span = Math.max(1, endFrame - startFrame);
+  const lens = chunks.map((c) => c.join(" ").length);
+  const total = lens.reduce((a, b) => a + b, 0);
+  // 묶음별 시작 프레임 (글자 수 비율, 최소 14프레임)
+  const startsF: number[] = [];
+  let accF = startFrame;
+  for (const l of lens) {
+    startsF.push(accF);
+    accF += Math.max(14, Math.round((l / total) * span));
+  }
+  let ci = 0;
+  for (let i = 0; i < startsF.length; i++) if (frame >= startsF[i]) ci = i;
+  const chunk = chunks[ci];
+  const key = chunk.reduce((best, w) => (w.replace(/[^가-힣A-Za-z0-9]/g, "").length > best.replace(/[^가-힣A-Za-z0-9]/g, "").length ? w : best), chunk[0]);
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: H * 0.36,
-        left: 0,
-        width: "100%",
-        textAlign: "center",
-        fontFamily,
-        fontWeight: 900,
-        fontSize: 68,
-        letterSpacing: "-0.02em",
-        color: "#FFFFFF",
-        textShadow: "0 3px 0 rgba(0,0,0,0.35), 0 6px 22px rgba(0,0,0,0.6)",
-      }}
-    >
-      {chunk.map((i) => (
-        <span key={i} style={{ color: i === wi ? HILITE : "#FFFFFF" }}>
-          {words[i]}{" "}
-        </span>
-      ))}
+    <div style={{ position: "absolute", bottom: bottomPx, left: 0, width: "100%", height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent, rgba(0,0,0,.45) 30%, rgba(0,0,0,.45) 70%, transparent)" }} />
+      <div
+        style={{
+          position: "relative",
+          textAlign: "center",
+          fontFamily,
+          fontWeight: 900,
+          fontSize: 68,
+          letterSpacing: "-0.02em",
+          color: "#FFFFFF",
+          textShadow: "0 3px 0 rgba(0,0,0,0.35), 0 6px 22px rgba(0,0,0,0.6)",
+        }}
+      >
+        {chunk.map((w, i) => (
+          <span key={i} style={{ color: w === key ? HILITE : "#FFFFFF" }}>
+            {w}
+            {i < chunk.length - 1 ? " " : ""}
+          </span>
+        ))}
+      </div>
     </div>
   );
 };
@@ -220,7 +239,8 @@ const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n
   const detailStart = Math.round(segFrames * titleShare * 0.9);
   return (
     <AbsoluteFill>
-      <WordCaption text={step.detail} startFrame={detailStart} endFrame={segFrames - 12} />
+      {/* 자막은 카드 바로 위(28px)에 붙여 한 덩어리로 */}
+      <WordCaption text={step.detail} startFrame={detailStart} endFrame={segFrames - 12} bottomPx={Math.round(H - H * 0.53 + 28)} />
       <div
         style={{
           position: "absolute",
@@ -229,7 +249,7 @@ const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n
           width: width * 0.88,
           background: INK.paper,
           borderRadius: 10,
-          padding: "70px 52px 54px",
+          padding: "40px 56px",
           boxShadow: "0 24px 50px rgba(0,0,0,0.4)",
           transform: `translateY(${(1 - rise) * 80}px)`,
           opacity: Math.min(1, rise * 2),
@@ -238,7 +258,7 @@ const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n
         <div
           style={{
             position: "absolute",
-            top: -40,
+            top: -36,
             left: 40,
             transform: "rotate(-4deg)",
             background: INK.tape,
@@ -253,7 +273,7 @@ const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n
         >
           {n}
         </div>
-        <div style={{ color: INK.ink, fontFamily: tapeFontFamily, fontSize: 84, lineHeight: 1.22, wordBreak: "keep-all", textWrap: "balance" }}>
+        <div style={{ color: INK.ink, fontFamily: tapeFontFamily, fontSize: 84, lineHeight: 1.22, paddingTop: 48, wordBreak: "keep-all", textWrap: "balance" }}>
           {step.title}
         </div>
       </div>
@@ -267,7 +287,7 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
   const { fps, width } = useVideoConfig();
   return (
     <AbsoluteFill>
-      <div style={{ position: "absolute", top: H * 0.44, width: "100%", textAlign: "center", color: HILITE, fontFamily: tapeFontFamily, fontSize: 60, textShadow: "0 3px 16px rgba(0,0,0,0.5)" }}>
+      <div style={{ position: "absolute", top: H * 0.425, width: "100%", textAlign: "center", color: HILITE, fontFamily: tapeFontFamily, fontSize: 76, textShadow: "0 3px 16px rgba(0,0,0,0.5)" }}>
         정리
       </div>
       <div style={{ position: "absolute", top: H * 0.51, left: width * 0.06, width: width * 0.88, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -304,8 +324,8 @@ const ProgressBar: React.FC = () => {
   const frame = useCurrentFrame();
   const { durationInFrames, width } = useVideoConfig();
   return (
-    <div style={{ position: "absolute", top: H * 0.13, left: width * 0.06, width: width * 0.88, height: 10, borderRadius: 5, background: "rgba(255,255,255,0.28)" }}>
-      <div style={{ width: `${Math.min(100, (frame / durationInFrames) * 100)}%`, height: "100%", borderRadius: 5, background: HILITE }} />
+    <div style={{ position: "absolute", top: H * 0.13, left: width * 0.06, width: width * 0.88, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.18)" }}>
+      <div style={{ width: `${Math.min(100, (frame / durationInFrames) * 100)}%`, height: "100%", borderRadius: 3, background: HILITE }} />
     </div>
   );
 };

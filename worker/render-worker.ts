@@ -1746,8 +1746,9 @@ async function renderTipProductVideo(
   // 마지막 상품 소개: "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님 "상품이 띡 나오기보다 어떤 분한테 필요한 상품인지").
   // 상품 문구 만들 때 같이 만든 '누구에게' 줄(hook_text 첫 줄, 정책 검사 거침)을 쓴다. 없으면 예전 문장.
   const heading = tipProductHeading(item.hook_text);
-  const ctaText = heading ? `${n}번에 정리해 뒀어요` : `관련 물건은 ${n}번에 정리해 뒀어요`;
-  const ctaSpoken = heading ? `${heading}, ${ctaText}` : ctaText;
+  // 화면 안내 한 줄(사진 아래) - 번호를 어디서 찾는지 (2026-10-28 아트디렉터: 번호만 있으면 무슨 뜻인지 모른다)
+  const ctaText = `프로필 링크에서 ${n}번`;
+  const ctaSpoken = heading ? `${heading}, 프로필 링크에서 ${n}번이에요` : `관련 물건은 프로필 링크에서 ${n}번이에요`;
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
 
   const clips = tip.stockQueries.length

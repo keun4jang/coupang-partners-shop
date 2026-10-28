@@ -48,6 +48,91 @@ export const CtaScene: React.FC<{
     config: { damping: MOTION.springDamping },
   });
 
+  // 꿀팁 영상 마무리 큰 판 (2026-10-28 아트디렉터 재검토): 제목 y27% · 사진 560px y32~61% · 번호는 사진 모서리 밖 · y65% 안내 한 줄
+  if (large) {
+    const H = 1920;
+    return (
+      <AbsoluteFill style={{ background: INK.scrim, fontFamily }}>
+        {heading && (
+          <div
+            style={{
+              position: "absolute",
+              top: H * 0.235,
+              width: "100%",
+              textAlign: "center",
+              color: "#FFFFFF",
+              fontWeight: 800,
+              fontSize: 54,
+              letterSpacing: "-0.02em",
+              wordBreak: "keep-all",
+              textShadow: "0 3px 0 rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.45)",
+              opacity: Math.min(1, pop * 1.5),
+            }}
+          >
+            {heading}
+          </div>
+        )}
+        <div
+          style={{
+            position: "absolute",
+            top: H * 0.32,
+            left: (1080 - 560) / 2,
+            width: 560,
+            height: 560,
+            background: INK.photoBg,
+            borderRadius: 6,
+            boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+            transform: `translateY(${(1 - pop) * 50}px)`,
+            opacity: Math.min(1, pop * 1.6),
+          }}
+        >
+          {productImageUrl && !imageFailed && (
+            <Img
+              src={productImageUrl}
+              style={{ width: "100%", height: "100%", objectFit: "contain", mixBlendMode: "multiply" }}
+              onError={() => setImageFailed(true)}
+            />
+          )}
+          <div
+            style={{
+              position: "absolute",
+              left: -48,
+              top: -78,
+              transform: `rotate(-4deg) scale(${0.85 + pop * 0.15})`,
+              background: INK.tape,
+              color: "#FFFFFF",
+              fontFamily: tapeFontFamily,
+              fontSize: 120,
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+              padding: "16px 28px 10px",
+              borderRadius: 4,
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 0 rgba(0,0,0,0.22)",
+            }}
+          >
+            {displayNumber}
+            <span style={{ fontSize: "0.46em", marginLeft: "0.08em", opacity: 0.85 }}>번</span>
+          </div>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            top: H * 0.645,
+            width: "100%",
+            textAlign: "center",
+            color: "#FFD84D",
+            fontFamily: tapeFontFamily,
+            fontSize: 48,
+            textShadow: "0 3px 14px rgba(0,0,0,0.5)",
+            opacity: textIn,
+          }}
+        >
+          {ctaText ?? ctaTemplate(displayNumber)}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
   // 2026-10-19 개편: 살구색 동그라미 + 앱 아이콘 같은 타일 → 회색 사진 칸 위 남색 번호 라벨 테이프 (사이트와 같은 한 벌)
   return (
     <AbsoluteFill

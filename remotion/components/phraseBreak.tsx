@@ -16,6 +16,18 @@ const ADNOMINAL = /(되|하|있|없|닿|받|오|가|보|나|들|드|쓰|사|넣|
 /** "빨고 나면", "해 보세요"처럼 붙어 다니는 말은 가르지 않는다 */
 const GLUED_NEXT = /^(나면|나서|나니|있|싶|보|두|줘|주|봐)/;
 
+/** 이 낱말 뒤에서 끊어도 되는가 (자막 묶음용) - 0 이면 안 됨, 숫자가 작을수록 좋은 자리 */
+/** 다음 낱말이 앞말에 붙어 다니는 말인가 (쌓아 두면, 해 보세요) */
+export function gluedNext(next?: string): boolean {
+  return !!next && GLUED_NEXT.test(next);
+}
+
+export function breakTier(word: string, next?: string): number {
+  const tier = PUNCT.test(word) ? 1 : CONNECTIVE.test(word) ? 2 : TOPIC.test(word) && !ADNOMINAL.test(word) ? 3 : PARTICLE.test(word) ? 4 : 0;
+  if (tier === 2 && next && GLUED_NEXT.test(next)) return 0;
+  return tier;
+}
+
 export function splitPhrase(text: string): [string, string] | null {
   const t = text.trim();
   if (t.length < 14) return null;
