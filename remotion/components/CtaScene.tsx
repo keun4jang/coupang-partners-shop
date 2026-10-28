@@ -30,7 +30,9 @@ export const CtaScene: React.FC<{
   productImageUrl?: string | null;
   /** 사진 위 소개 줄 - "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님: 상품이 띡 나오기보다 어떤 분께 필요한 물건인지) */
   heading?: string | null;
-}> = ({ displayNumber, ctaText, productImageUrl, heading }) => {
+  /** 꿀팁 영상 마무리용 큰 판 (2026-10-28 아트디렉터): 사진 크게, 번호 크게 한 번만, 아래 문장 없음 */
+  large?: boolean;
+}> = ({ displayNumber, ctaText, productImageUrl, heading, large }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -80,8 +82,8 @@ export const CtaScene: React.FC<{
       <div
         style={{
           position: "relative",
-          width: 420,
-          height: 420,
+          width: large ? 640 : 420,
+          height: large ? 640 : 420,
           background: INK.photoBg,
           borderRadius: 4,
           boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
@@ -106,7 +108,7 @@ export const CtaScene: React.FC<{
             background: INK.tape,
             color: "#FFFFFF",
             fontFamily: tapeFontFamily,
-            fontSize: Math.round(ctaNumberFontSize(displayNumber) * 0.8),
+            fontSize: large ? 150 : Math.round(ctaNumberFontSize(displayNumber) * 0.8),
             lineHeight: 1,
             letterSpacing: "0.04em",
             whiteSpace: "nowrap",
@@ -120,8 +122,8 @@ export const CtaScene: React.FC<{
         </div>
       </div>
 
-      {/* 나레이션과 동일한 문장 한 줄 */}
-      <div
+      {/* 나레이션과 동일한 문장 한 줄 (큰 판에서는 번호와 겹치는 말이라 뺀다) */}
+      {!large && <div
         style={{
           marginTop: 64,
           width: "84%",
@@ -138,7 +140,7 @@ export const CtaScene: React.FC<{
         }}
       >
         {ctaText ?? ctaTemplate(displayNumber)}
-      </div>
+      </div>}
     </AbsoluteFill>
   );
 };

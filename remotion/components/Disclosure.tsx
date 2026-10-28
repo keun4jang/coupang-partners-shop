@@ -49,7 +49,8 @@ export function withDisclosureText<P extends { disclosureText?: string | null; d
 }
 
 /** 하단 대가성 문구 - 영상 내내 작게 표시 (하단 데드존 위에 배치) */
-export const Disclosure: React.FC = () => {
+/** bottomPx: 아래에서 띄울 높이(px). 없으면 LAYOUT.disclosureBottom (꿀팁 영상은 2026-10-28 아트디렉터 의견으로 조금 더 위) */
+export const Disclosure: React.FC<{ bottomPx?: number }> = ({ bottomPx }) => {
   const text = useDisclosureText();
   const visible = useDisclosureVisible();
   const mode = useContext(DisclosureModeContext);
@@ -60,7 +61,7 @@ export const Disclosure: React.FC = () => {
     <div
       style={{
         position: "absolute",
-        bottom: LAYOUT.disclosureBottom,
+        bottom: bottomPx ?? LAYOUT.disclosureBottom,
         left: 0,
         width: "100%",
         display: "flex",
