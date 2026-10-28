@@ -89,6 +89,15 @@ import { selectProductsForVideos } from "../src/lib/productSelector";
 const TIP_OPENER = "오늘의 살림 꿀팁";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
 const TIP_ORIGIN_TAG = "꿀팁:";
+/** 첫 나레이션: 여는 말 + 실수형 첫 문장 + 숫자 예고 (2026-10-28 후킹 개편 - "딱 세 가지만 기억하세요") */
+function tipOpeningLine(tip: { hook: string; steps: unknown[] }): string {
+  const n = ["영", "한", "두", "세", "네", "다섯"][tip.steps.length] ?? String(tip.steps.length);
+  return `${TIP_OPENER}. ${tip.hook}. 딱 ${n} 가지만 기억하세요`;
+}
+/** 마무리 나레이션: 요약 (화면 Recap 과 같은 내용) */
+function tipRecapLine(tip: { steps: { title: string }[] }): string {
+  return `정리하면, ${tip.steps.map((s) => s.title).join(", ")}`;
+}
 /** "캠핑 자주 가는 분께" → "캠핑 자주 가는 분께 필요한 물건" (누구에게 줄이 없거나 "~께"로 안 끝나면 null) */
 function tipProductHeading(hookText: string | null | undefined): string | null {
   const who = unpackHookText(hookText).forWho;
@@ -1748,7 +1757,7 @@ async function renderTipProductVideo(
   // 없는 파일이 섞이면 렌더가 통째로 멈춘다)
   const brollFiles = existingBrollFiles(clips.map((c) => c.file));
   if (brollFiles.length) cachedBundle = null;
-  const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro, ctaSpoken];
+  const lines = [tipOpeningLine(tip), ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tipRecapLine(tip), ctaSpoken];
   const narr = await generateNarration(lines);
   const segments = lines.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;
@@ -1842,7 +1851,7 @@ async function runTipDemo(): Promise<void> {
     : [];
   const brollFiles = clips.map((c) => c.file);
 
-  const lines = [`${TIP_OPENER}. ${tip.hook}`, ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tip.outro];
+  const lines = [tipOpeningLine(tip), ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tipRecapLine(tip)];
   const narr = await generateNarration(lines);
   const segments = lines.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;

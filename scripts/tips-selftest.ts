@@ -4,7 +4,7 @@
  */
 import { TIP_TOPICS, checkTipSafety, pickTopic, topicsFor } from "../src/lib/tips";
 import { findPolicyIssues } from "../src/lib/policy";
-import { TIP_SCRIPTS } from "../src/lib/tipScripts";
+import { TIP_SCRIPTS, TIP_HOOKS, reviewedTip } from "../src/lib/tipScripts";
 import { matchTipTopicByRule, matchTipTopicsByRule } from "../src/lib/tipMatch";
 import { OWN_PRODUCTS } from "../src/lib/ownProducts";
 
@@ -79,5 +79,14 @@ for (const o of OWN_PRODUCTS) {
   check(`근사장 상품 꿀팁 후보 ${n}개 - ${o.name.slice(0, 24)}`, n >= 1);
 }
 check("타프류는 후보 2개 이상", matchTipTopicsByRule("해먹 모기장 타프 세트").length >= 2);
+// 후킹 첫 문장 (2026-10-28): 모든 주제에 있고, 안전 검사·길이(34자) 통과
+for (const t of TIP_SCRIPTS) {
+  const h = TIP_HOOKS[t.topic];
+  if (!h) { check(`후킹 첫 문장 있음 - ${t.topic}`, false); continue; }
+  const r = reviewedTip(t.topic)!;
+  const iss = checkTipSafety(r);
+  if (iss.length) check(`후킹 첫 문장 ${t.topic}: ${iss.join(", ")}`, false);
+}
+check(`후킹 첫 문장 ${Object.keys(TIP_HOOKS).length}개 = 주제 ${TIP_SCRIPTS.length}개`, Object.keys(TIP_HOOKS).length === TIP_SCRIPTS.length);
 console.log(fail ? `❌ ${fail}건 실패` : "✅ 전부 통과");
 process.exit(fail ? 1 : 0);

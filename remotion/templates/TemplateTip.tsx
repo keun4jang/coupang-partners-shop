@@ -1,11 +1,11 @@
 import React from "react";
-import { AbsoluteFill, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Background } from "../components/Background";
 import { Narration } from "../components/Narration";
 import { INK, VIDEO } from "../config/videoConfig";
 import { fontFamily, tapeFontFamily } from "../fonts";
 import { CtaScene } from "../components/CtaScene";
-import { PhraseLines } from "../components/phraseBreak";
+import { PhraseLines, splitPhrase } from "../components/phraseBreak";
 import { Disclosure, type DisclosureMode } from "../components/Disclosure";
 
 /**
@@ -99,34 +99,73 @@ const Label: React.FC<{ text: string; gap: number }> = ({ text, gap }) => (
   </div>
 );
 
-const Hook: React.FC<{ text: string; topic: string }> = ({ text, topic }) => {
+/** 숫자를 우리말로 (딱 세 가지) */
+export function countWord(n: number): string {
+  return ["영", "한", "두", "세", "네", "다섯"][n] ?? String(n);
+}
+
+/** 강조 노랑 - 첫 화면 핵심 구절 (2026-10-28 후킹 개편) */
+const HILITE = "#FFD84D";
+
+/**
+ * 첫 화면 (2026-10-28 사장님 "재미없다, 다시 보고 싶게, 릴스 후킹 법칙 접목"):
+ * - 첫 프레임부터 글자가 보인다 (예전엔 0프레임 투명 → 피드에서 빈 화면으로 넘겨졌다). 크게 들어왔다가 제자리로(펀치).
+ * - 문장 앞 구절을 노랗게 - 눈이 바로 꽂히는 곳.
+ * - "딱 세 가지" 숫자 예고 - 무엇을 얻을지 알면 끝까지 본다.
+ */
+const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const pop = spring({ frame, fps, config: { damping: 16 } });
+  const punch = spring({ frame, fps, config: { damping: 11, stiffness: 180 } });
+  const badge = spring({ frame: frame - 10, fps, config: { damping: 12 } });
+  const parts = splitPhrase(text);
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
-      {/* 첫 화면은 "오늘의 살림 꿀팁"으로 연다 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을 해야") - 나레이션도 같은 말로 시작 */}
+      {/* 첫 화면은 "오늘의 살림 꿀팁"으로 연다 (2026-10-22 사장님) - 나레이션도 같은 말로 시작 */}
       <Label text="오늘의 살림 꿀팁" gap={44} />
       <div
         style={{
-          width: "84%",
+          width: "86%",
           textAlign: "center",
           color: "#FFFFFF",
           fontFamily,
           fontWeight: 900,
-          fontSize: 82,
-          lineHeight: 1.26,
+          fontSize: 88,
+          lineHeight: 1.24,
           letterSpacing: "-0.02em",
           wordBreak: "keep-all",
           textWrap: "balance",
-          textShadow: "0 3px 0 rgba(0,0,0,0.28), 0 8px 26px rgba(0,0,0,0.45)",
-          WebkitTextStroke: "2px rgba(0,0,0,0.55)",
+          textShadow: "0 3px 0 rgba(0,0,0,0.3), 0 8px 26px rgba(0,0,0,0.5)",
+          WebkitTextStroke: "2px rgba(0,0,0,0.6)",
           paintOrder: "stroke fill" as const,
-          transform: `translateY(${(1 - pop) * 40}px)`,
-          opacity: Math.min(1, pop * 1.5),
+          transform: `scale(${1.18 - 0.18 * punch})`,
         }}
       >
-        <PhraseLines text={text} />
+        {parts ? (
+          <>
+            <span style={{ display: "inline-block", color: HILITE }}>{parts[0]}</span>
+            <br />
+            <span style={{ display: "inline-block" }}>{parts[1]}</span>
+          </>
+        ) : (
+          <span style={{ color: HILITE }}>{text}</span>
+        )}
+      </div>
+      <div
+        style={{
+          marginTop: 46,
+          background: "#FFFFFF",
+          color: INK.ink,
+          fontFamily,
+          fontWeight: 900,
+          fontSize: 46,
+          padding: "10px 28px",
+          borderRadius: 999,
+          transform: `scale(${Math.max(0, badge)})`,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+        }}
+      >
+        딱 {countWord(count)} 가지
       </div>
     </AbsoluteFill>
   );
@@ -135,7 +174,9 @@ const Hook: React.FC<{ text: string; topic: string }> = ({ text, topic }) => {
 const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: string }> = ({ n, total, step, topic }) => {
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
-  const rise = spring({ frame, fps, config: { damping: 18 } });
+  // 장면이 바뀔 때마다 눈에 띄는 변화(패턴 전환): 카드가 살짝 크게 튀어 들어오고 화면이 한 번 번쩍 (2026-10-28)
+  const rise = spring({ frame, fps, config: { damping: 13, stiffness: 160 } });
+  const flash = interpolate(frame, [0, 5], [0.35, 0], { extrapolateRight: "clamp" });
   const cardW = width * 0.88;
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
@@ -149,8 +190,8 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
           borderRadius: 8,
           padding: "100px 50px 60px",
           boxShadow: "0 24px 50px rgba(0,0,0,0.35)",
-          transform: `translateY(${(1 - rise) * 90}px)`,
-          opacity: Math.min(1, rise * 1.6),
+          transform: `translateY(${(1 - rise) * 70}px) scale(${1.08 - 0.08 * rise})`,
+          opacity: Math.min(1, rise * 2),
           fontFamily,
         }}
       >
@@ -203,48 +244,78 @@ const StepCard: React.FC<{ n: number; total: number; step: TipStep; topic: strin
           <PhraseLines text={step.detail} />
         </div>
       </div>
+      <AbsoluteFill style={{ background: "#FFFFFF", opacity: flash, pointerEvents: "none" }} />
     </AbsoluteFill>
   );
 };
 
-const Outro: React.FC<{ text: string }> = ({ text }) => {
+/**
+ * 마무리 요약 (2026-10-28 후킹 개편): 세 단계를 한 화면에 다시 모아 보여 준다 - 저장·다시 보기를 부르는 장면.
+ * 나레이션도 "정리하면, ①, ②, ③".
+ */
+const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const pop = spring({ frame, fps, config: { damping: 16 } });
+  const { fps, width } = useVideoConfig();
   return (
-    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", fontFamily }}>
-      <div
-        style={{
-          width: "82%",
-          textAlign: "center",
-          color: "#FFFFFF",
-          fontWeight: 800,
-          fontSize: 64,
-          lineHeight: 1.36,
-          wordBreak: "keep-all",
-          textWrap: "balance",
-          textShadow: "0 3px 0 rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.45)",
-          opacity: Math.min(1, pop * 1.5),
-          transform: `translateY(${(1 - pop) * 30}px)`,
-        }}
-      >
-        <PhraseLines text={text} />
-      </div>
-      <div
-        style={{
-          marginTop: 48,
-          color: "rgba(255,255,255,0.85)",
-          fontFamily: tapeFontFamily,
-          fontSize: 50,
-          letterSpacing: "0.04em",
-          opacity: pop,
-        }}
-      >
-        살림템 메모장
+    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column", fontFamily }}>
+      <Label text="정리" gap={40} />
+      <div style={{ width: width * 0.86, display: "flex", flexDirection: "column", gap: 22 }}>
+        {steps.map((st, i) => {
+          const k = spring({ frame: frame - i * 6, fps, config: { damping: 14 } });
+          return (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 22,
+                background: INK.paper,
+                borderRadius: 8,
+                padding: "22px 28px",
+                boxShadow: "0 12px 30px rgba(0,0,0,0.3)",
+                transform: `translateX(${(1 - k) * 80}px)`,
+                opacity: Math.min(1, k * 2),
+              }}
+            >
+              <span
+                style={{
+                  background: INK.tape,
+                  color: "#FFFFFF",
+                  fontFamily: tapeFontFamily,
+                  fontSize: 50,
+                  lineHeight: 1,
+                  padding: "10px 18px 6px",
+                  borderRadius: 3,
+                }}
+              >
+                {i + 1}
+              </span>
+              <span style={{ color: INK.ink, fontWeight: 900, fontSize: 56, letterSpacing: "-0.02em", wordBreak: "keep-all" }}>
+                {st.title}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </AbsoluteFill>
   );
 };
+
+/** 맨 위 진행 막대 - 얼마나 남았는지 보이면 끝까지 본다 (2026-10-28) */
+const ProgressBar: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { durationInFrames, width } = useVideoConfig();
+  return (
+    <div style={{ position: "absolute", top: 118, left: width * 0.07, width: width * 0.86, height: 10, borderRadius: 5, background: "rgba(255,255,255,0.25)" }}>
+      <div style={{ width: `${Math.min(100, (frame / durationInFrames) * 100)}%`, height: "100%", borderRadius: 5, background: HILITE }} />
+    </div>
+  );
+};
+
+/** 장면 전환 효과음 (ffmpeg 로 직접 만든 소리 - public/sfx, 저작권 없음) */
+const Sfx: React.FC<{ name: "pop" | "whoosh"; volume?: number }> = ({ name, volume = 0.35 }) => (
+  <Audio src={staticFile(`sfx/${name}.mp3`)} volume={volume} />
+);
 
 export const TemplateTip: React.FC<TipProps> = (props) => {
   const seg = tipSegments(props);
@@ -270,7 +341,8 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
       {/* 훅: 배경을 살짝만 어둡게 */}
       <Sequence durationInFrames={f(seg[0])}>
         <Dim strength={0.45} />
-        <Hook text={props.hook} topic={props.topic} />
+        <Hook text={props.hook} count={props.steps.length} />
+        <Sfx name="pop" />
         <Narration src={props.narration?.[0]} />
       </Sequence>
       {/* 단계 카드: 배경을 흐리고 어둡게 - 카드에 집중 */}
@@ -278,12 +350,14 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
         <Sequence key={i} from={f(starts[i + 1])} durationInFrames={f(seg[i + 1])}>
           <Dim strength={1} />
           <StepCard n={i + 1} total={props.steps.length} step={st} topic={props.topic} />
+          <Sfx name="whoosh" volume={0.3} />
           <Narration src={props.narration?.[i + 1]} />
         </Sequence>
       ))}
       <Sequence from={f(starts[outroIdx])} durationInFrames={f(seg[outroIdx])}>
         <Dim strength={0.8} />
-        <Outro text={props.outro} />
+        <Recap steps={props.steps} />
+        <Sfx name="whoosh" volume={0.3} />
         <Narration src={props.narration?.[outroIdx]} />
       </Sequence>
       {/* 상품 마무리: 사진 + 번호만 짧게 */}
@@ -298,6 +372,7 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
           <Narration src={props.narration?.[productIdx]} />
         </Sequence>
       )}
+      <ProgressBar />
       {props.product && <Disclosure />}
     </AbsoluteFill>
   );
