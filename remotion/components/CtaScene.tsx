@@ -8,6 +8,7 @@ import {
 } from "remotion";
 import {
   INK,
+  MEMO,
   MOTION,
   ctaNumberFontSize,
   ctaTemplate,
@@ -52,7 +53,7 @@ export const CtaScene: React.FC<{
   if (large) {
     const H = 1920;
     return (
-      <AbsoluteFill style={{ background: INK.scrim, fontFamily }}>
+      <AbsoluteFill style={{ background: MEMO.scrim, fontFamily }}>
         {heading && (
           <div
             style={{
@@ -60,12 +61,12 @@ export const CtaScene: React.FC<{
               top: H * 0.235,
               width: "100%",
               textAlign: "center",
-              color: "#FFFFFF",
+              color: MEMO.onVideo,
               fontWeight: 800,
               fontSize: 54,
               letterSpacing: "-0.02em",
               wordBreak: "keep-all",
-              textShadow: "0 3px 0 rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.45)",
+              textShadow: MEMO.textShadow,
               opacity: Math.min(1, pop * 1.5),
             }}
           >
@@ -79,9 +80,9 @@ export const CtaScene: React.FC<{
             left: (1080 - 560) / 2,
             width: 560,
             height: 560,
-            background: INK.photoBg,
+            background: MEMO.photoBg,
             borderRadius: 6,
-            boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+            boxShadow: "0 24px 60px rgba(20,17,14,0.45)",
             transform: `translateY(${(1 - pop) * 50}px)`,
             opacity: Math.min(1, pop * 1.6),
           }}
@@ -99,15 +100,15 @@ export const CtaScene: React.FC<{
               left: -48,
               top: -78,
               transform: `rotate(-4deg) scale(${0.85 + pop * 0.15})`,
-              background: INK.tape,
-              color: "#FFFFFF",
+              background: MEMO.ink,
+              color: MEMO.paper,
               fontFamily: tapeFontFamily,
               fontSize: 120,
               lineHeight: 1,
               whiteSpace: "nowrap",
               padding: "16px 28px 10px",
               borderRadius: 4,
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 0 rgba(0,0,0,0.22)",
+              boxShadow: "0 6px 0 rgba(20,17,14,0.25)",
             }}
           >
             {displayNumber}
@@ -120,14 +121,15 @@ export const CtaScene: React.FC<{
             top: H * 0.645,
             width: "100%",
             textAlign: "center",
-            color: "#FFD84D",
             fontFamily: tapeFontFamily,
             fontSize: 48,
-            textShadow: "0 3px 14px rgba(0,0,0,0.5)",
             opacity: textIn,
           }}
         >
-          {ctaText ?? ctaTemplate(displayNumber)}
+          {/* 첫 장면과 같은 형광펜 장치로 처음과 끝을 잇는다 (아트디렉터 색 규칙: 강조색은 바탕으로) */}
+          <span style={{ color: MEMO.ink, background: MEMO.accent, padding: "6px 18px", borderRadius: 6 }}>
+            {ctaText ?? ctaTemplate(displayNumber)}
+          </span>
         </div>
       </AbsoluteFill>
     );

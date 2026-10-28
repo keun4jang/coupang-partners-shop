@@ -144,6 +144,22 @@ export const INK = {
   scrim: "rgba(16, 17, 20, 0.78)",
 } as const;
 
+/**
+ * 꿀팁 영상 '메모지' 색 (2026-10-28 사장님 "색깔들이 서로 어울리지 않는다" → 아트디렉터 재작업):
+ * 남색 띠 + 레몬 노랑이 정반대 색이라 판촉물 같았다 → 따뜻한 종이 + 먹색 두 가지에 강조 노랑 하나만.
+ * 규칙: 강조색은 한 화면 1곳·영상 전체 3용도(첫 장면 형광펜·자막 핵심어·진행 막대)까지, 글자색이 아니라 형광펜(바탕)으로.
+ * 흰색·검정은 같은 따뜻한 온도로(순수 #FFFFFF·#000000 쓰지 않음).
+ */
+export const MEMO = {
+  paper: "#FBF7EE",
+  ink: "#24211C",
+  accent: "#F5C842",
+  photoBg: "#F4F0E8",
+  scrim: "rgba(28, 24, 20, 0.78)",
+  onVideo: "#FFFDF8",
+  textShadow: "0 2px 14px rgba(20, 17, 14, 0.65)",
+} as const;
+
 /** 베이지/살구톤 팔레트 (사이트와 톤 일치) */
 export const COLORS = {
   cream: PALETTE.ivory,

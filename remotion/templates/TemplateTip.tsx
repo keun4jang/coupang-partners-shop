@@ -2,7 +2,7 @@ import React from "react";
 import { AbsoluteFill, Audio, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Background } from "../components/Background";
 import { Narration } from "../components/Narration";
-import { INK, VIDEO } from "../config/videoConfig";
+import { MEMO as INK, VIDEO } from "../config/videoConfig";
 import { fontFamily, tapeFontFamily } from "../fonts";
 import { CtaScene } from "../components/CtaScene";
 import { breakTier, gluedNext, splitPhrase } from "../components/phraseBreak";
@@ -71,7 +71,7 @@ export function countWord(n: number): string {
 }
 
 /** 강조 노랑 */
-const HILITE = "#FFD84D";
+const HILITE = INK.accent;
 const H = VIDEO.height;
 
 /**
@@ -87,8 +87,8 @@ const Shade: React.FC<{ hook?: boolean }> = ({ hook }) => (
   <AbsoluteFill
     style={{
       background: hook
-        ? "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 16%, rgba(10,10,12,0.62) 34%, rgba(10,10,12,0.74) 70%, rgba(10,10,12,0.8) 100%)"
-        : "linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.04) 14%, rgba(0,0,0,0.04) 40%, rgba(10,10,12,0.78) 56%, rgba(10,10,12,0.9) 100%)",
+        ? "linear-gradient(180deg, rgba(20,17,14,0.35) 0%, rgba(20,17,14,0.15) 16%, rgba(20,17,14,0.62) 34%, rgba(20,17,14,0.76) 70%, rgba(20,17,14,0.84) 100%)"
+        : "linear-gradient(180deg, rgba(20,17,14,0.3) 0%, rgba(20,17,14,0.04) 14%, rgba(20,17,14,0.04) 40%, rgba(20,17,14,0.78) 56%, rgba(20,17,14,0.88) 100%)",
     }}
   />
 );
@@ -122,19 +122,19 @@ const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
   const parts = splitPhrase(text);
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: H * 0.3 }}>
-      <div style={{ color: "rgba(255,255,255,0.85)", fontFamily, fontWeight: 700, fontSize: 40, letterSpacing: "0.08em", marginBottom: 36 }}>
+      <div style={{ color: "rgba(255,253,248,0.85)", fontFamily, fontWeight: 700, fontSize: 40, letterSpacing: "0.08em", marginBottom: 36 }}>
         오늘의 살림 꿀팁
       </div>
       <div
         style={{
           width: "88%",
           textAlign: "center",
-          color: "#FFFFFF",
+          color: INK.onVideo,
           fontFamily: tapeFontFamily,
           fontSize: 92,
           lineHeight: 1.3,
           wordBreak: "keep-all",
-          textShadow: "0 4px 24px rgba(0,0,0,0.5)",
+          textShadow: INK.textShadow,
           transform: `scale(${1.1 - 0.1 * punch})`,
         }}
       >
@@ -148,7 +148,7 @@ const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
           <Marker text={text} progress={mark} />
         )}
       </div>
-      <div style={{ marginTop: 44, color: HILITE, fontFamily: tapeFontFamily, fontSize: 54, textShadow: "0 3px 16px rgba(0,0,0,0.5)" }}>
+      <div style={{ marginTop: 44, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 54, textShadow: INK.textShadow }}>
         딱 {countWord(count)} 가지
       </div>
     </AbsoluteFill>
@@ -206,7 +206,7 @@ const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number
   const key = chunk.reduce((best, w) => (w.replace(/[^가-힣A-Za-z0-9]/g, "").length > best.replace(/[^가-힣A-Za-z0-9]/g, "").length ? w : best), chunk[0]);
   return (
     <div style={{ position: "absolute", bottom: bottomPx, left: 0, width: "100%", height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent, rgba(0,0,0,.45) 30%, rgba(0,0,0,.45) 70%, transparent)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent, rgba(20,17,14,.45) 30%, rgba(20,17,14,.45) 70%, transparent)" }} />
       <div
         style={{
           position: "relative",
@@ -215,12 +215,19 @@ const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number
           fontWeight: 900,
           fontSize: 68,
           letterSpacing: "-0.02em",
-          color: "#FFFFFF",
-          textShadow: "0 3px 0 rgba(0,0,0,0.35), 0 6px 22px rgba(0,0,0,0.6)",
+          color: INK.onVideo,
+          textShadow: INK.textShadow,
         }}
       >
         {chunk.map((w, i) => (
-          <span key={i} style={{ color: w === key ? HILITE : "#FFFFFF" }}>
+          <span
+            key={i}
+            style={
+              w === key
+                ? { color: INK.ink, background: HILITE, padding: "0 10px", borderRadius: 6, textShadow: "none" }
+                : { color: INK.onVideo }
+            }
+          >
             {w}
             {i < chunk.length - 1 ? " " : ""}
           </span>
@@ -249,32 +256,32 @@ const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n
           width: width * 0.88,
           background: INK.paper,
           borderRadius: 10,
-          padding: "40px 56px",
-          boxShadow: "0 24px 50px rgba(0,0,0,0.4)",
+          padding: "40px 48px",
+          boxShadow: "0 24px 50px rgba(20,17,14,0.4)",
           transform: `translateY(${(1 - rise) * 80}px)`,
           opacity: Math.min(1, rise * 2),
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: -36,
-            left: 40,
-            transform: "rotate(-4deg)",
-            background: INK.tape,
-            color: "#FFFFFF",
-            fontFamily: tapeFontFamily,
-            fontSize: 88,
-            lineHeight: 1,
-            padding: "16px 30px 10px",
-            borderRadius: 3,
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 5px 0 rgba(0,0,0,0.22)",
-          }}
-        >
-          {n}
-        </div>
-        <div style={{ color: INK.ink, fontFamily: tapeFontFamily, fontSize: 84, lineHeight: 1.22, paddingTop: 48, wordBreak: "keep-all", textWrap: "balance" }}>
-          {step.title}
+        {/* 번호는 카드 안쪽 제목 왼쪽에 (먹색 띠가 어두운 배경 위로 튀어나오면 묻힌다 - 정리 화면과 같은 모양) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
+          <span
+            style={{
+              flex: "0 0 auto",
+              background: INK.ink,
+              color: INK.paper,
+              fontFamily: tapeFontFamily,
+              fontSize: 76,
+              lineHeight: 1,
+              padding: "14px 24px 8px",
+              borderRadius: 4,
+              transform: "rotate(-4deg)",
+            }}
+          >
+            {n}
+          </span>
+          <div style={{ color: INK.ink, fontFamily: tapeFontFamily, fontSize: 80, lineHeight: 1.2, wordBreak: "keep-all", textWrap: "balance" }}>
+            {step.title}
+          </div>
         </div>
       </div>
     </AbsoluteFill>
@@ -287,7 +294,7 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
   const { fps, width } = useVideoConfig();
   return (
     <AbsoluteFill>
-      <div style={{ position: "absolute", top: H * 0.425, width: "100%", textAlign: "center", color: HILITE, fontFamily: tapeFontFamily, fontSize: 76, textShadow: "0 3px 16px rgba(0,0,0,0.5)" }}>
+      <div style={{ position: "absolute", top: H * 0.425, width: "100%", textAlign: "center", color: INK.paper, fontFamily: tapeFontFamily, fontSize: 76, textShadow: INK.textShadow }}>
         정리
       </div>
       <div style={{ position: "absolute", top: H * 0.51, left: width * 0.06, width: width * 0.88, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -307,7 +314,7 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
                 opacity: Math.min(1, k * 2),
               }}
             >
-              <span style={{ background: INK.tape, color: "#FFFFFF", fontFamily: tapeFontFamily, fontSize: 52, lineHeight: 1, padding: "10px 18px 6px", borderRadius: 3 }}>
+              <span style={{ background: INK.ink, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 52, lineHeight: 1, padding: "10px 18px 6px", borderRadius: 3 }}>
                 {i + 1}
               </span>
               <span style={{ color: INK.ink, fontFamily: tapeFontFamily, fontSize: 58, wordBreak: "keep-all" }}>{st.title}</span>
@@ -324,7 +331,7 @@ const ProgressBar: React.FC = () => {
   const frame = useCurrentFrame();
   const { durationInFrames, width } = useVideoConfig();
   return (
-    <div style={{ position: "absolute", top: H * 0.13, left: width * 0.06, width: width * 0.88, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.18)" }}>
+    <div style={{ position: "absolute", top: H * 0.13, left: width * 0.06, width: width * 0.88, height: 6, borderRadius: 3, background: "rgba(255,253,248,0.18)" }}>
       <div style={{ width: `${Math.min(100, (frame / durationInFrames) * 100)}%`, height: "100%", borderRadius: 3, background: HILITE }} />
     </div>
   );
@@ -354,7 +361,7 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
   for (let i = 0; i < starts.length; i++) if (t >= starts[i]) si = i;
   const local = Math.min(1, (t - starts[si]) / Math.max(0.1, seg[si]));
   return (
-    <AbsoluteFill style={{ background: "#111214" }}>
+    <AbsoluteFill style={{ background: "#1C1915" }}>
       <AbsoluteFill style={{ transform: `scale(${1 + 0.08 * local})` }}>
         <Background
           brollFile={null}
