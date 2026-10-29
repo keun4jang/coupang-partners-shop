@@ -150,8 +150,9 @@ const Hook: React.FC<{ text: string; count: number; answer?: number | null }> = 
           <Marker text={text} progress={mark} />
         )}
       </div>
-      <div style={{ marginTop: 44, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 54, textShadow: INK.textShadow }}>
-        딱 {countWord(count)} 가지 · 핵심은 {answer ?? count}번
+      {/* 한 가지 말만 - '세 가지'는 목소리와 진행 막대가 알려 준다 (아트디렉터 3차) */}
+      <div style={{ marginTop: 44, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 56, textShadow: INK.textShadow }}>
+        핵심은 {answer ?? count}번
       </div>
     </AbsoluteFill>
   );
@@ -254,13 +255,14 @@ const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number
   );
 };
 
-const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n, step, segFrames }) => {
+const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number; isAnswer?: boolean }> = ({ n, step, segFrames, isAnswer }) => {
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
   const rise = spring({ frame, fps, config: { damping: 15, stiffness: 170 } });
   // 나레이션은 "제목. 설명" - 설명이 시작되는 때를 글자 수 비율로 어림
   const titleShare = step.title.length / (step.title.length + step.detail.length + 2);
-  const detailStart = Math.round(segFrames * titleShare * 0.9);
+  // 제목만 있는 빈 구간은 0.4초 이하로 (아트디렉터 3차: 위쪽이 텅 빈다)
+  const detailStart = Math.min(12, Math.round(segFrames * titleShare * 0.9));
   return (
     <AbsoluteFill>
       {/* 자막은 카드 바로 위(28px)에 붙여 한 덩어리로 */}
@@ -300,13 +302,33 @@ const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number }> = ({ n
             {step.title}
           </div>
         </div>
+        {/* 답 단계에만 '핵심' 표시 - 궁금증이 풀리는 순간을 화면에서도 (새 색 없이 먹색+종이색) */}
+        {isAnswer && (
+          <div
+            style={{
+              position: "absolute",
+              top: -26,
+              right: 40,
+              background: INK.ink,
+              color: INK.paper,
+              fontFamily: tapeFontFamily,
+              fontSize: 36,
+              lineHeight: 1,
+              padding: "10px 18px 6px",
+              borderRadius: 4,
+              transform: `scale(${0.6 + 0.4 * rise})`,
+            }}
+          >
+            핵심
+          </div>
+        )}
       </div>
     </AbsoluteFill>
   );
 };
 
 /** 마무리 요약 - 세 단계를 한 번에 (저장·다시 보기를 부르는 장면) */
-const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
+const Recap: React.FC<{ steps: TipStep[]; answer?: number | null }> = ({ steps, answer }) => {
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
   return (
@@ -316,7 +338,10 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
       </div>
       <div style={{ position: "absolute", top: H * 0.51, left: width * 0.06, width: width * 0.88, display: "flex", flexDirection: "column", gap: 20 }}>
         {steps.map((st, i) => {
-          const k = spring({ frame: frame - i * 5, fps, config: { damping: 15 } });
+          const isAns = i + 1 === answer;
+          const k = spring({ frame: frame - i * 5 - (isAns ? 5 : 0), fps, config: { damping: 15 } });
+          // 핵심 줄은 조금 늦게 들어와 한 번 살짝 커졌다 돌아온다
+          const pulse = isAns ? interpolate(frame - i * 5 - 5, [8, 14, 20], [1, 1.04, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 1;
           return (
             <div
               key={i}
@@ -327,7 +352,7 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
                 background: INK.paper,
                 borderRadius: 10,
                 padding: "20px 28px",
-                transform: `translateX(${(1 - k) * 90}px)`,
+                transform: `translateX(${(1 - k) * 90}px) scale(${pulse})`,
                 opacity: Math.min(1, k * 2),
               }}
             >
@@ -346,12 +371,16 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
 /** 마지막 0.5초: 첫 장면을 미리 띄워 끝→처음이 이어지게 */
 const LoopIn: React.FC<{ text: string; count: number; answer?: number | null }> = ({ text, count, answer }) => {
   const frame = useCurrentFrame();
-  const k = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: "clamp" });
+  // 두 단계로 - 마지막 장면을 먼저 덮고(0~7) 그다음 첫 장면을 띄운다(7~15). 두 장면이 겹쳐 보이지 않게 (아트디렉터 3차)
+  const cover = interpolate(frame, [0, 7], [0, 1], { extrapolateRight: "clamp" });
+  const show = interpolate(frame, [7, 15], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ opacity: k }}>
-      <AbsoluteFill style={{ background: "#1C1915" }} />
-      <Shade hook />
-      <Hook text={text} count={count} answer={answer} />
+    <AbsoluteFill>
+      <AbsoluteFill style={{ background: "#1C1915", opacity: cover }} />
+      <AbsoluteFill style={{ opacity: show }}>
+        <Shade hook />
+        <Hook text={text} count={count} answer={answer} />
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };
@@ -410,14 +439,14 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
       {props.steps.map((st, i) => (
         <Sequence key={i} from={f(starts[i + 1])} durationInFrames={f(seg[i + 1])}>
           <Shade />
-          <StepCard n={i + 1} step={st} segFrames={f(seg[i + 1])} />
+          <StepCard n={i + 1} step={st} segFrames={f(seg[i + 1])} isAnswer={i + 1 === (props.answer ?? -1)} />
           <Sfx name="whoosh" volume={0.3} />
           <Narration src={props.narration?.[i + 1]} />
         </Sequence>
       ))}
       <Sequence from={f(starts[outroIdx])} durationInFrames={f(seg[outroIdx])}>
         <Shade />
-        <Recap steps={props.steps} />
+        <Recap steps={props.steps} answer={props.answer} />
         <Sfx name="whoosh" volume={0.3} />
         <Narration src={props.narration?.[outroIdx]} />
       </Sequence>

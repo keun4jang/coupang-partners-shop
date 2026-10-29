@@ -97,9 +97,10 @@ export const CtaScene: React.FC<{
           <div
             style={{
               position: "absolute",
-              left: -56,
-              top: -96,
-              transform: `rotate(-4deg) scale(${0.85 + pop * 0.15})`,
+              // 사진 오른쪽 아래 모서리 - 위쪽 제목과 겹칠 일이 없다 (아트디렉터 3차)
+              right: -40,
+              bottom: -36,
+              transform: `rotate(3deg) scale(${0.85 + pop * 0.15})`,
               background: MEMO.ink,
               color: MEMO.paper,
               fontFamily: tapeFontFamily,
