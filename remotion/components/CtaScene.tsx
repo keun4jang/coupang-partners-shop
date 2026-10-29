@@ -97,8 +97,8 @@ export const CtaScene: React.FC<{
           <div
             style={{
               position: "absolute",
-              left: -48,
-              top: -78,
+              left: -56,
+              top: -96,
               transform: `rotate(-4deg) scale(${0.85 + pop * 0.15})`,
               background: MEMO.ink,
               color: MEMO.paper,

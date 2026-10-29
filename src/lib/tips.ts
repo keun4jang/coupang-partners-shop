@@ -11,7 +11,7 @@
  */
 import { geminiGenerateJson } from "./ai";
 import { findPolicyIssues } from "./policy";
-import { reviewedTip } from "./tipScripts";
+import { KEEP_ORDER, TIP_ANSWER, reviewedTip } from "./tipScripts";
 
 export type TipTopic = {
   topic: string;
@@ -239,4 +239,20 @@ export async function generateTipDraft(t: TipTopic): Promise<TipScript | null> {
 export function shortTopic(topic: string): string {
   const words = topic.split(" ");
   return words.slice(0, Math.min(2, words.length)).join(" ");
+}
+
+/**
+ * 첫 문장(후킹)의 답이 되는 단계를 맨 끝으로 (2026-10-29 아트디렉터: "답이 2번에 나오면 궁금증이 9초에 풀리고 뒤는 덤").
+ * 답 단계는 tipScripts TIP_ANSWER(직접 지정). 사실은 그대로, 순서만 바꾼다.
+ * "~순서" 주제와 KEEP_ORDER 주제는 옮기지 않는다. answer 는 영상에서의 답 단계 번호(1부터).
+ */
+export function arrangeAnswerLast<T extends { topic: string; hook: string; steps: { title: string; detail: string }[] }>(
+  tip: T
+): T & { answer: number } {
+  const n = tip.steps.length;
+  const a = Math.min(n, Math.max(1, TIP_ANSWER[tip.topic] ?? n));
+  if (/순서/.test(tip.topic) || KEEP_ORDER.has(tip.topic) || a === n) return { ...tip, answer: a };
+  const i = a - 1;
+  const steps = [...tip.steps.slice(0, i), ...tip.steps.slice(i + 1), tip.steps[i]];
+  return { ...tip, steps, answer: n };
 }

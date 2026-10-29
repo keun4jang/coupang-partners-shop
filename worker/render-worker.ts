@@ -82,7 +82,7 @@ import { fillVideoCopy } from "../src/lib/videoItems";
 import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
-import { TIP_TOPICS, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
+import { TIP_TOPICS, arrangeAnswerLast, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
 import { matchTipTopics, tipFitsProduct } from "../src/lib/tipMatch";
 import { selectProductsForVideos } from "../src/lib/productSelector";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
@@ -90,9 +90,9 @@ const TIP_OPENER = "오늘의 살림 꿀팁";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
 const TIP_ORIGIN_TAG = "꿀팁:";
 /** 첫 나레이션: 여는 말 + 실수형 첫 문장 + 숫자 예고 (2026-10-28 후킹 개편 - "딱 세 가지만 기억하세요") */
-function tipOpeningLine(tip: { hook: string; steps: unknown[] }): string {
-  const n = ["영", "한", "두", "세", "네", "다섯"][tip.steps.length] ?? String(tip.steps.length);
-  return `${TIP_OPENER}. ${tip.hook}. 딱 ${n} 가지만 기억하세요`;
+function tipOpeningLine(tip: { hook: string; answer?: number }): string {
+  // 2026-10-29 아트디렉터: 첫 1초는 후킹 문장으로 - "오늘의 살림 꿀팁"(10/22 사장님 요청)은 바로 뒤에, 답이 몇 번인지 예고
+  return `${tip.hook}. ${TIP_OPENER}, 핵심은 ${tip.answer ?? 3}번이에요`;
 }
 /** 마무리 나레이션: 요약 (화면 Recap 과 같은 내용) */
 function tipRecapLine(tip: { steps: { title: string }[] }): string {
@@ -1741,6 +1741,8 @@ async function renderTipProductVideo(
     `꿀팁 주제: ${tip.topic} (${match.how}; 후보 ${match.topics.length}개` +
       `${used.size ? `, 이 상품 지난 꿀팁 ${[...used.entries()].map(([t, c]) => `${t}×${c}`).join(" / ")}` : ""})`
   );
+  // 첫 문장의 답 단계를 맨 끝으로 (궁금증을 끝까지)
+  const atip = arrangeAnswerLast(tip);
   const n = item.display_number;
   const own = isOwnProduct(product);
   // 마지막 상품 소개: "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님 "상품이 띡 나오기보다 어떤 분한테 필요한 상품인지").
@@ -1751,29 +1753,34 @@ async function renderTipProductVideo(
   const ctaSpoken = heading ? `${heading}, 프로필 링크에서 ${n}번이에요` : `관련 물건은 프로필 링크에서 ${n}번이에요`;
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
 
-  const clips = tip.stockQueries.length
-    ? await fetchStockBrollsByQueries(tip.stockQueries, n, tip.steps.length + 2, "portrait", tip.topic)
+  const clips = atip.stockQueries.length
+    ? await fetchStockBrollsByQueries(atip.stockQueries, n, atip.steps.length + 2, "portrait", atip.topic)
     : [];
   // 실제로 받아진 파일만 쓰고, 새 클립이 번들에 들어가게 캐시를 비운다 (운영 워커는 여러 편을 이어서 렌더한다 -
   // 없는 파일이 섞이면 렌더가 통째로 멈춘다)
   const brollFiles = existingBrollFiles(clips.map((c) => c.file));
   if (brollFiles.length) cachedBundle = null;
-  const lines = [tipOpeningLine(tip), ...tip.steps.map((st) => `${st.title}. ${st.detail}`), tipRecapLine(tip), ctaSpoken];
-  const narr = await generateNarration(lines);
-  const segments = lines.map((_, i) => {
+  // 정리 화면은 목소리 없이 1.8초 (아트디렉터: 방금 들은 걸 또 읽으면 이탈) - 나머지는 나레이션 + 0.3초로 촘촘하게
+  const spoken = [tipOpeningLine(atip), ...atip.steps.map((st) => `${st.title}. ${st.detail}`), ctaSpoken];
+  const narrSpoken = await generateNarration(spoken);
+  const recapAt = atip.steps.length + 1;
+  const narr = narrSpoken ? [...narrSpoken.slice(0, recapAt), null, ...narrSpoken.slice(recapAt)] : null;
+  const segments = [...spoken.slice(0, recapAt), "", ...spoken.slice(recapAt)].map((_, i) => {
+    if (i === recapAt) return 1.8;
     const sec = narr?.[i]?.seconds ?? 0;
-    const min = i === 0 || i === lines.length - 2 ? 2.6 : i === lines.length - 1 ? 3.2 : 3.4;
-    return Math.max(min, sec + 0.5);
+    const min = i === 0 ? 2.0 : i === recapAt + 1 ? 3.0 : 2.8;
+    return Math.max(min, sec + 0.3);
   });
   const inputProps = {
-    topic: shortTopic(tip.topic),
-    hook: tip.hook,
-    steps: tip.steps,
-    outro: tip.outro,
+    topic: shortTopic(atip.topic),
+    hook: atip.hook,
+    steps: atip.steps,
+    outro: atip.outro,
     brollFiles: brollFiles.length ? brollFiles : null,
     brollDurations: brollFiles.length ? brollFileDurations(brollFiles) : null,
     narration: narr ? narr.map((l) => l?.uri ?? null) : null,
     segments,
+    answer: atip.answer,
     product: { displayNumber: n, imageUrl, ctaText, heading },
     // 고지: 파트너스는 처음·끝 3초 짧은 문구, 본인 상품은 화면에 안 띄움(캡션·설명에만) - TemplateD 와 같은 규칙
     disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
@@ -1802,9 +1809,9 @@ async function renderTipProductVideo(
   // broll_origin 끝의 "꿀팁:주제" 를 발행 단계(publishToSns)가 읽어 제목·설명·캡션을 꿀팁 중심으로 만든다 (DB 칸 추가 없이)
   return {
     videoPath,
-    brollOrigin: `꿀팁 스톡(${tip.stockQueries.join(" / ")}) ${TIP_ORIGIN_TAG}${tip.topic}`,
+    brollOrigin: `꿀팁 스톡(${atip.stockQueries.join(" / ")}) ${TIP_ORIGIN_TAG}${atip.topic}`,
     brollFiles,
-    tipTopic: tip.topic,
+    tipTopic: atip.topic,
     seconds,
   };
 }

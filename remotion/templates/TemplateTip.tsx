@@ -37,6 +37,8 @@ export type TipProps = {
   product?: { displayNumber: number; imageUrl: string | null; ctaText: string; heading?: string | null } | null;
   disclosureText?: string | null;
   disclosureMode?: DisclosureMode | null;
+  /** 첫 문장의 답이 되는 단계 번호(1부터) - 첫 화면 "핵심은 N번" 예고 (2026-10-29) */
+  answer?: number | null;
 };
 
 export const defaultTipProps: TipProps = {
@@ -112,7 +114,7 @@ const Marker: React.FC<{ text: string; progress: number }> = ({ text, progress }
   </span>
 );
 
-const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
+const Hook: React.FC<{ text: string; count: number; answer?: number | null }> = ({ text, count, answer }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const punch = spring({ frame, fps, config: { damping: 14, stiffness: 200 } });
@@ -149,7 +151,7 @@ const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
         )}
       </div>
       <div style={{ marginTop: 44, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 54, textShadow: INK.textShadow }}>
-        딱 {countWord(count)} 가지
+        딱 {countWord(count)} 가지 · 핵심은 {answer ?? count}번
       </div>
     </AbsoluteFill>
   );
@@ -160,6 +162,10 @@ const Hook: React.FC<{ text: string; count: number }> = ({ text, count }) => {
  * 한 낱말만 남는 묶음은 앞 묶음에 붙이고, 한 묶음은 최소 14프레임 보인다. 노랑은 묶음 안 가장 긴 낱말(대개 핵심 명사) 하나만.
  * 시점은 글자 수 비율로 어림한다.
  */
+const DETERMINER = /^(맨|첫|새|각|몇|이|그|저|다른|모든|한|온|딴)$/;
+/** 동사·형용사 끝말 - 형광펜은 이런 낱말이 아닌 명사에 */
+const VERBAL_END = /(요|다|고|면|서|게|지|야|며|니|어|아|해|은|는|을|던|도록)$/;
+
 export function captionChunks(text: string): string[][] {
   const words = text.split(/\s+/).filter(Boolean);
   const chunks: string[][] = [];
@@ -169,6 +175,13 @@ export function captionChunks(text: string): string[][] {
     const len = cur.join(" ").length;
     const nextLen = i + 1 < words.length ? len + 1 + words[i + 1].length : 0;
     const goodBreak = breakTier(words[i], words[i + 1]) > 0 && cur.length >= 2;
+    // 꾸미는 말(맨·첫·새·각·몇·이·그·저·다른·모든·한)은 다음 낱말과 한 덩어리로 - 그 앞에서 미리 끊는다
+    if (i < words.length - 1 && DETERMINER.test(words[i])) continue;
+    if (i < words.length - 2 && DETERMINER.test(words[i + 1]) && cur.length >= 2) {
+      chunks.push(cur);
+      cur = [];
+      continue;
+    }
     // 붙어 다니는 말(쌓아 '두면')이 다음이면 한 낱말 더 데려간다 (14자까지)
     if (i < words.length - 1 && gluedNext(words[i + 1]) && nextLen <= 14) continue;
     if (i === words.length - 1 || cur.length >= 3 || nextLen > 12 || goodBreak) {
@@ -203,7 +216,11 @@ const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number
   let ci = 0;
   for (let i = 0; i < startsF.length; i++) if (frame >= startsF[i]) ci = i;
   const chunk = chunks[ci];
-  const key = chunk.reduce((best, w) => (w.replace(/[^가-힣A-Za-z0-9]/g, "").length > best.replace(/[^가-힣A-Za-z0-9]/g, "").length ? w : best), chunk[0]);
+  // 형광펜은 명사 쪽 낱말 하나에 (동사 끝말 낱말은 제외, 없으면 가장 긴 낱말)
+  const clean = (w: string) => w.replace(/[^가-힣A-Za-z0-9]/g, "");
+  const nouny = chunk.filter((w) => !VERBAL_END.test(clean(w)));
+  const pool = nouny.length ? nouny : chunk;
+  const key = pool.reduce((best, w) => (clean(w).length > clean(best).length ? w : best), pool[0]);
   return (
     <div style={{ position: "absolute", bottom: bottomPx, left: 0, width: "100%", height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent, rgba(20,17,14,.45) 30%, rgba(20,17,14,.45) 70%, transparent)" }} />
@@ -326,6 +343,19 @@ const Recap: React.FC<{ steps: TipStep[] }> = ({ steps }) => {
   );
 };
 
+/** 마지막 0.5초: 첫 장면을 미리 띄워 끝→처음이 이어지게 */
+const LoopIn: React.FC<{ text: string; count: number; answer?: number | null }> = ({ text, count, answer }) => {
+  const frame = useCurrentFrame();
+  const k = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill style={{ opacity: k }}>
+      <AbsoluteFill style={{ background: "#1C1915" }} />
+      <Shade hook />
+      <Hook text={text} count={count} answer={answer} />
+    </AbsoluteFill>
+  );
+};
+
 /** 진행 막대 - 쇼츠·릴스 위쪽 버튼 아래(화면 13%)에 */
 const ProgressBar: React.FC = () => {
   const frame = useCurrentFrame();
@@ -373,7 +403,7 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
       </AbsoluteFill>
       <Sequence durationInFrames={f(seg[0])}>
         <Shade hook />
-        <Hook text={props.hook} count={props.steps.length} />
+        <Hook text={props.hook} count={props.steps.length} answer={props.answer} />
         <Sfx name="pop" />
         <Narration src={props.narration?.[0]} />
       </Sequence>
@@ -403,6 +433,10 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
           <Narration src={props.narration?.[productIdx]} />
         </Sequence>
       )}
+      {/* 끝에서 첫 장면이 서서히 떠올라 처음으로 이어지게 (다시 보기) */}
+      <Sequence from={Math.max(0, Math.round(acc * fps) - 15)}>
+        <LoopIn text={props.hook} count={props.steps.length} answer={props.answer} />
+      </Sequence>
       <ProgressBar />
       {/* 고지: 아래 캡션·버튼에 덜 가리게 화면 74% 선 (아트디렉터) */}
       {props.product && <Disclosure bottomPx={Math.round(H * 0.26)} />}

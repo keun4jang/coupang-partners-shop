@@ -155,7 +155,7 @@ export const MEMO = {
   ink: "#24211C",
   accent: "#F5C842",
   photoBg: "#F4F0E8",
-  scrim: "rgba(28, 24, 20, 0.78)",
+  scrim: "rgba(28, 24, 20, 0.62)",
   onVideo: "#FFFDF8",
   textShadow: "0 2px 14px rgba(20, 17, 14, 0.65)",
 } as const;

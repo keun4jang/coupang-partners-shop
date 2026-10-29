@@ -4,7 +4,7 @@
  */
 import { TIP_TOPICS, checkTipSafety, pickTopic, topicsFor } from "../src/lib/tips";
 import { findPolicyIssues } from "../src/lib/policy";
-import { TIP_SCRIPTS, TIP_HOOKS, reviewedTip } from "../src/lib/tipScripts";
+import { TIP_SCRIPTS, TIP_HOOKS, TIP_ANSWER, reviewedTip } from "../src/lib/tipScripts";
 import { matchTipTopicByRule, matchTipTopicsByRule } from "../src/lib/tipMatch";
 import { OWN_PRODUCTS } from "../src/lib/ownProducts";
 
@@ -88,5 +88,7 @@ for (const t of TIP_SCRIPTS) {
   if (iss.length) check(`후킹 첫 문장 ${t.topic}: ${iss.join(", ")}`, false);
 }
 check(`후킹 첫 문장 ${Object.keys(TIP_HOOKS).length}개 = 주제 ${TIP_SCRIPTS.length}개`, Object.keys(TIP_HOOKS).length === TIP_SCRIPTS.length);
+// 답 단계 지정 (2026-10-29): 모든 주제에 있고 단계 수 안
+check("답 단계 지정 67개 전부", TIP_SCRIPTS.every((t) => (TIP_ANSWER[t.topic] ?? 0) >= 1 && TIP_ANSWER[t.topic] <= t.steps.length));
 console.log(fail ? `❌ ${fail}건 실패` : "✅ 전부 통과");
 process.exit(fail ? 1 : 0);
