@@ -118,22 +118,8 @@ export const CtaScene: React.FC<{
             <span style={{ fontSize: "0.46em", marginLeft: "0.08em", opacity: 0.85 }}>번</span>
           </div>
         </div>
-        <div
-          style={{
-            position: "absolute",
-            top: H * 0.645,
-            width: "100%",
-            textAlign: "center",
-            fontFamily: tapeFontFamily,
-            fontSize: 48,
-            opacity: textIn,
-          }}
-        >
-          {/* 첫 장면과 같은 형광펜 장치로 처음과 끝을 잇는다 (아트디렉터 색 규칙: 강조색은 바탕으로) */}
-          <span style={{ color: MEMO.ink, background: MEMO.accent, padding: "6px 18px", borderRadius: 6 }}>
-            {ctaText ?? ctaTemplate(displayNumber)}
-          </span>
-        </div>
+        {/* 사진 아래 "프로필 링크에서 N번" 줄은 뺐다 - 번호가 두 번 나온다 (2026-10-31 사장님 "아래 작은 거는 지워").
+            어디서 찾는지는 목소리("프로필 링크에서 N번이에요")가 알려 준다. */}
       </AbsoluteFill>
     );
   }
