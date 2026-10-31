@@ -129,7 +129,7 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
-          DEMO_SEND_TELEGRAM: "1"
+          DEMO_SEND_TELEGRAM: ${{ github.event.inputs.mode == 'drama' && '0' || '1' }}
           TIP_FORMAT: ${{ github.event.inputs.tipformat == 'on' && '1' || '0' }}
           SCENE_CUTOUT: ${{ github.event.inputs.cutout == 'on' && '1' || '0' }}
           NUM: ${{ github.event.inputs.number }}
@@ -145,3 +145,13 @@ jobs:
           else
             npx tsx worker/render-worker.ts --demo "$NUM"
           fi
+
+      # 샘플 영상을 실행 결과에 3일 보관 - Claude 가 받아서 대화창에서 바로 보여 준다 (2026-10-31 사장님 "텔레그램 말고 여기서 보여줘")
+      - name: 샘플 영상 보관
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-video
+          path: renders/**/*.mp4
+          retention-days: 3
+          if-no-files-found: ignore

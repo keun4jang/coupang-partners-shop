@@ -11,7 +11,7 @@ import { FontFaceStyle } from "../components/FontFaceStyle";
  * 대화형 드라마 쇼츠 (2026-10-31 사장님 "스토리가 들어간 드라마 타이즈 릴스" → 추천안 "대화형" 샘플).
  * 메신저 대화가 한 줄씩 올라오고 두 목소리가 주고받는다. 이야기 속에서 검수본 꿀팁이 풀리고,
  * 마지막에 "팔로우" 한 마디 → "오늘의 추천 상품도 알려드릴게요" → 상품 사진·번호.
- * - 지어낸 이야기라 위에 "연출된 이야기"를 늘 띄운다(실제 후기로 오인 방지). 등장인물이 상품을 써 봤다고 말하지 않는다.
+ * - "연출된 이야기" 표시는 2026-10-31 사장님 요청으로 뺐다. 대신 등장인물이 상품을 써 봤다·좋았다고 말하지 않는다(후기로 오인 방지 - 대본 검사가 막는다).
  * - 특정 메신저 모양·색(상표)을 흉내 내지 않고 메모지 팔레트(MEMO)만 쓴다.
  */
 export type ChatLine = { who: "a" | "b"; text: string };
@@ -162,10 +162,7 @@ const Title: React.FC<{ text: string }> = ({ text }) => {
   const { fps } = useVideoConfig();
   const k = spring({ frame, fps, config: { damping: 12, stiffness: 200 } });
   return (
-    <div style={{ position: "absolute", top: H * 0.135, left: 60, right: 60, textAlign: "center" }}>
-      <div style={{ color: INK.ink, opacity: 0.55, fontFamily, fontWeight: 700, fontSize: 30, marginBottom: 14 }}>
-        연출된 이야기
-      </div>
+    <div style={{ position: "absolute", top: H * 0.15, left: 60, right: 60, textAlign: "center" }}>
       <span
         style={{
           background: INK.accent,
