@@ -1881,7 +1881,8 @@ async function runDramaDemo(): Promise<void> {
   const narr = [...drama.lines.map((l, i) => (l.who === "a" ? va?.[i] : vb?.[i]) ?? null), vb?.[texts.length] ?? null, vb?.[texts.length + 1] ?? null];
   const segments = narr.map((l, i) => {
     const sec = l?.seconds ?? 0;
-    if (i < texts.length) return Math.max(1.0, sec + 0.15);
+    // 0.1초(말풍선 소리 뒤 지연) + 끝 여유 0.2초
+    if (i < texts.length) return Math.max(1.0, sec + 0.3);
     return i === texts.length ? Math.max(1.6, sec + 0.35) : Math.max(3.0, sec + 0.6);
   });
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;

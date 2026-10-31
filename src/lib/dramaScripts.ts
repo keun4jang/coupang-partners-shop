@@ -9,7 +9,7 @@
  *   상품은 대화가 끝난 뒤 "오늘의 추천 상품"으로 사진·번호만.
  * - 효능·과장·클릭 재촉 표현 금지(policy.ts 검사를 렌더 전에 한 번 더 거친다).
  * - 목소리 (2026-10-31 사장님 "엄마랑 아들인데 전혀 목소리가 그렇지 않아" → 견본 10개 음높이 실측 후 연출 판단):
- *   엄마 = F3(여자 중 가장 낮고 차분, 조금 느리게), 아들 = M1(남자 중 가장 높고 가벼움, 조금 빠르게).
+ *   엄마 = F3(여자 중 가장 낮고 차분, 조금 느리게), 아들 = M1(남자 중 가장 높고 가벼움, 1.2배).
  *   예전 M2 는 남자 중 가장 낮은 목소리(중년 느낌)라 아들에 안 맞았다. 팔로우·상품 안내도 아들이 시청자에게 말한다(세 번째 목소리 없음).
  */
 import { findPolicyIssues } from "./policy";
@@ -26,7 +26,7 @@ export type DramaScript = {
 
 export const DRAMA_VOICES = {
   a: { voice: "F3", speed: 1.15 },
-  b: { voice: "M1", speed: 1.3 },
+  b: { voice: "M1", speed: 1.2 }, // 1.3 은 말끝이 뭉개졌다 (10/31)
 } as const;
 
 export const DRAMA_SCRIPTS: DramaScript[] = [

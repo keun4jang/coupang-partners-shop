@@ -55,6 +55,8 @@ export function chatDurationSeconds(p: ChatProps): number {
 }
 
 const H = VIDEO.height;
+/** 대사 소리 시작 지연(프레임) - 렌더 워커는 장면 길이에 이만큼(0.1초)을 더해 둔다 */
+export const VOICE_DELAY = 3;
 const W = VIDEO.width;
 const FONT = 54;
 const LINE_H = 74;
@@ -288,8 +290,11 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
 
       {props.lines.map((_, i) => (
         <Sequence key={i} from={starts[i]} durationInFrames={f(seg[i])}>
-          <Sfx name="pop" volume={0.22} />
-          <Narration src={props.narration?.[i]} />
+          <Sfx name="pop" volume={0.14} />
+          {/* 말풍선 '톡' 소리 뒤 0.1초에 말을 시작 - 겹치면 첫 글자가 묻혀 끊겨 들린다 (2026-10-31 사장님 "아직도 말이 끊기는 부분") */}
+          <Sequence from={VOICE_DELAY}>
+            <Narration src={props.narration?.[i]} />
+          </Sequence>
         </Sequence>
       ))}
       <Sequence from={starts[n]} durationInFrames={f(seg[n])}>
