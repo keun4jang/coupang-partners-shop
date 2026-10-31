@@ -13,12 +13,12 @@ import os
 import sys
 
 
-def trim_silence(wav, sr: int, pad: float = 0.06):
+def trim_silence(wav, sr: int, pad: float = 0.1):
     """앞뒤 무음 자르기 - 대화형 드라마는 대사 사이가 비면 말이 뚝뚝 끊겨 들린다 (2026-10-31 사장님 "멘트가 끊긴다")"""
     import numpy as np
 
     a = np.abs(wav)
-    thr = max(1e-4, float(a.max()) * 0.02)
+    thr = max(1e-4, float(a.max()) * 0.01)  # 낮게 잡아 약한 첫·끝 소리가 잘리지 않게
     idx = np.where(a > thr)[0]
     if len(idx) == 0:
         return wav
