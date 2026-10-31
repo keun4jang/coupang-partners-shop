@@ -58,7 +58,7 @@ export const CtaScene: React.FC<{
           <div
             style={{
               position: "absolute",
-              top: H * 0.235,
+              top: H * 0.205,
               width: "100%",
               textAlign: "center",
               color: MEMO.onVideo,
@@ -70,6 +70,8 @@ export const CtaScene: React.FC<{
               opacity: Math.min(1, pop * 1.5),
             }}
           >
+            {/* 2026-10-31 사장님: "오늘의 추천 상품도 알려드릴게요" - 목소리와 같은 말을 작게 */}
+            <div style={{ fontSize: 36, fontWeight: 700, opacity: 0.78, marginBottom: 10 }}>오늘의 추천 상품</div>
             {heading}
           </div>
         )}

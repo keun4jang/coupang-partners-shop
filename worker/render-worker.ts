@@ -87,6 +87,9 @@ import { matchTipTopics, tipFitsProduct } from "../src/lib/tipMatch";
 import { selectProductsForVideos } from "../src/lib/productSelector";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
 const TIP_OPENER = "오늘의 살림 꿀팁";
+/** 정리 화면 한 마디 · 상품 소개 첫마디 (2026-10-31 사장님 "팔로우하라고 말하고, 그다음 오늘의 추천 상품도 알려드릴게요") */
+const TIP_FOLLOW_LINE = "도움 됐다면 팔로우해 두세요";
+const TIP_PRODUCT_INTRO = "오늘의 추천 상품도 알려드릴게요.";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
 const TIP_ORIGIN_TAG = "꿀팁:";
 /** 첫 나레이션: 여는 말 + 실수형 첫 문장 + 숫자 예고 (2026-10-28 후킹 개편 - "딱 세 가지만 기억하세요") */
@@ -1750,7 +1753,10 @@ async function renderTipProductVideo(
   const heading = tipProductHeading(item.hook_text);
   // 화면 안내 한 줄(사진 아래) - 번호를 어디서 찾는지 (2026-10-28 아트디렉터: 번호만 있으면 무슨 뜻인지 모른다)
   const ctaText = `프로필 링크에서 ${n}번`;
-  const ctaSpoken = heading ? `${heading}, 프로필 링크에서 ${n}번이에요` : `관련 물건은 프로필 링크에서 ${n}번이에요`;
+  // 2026-10-31 사장님: 팔로우하라고 말하고, 그다음 "오늘의 추천 상품도 알려드릴게요" → 상품
+  const ctaSpoken = heading
+    ? `${TIP_PRODUCT_INTRO} ${heading}, 프로필 링크에서 ${n}번이에요`
+    : `${TIP_PRODUCT_INTRO} 프로필 링크에서 ${n}번이에요`;
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
 
   const clips = atip.stockQueries.length
@@ -1760,15 +1766,13 @@ async function renderTipProductVideo(
   // 없는 파일이 섞이면 렌더가 통째로 멈춘다)
   const brollFiles = existingBrollFiles(clips.map((c) => c.file));
   if (brollFiles.length) cachedBundle = null;
-  // 정리 화면은 목소리 없이 1.8초 (아트디렉터: 방금 들은 걸 또 읽으면 이탈) - 나머지는 나레이션 + 0.3초로 촘촘하게
-  const spoken = [tipOpeningLine(atip), ...atip.steps.map((st) => `${st.title}. ${st.detail}`), ctaSpoken];
-  const narrSpoken = await generateNarration(spoken);
+  // 정리 화면에서는 단계를 다시 읽지 않고(아트디렉터: 방금 들은 걸 또 읽으면 이탈) 팔로우 한 마디만 - 나머지는 나레이션 + 0.3초로 촘촘하게
   const recapAt = atip.steps.length + 1;
-  const narr = narrSpoken ? [...narrSpoken.slice(0, recapAt), null, ...narrSpoken.slice(recapAt)] : null;
-  const segments = [...spoken.slice(0, recapAt), "", ...spoken.slice(recapAt)].map((_, i) => {
-    if (i === recapAt) return 1.8;
+  const spoken = [tipOpeningLine(atip), ...atip.steps.map((st) => `${st.title}. ${st.detail}`), TIP_FOLLOW_LINE, ctaSpoken];
+  const narr = await generateNarration(spoken);
+  const segments = spoken.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;
-    const min = i === 0 ? 2.0 : i === recapAt + 1 ? 3.0 : 2.8;
+    const min = i === 0 ? 2.0 : i === recapAt ? 1.8 : i === recapAt + 1 ? 3.0 : 2.8;
     return Math.max(min, sec + 0.3);
   });
   const inputProps = {
