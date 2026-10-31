@@ -50,7 +50,8 @@ export function withDisclosureText<P extends { disclosureText?: string | null; d
 
 /** 하단 대가성 문구 - 영상 내내 작게 표시 (하단 데드존 위에 배치) */
 /** bottomPx: 아래에서 띄울 높이(px). 없으면 LAYOUT.disclosureBottom (꿀팁 영상은 2026-10-28 아트디렉터 의견으로 조금 더 위) */
-export const Disclosure: React.FC<{ bottomPx?: number }> = ({ bottomPx }) => {
+/** onLight: 밝은 바탕(대화형 드라마 메모지 화면)에서는 먹색 글자로 - 흰 글자는 안 읽힌다 (2026-10-31) */
+export const Disclosure: React.FC<{ bottomPx?: number; onLight?: boolean }> = ({ bottomPx, onLight }) => {
   const text = useDisclosureText();
   const visible = useDisclosureVisible();
   const mode = useContext(DisclosureModeContext);
@@ -72,12 +73,12 @@ export const Disclosure: React.FC<{ bottomPx?: number }> = ({ bottomPx }) => {
         style={{
           maxWidth: "92%",
           textAlign: "center",
-          color: "rgba(255, 255, 255, 0.95)",
+          color: onLight ? "rgba(36, 33, 28, 0.88)" : "rgba(255, 255, 255, 0.95)",
           // edges 모드는 짧은 문구라 조금 더 작게 (10/26~)
           fontSize: mode === "edges" ? Math.round(FONT_SIZES.disclosure * 0.9) : FONT_SIZES.disclosure,
           fontWeight: 500,
           fontFamily,
-          textShadow: "0 1px 6px rgba(0, 0, 0, 0.55), 0 0 2px rgba(0, 0, 0, 0.35)",
+          textShadow: onLight ? "none" : "0 1px 6px rgba(0, 0, 0, 0.55), 0 0 2px rgba(0, 0, 0, 0.35)",
         }}
       >
         {text}

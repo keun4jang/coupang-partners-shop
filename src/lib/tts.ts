@@ -194,7 +194,7 @@ const SUPERTONIC_VOICE = "M1";
 /** 말 속도 - 10/13 승인 샘플 1.15 → 2026-10-22 사장님 "말 속도 살짝 빠르게" 1.25 (약 9% 빠르게, 모든 영상 공통) */
 const SUPERTONIC_SPEED = 1.25;
 
-function synthesizeSupertonic(lines: string[]): (NarrationLine | null)[] | null {
+function synthesizeSupertonic(lines: string[], voiceOverride?: string): (NarrationLine | null)[] | null {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "supertonic-"));
   try {
     const python = optionalEnv("TTS_PYTHON") ?? (process.platform === "win32" ? "python" : "python3");
@@ -202,7 +202,7 @@ function synthesizeSupertonic(lines: string[]): (NarrationLine | null)[] | null 
       input: JSON.stringify({
         lines: lines.map((l) => (l.trim() ? naturalizePhrasing(ttsReadable(l.trim())) : "")),
         outDir,
-        voice: optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE,
+        voice: voiceOverride ?? optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE,
         speed: SUPERTONIC_SPEED,
       }),
       encoding: "utf8",
@@ -232,15 +232,17 @@ function synthesizeSupertonic(lines: string[]): (NarrationLine | null)[] | null 
  * Supertonic(무료, 1순위) → 구글 TTS → Edge 무료 음성 순서로 폴백.
  */
 export async function generateNarration(
-  lines: string[]
+  lines: string[],
+  /** Supertonic 목소리 지정 (대화형 드라마의 두 목소리 - 2026-10-31). 없으면 기본 M1 */
+  opts?: { voice?: string }
 ): Promise<(NarrationLine | null)[] | null> {
   if (optionalEnv("TTS_DISABLED") === "1") return null;
 
   // 0) Supertonic
   if (optionalEnv("TTS_ENGINE") !== "legacy") {
-    const st = synthesizeSupertonic(lines);
+    const st = synthesizeSupertonic(lines, opts?.voice);
     if (st) {
-      console.log(`Supertonic 음성 사용 (${optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE})`);
+      console.log(`Supertonic 음성 사용 (${opts?.voice ?? optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE})`);
       return st;
     }
     console.warn("Supertonic 사용 불가 → 구글/Edge 음성으로 폴백");

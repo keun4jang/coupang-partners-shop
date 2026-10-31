@@ -10,6 +10,7 @@ import { TemplateE } from "./templates/TemplateE";
 import { TemplateEUseCase } from "./templates/TemplateEUseCase";
 import { withDisclosureText } from "./components/Disclosure";
 import { TemplateTip, TipProps, defaultTipProps, tipDurationSeconds } from "./templates/TemplateTip";
+import { ChatProps, TemplateChat, chatDurationSeconds, defaultChatProps } from "./templates/TemplateChat";
 import {
   TOP10_FPS,
   TOP10_HEIGHT,
@@ -34,12 +35,17 @@ const top10Metadata: CalculateMetadataFunction<Top10Props> = ({ props }) => ({
 // 하단 고지 문구를 props.disclosureText 로 바꿀 수 있게 감싼다 (사장님 본인 상품 = 판매자 고지)
 const TemplateDWithDisclosure = withDisclosureText(TemplateD);
 const TemplateTipWithDisclosure = withDisclosureText(TemplateTip);
+const TemplateChatWithDisclosure = withDisclosureText(TemplateChat);
 const TemplateEWithDisclosure = withDisclosureText(TemplateE);
 const TemplateEUseCaseWithDisclosure = withDisclosureText(TemplateEUseCase);
 
 /** 살림 정보 쇼츠 - 나레이션 장면 길이 합 */
 const tipMetadata: CalculateMetadataFunction<TipProps> = ({ props }) => ({
   durationInFrames: Math.max(1, Math.round(tipDurationSeconds(props) * VIDEO.fps)),
+});
+
+const chatMetadata: CalculateMetadataFunction<ChatProps> = ({ props }) => ({
+  durationInFrames: Math.max(1, Math.round(chatDurationSeconds(props) * VIDEO.fps)),
 });
 
 const defaultTop10Props: Top10Props = { categoryLabel: "생활템", items: [] };
@@ -76,6 +82,16 @@ export const RemotionRoot: React.FC = () => {
         durationInFrames={Math.round(tipDurationSeconds(defaultTipProps) * VIDEO.fps)}
         defaultProps={defaultTipProps}
         calculateMetadata={tipMetadata}
+      />
+      <Composition
+        id="TemplateChat"
+        component={TemplateChatWithDisclosure}
+        width={VIDEO.width}
+        height={VIDEO.height}
+        fps={VIDEO.fps}
+        durationInFrames={Math.round(chatDurationSeconds(defaultChatProps) * VIDEO.fps)}
+        defaultProps={defaultChatProps}
+        calculateMetadata={chatMetadata}
       />
       <Composition
         id="TemplateTop10"
