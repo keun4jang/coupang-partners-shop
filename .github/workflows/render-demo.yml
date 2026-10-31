@@ -11,11 +11,11 @@ on:
         required: true
         default: "377"
       mode:
-        description: "샘플 종류 - product(상품 영상) / tip(살림 정보 영상, 번호 칸은 무시) / tipcheck(정보 대본 37개 전수 점검, 렌더 없음) / drama(대화형 드라마 - 번호의 상품에 맞는 대본이 있을 때만)"
+        description: "샘플 종류 - product(상품 영상) / tip(살림 정보 영상, 번호 칸은 무시) / tipcheck(정보 대본 37개 전수 점검, 렌더 없음) / drama(대화형 드라마 - 번호의 상품에 맞는 대본이 있을 때만) / voices(무료 목소리 10개 견본)"
         required: false
         default: "product"
         type: choice
-        options: ["product", "tip", "tipcheck", "drama"]
+        options: ["product", "tip", "tipcheck", "drama", "voices"]
       topic:
         description: "(tip 일 때) 주제 번호 또는 주제 글 일부 - 비우면 오늘 날짜로 고름"
         required: false
@@ -131,7 +131,7 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
-          DEMO_SEND_TELEGRAM: ${{ github.event.inputs.mode == 'drama' && '0' || '1' }}
+          DEMO_SEND_TELEGRAM: ${{ (github.event.inputs.mode == 'drama' || github.event.inputs.mode == 'voices') && '0' || '1' }}
           TIP_FORMAT: ${{ github.event.inputs.tipformat == 'on' && '1' || '0' }}
           SCENE_CUTOUT: ${{ github.event.inputs.cutout == 'on' && '1' || '0' }}
           NUM: ${{ github.event.inputs.number }}
@@ -140,6 +140,8 @@ jobs:
         run: |
           if [ "$MODE" = "tipcheck" ]; then
             npx tsx worker/render-worker.ts --tip-check
+          elif [ "$MODE" = "voices" ]; then
+            python3 scripts/voice_samples.py
           elif [ "$MODE" = "drama" ]; then
             npx tsx worker/render-worker.ts --drama-demo "$NUM"
           elif [ "$MODE" = "tip" ]; then

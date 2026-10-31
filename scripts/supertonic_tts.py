@@ -35,7 +35,10 @@ def main() -> None:
             path = os.path.join(out_dir, f"line{i}.mp3")
             sf.write(path, wav.squeeze(), tts.sample_rate, format="MP3")
             files.append(path)
-            seconds.append(float(sum(dur)) if hasattr(dur, "__len__") else float(dur))
+            # 실제 소리 길이로 잰다 - 엔진이 알려 주는 dur 가 실제보다 짧아 영상에서 말끝이 잘렸다 (2026-10-31 사장님 "마지막쯤 멘트가 끊긴다")
+            reported = float(sum(dur)) if hasattr(dur, "__len__") else float(dur)
+            actual = float(wav.squeeze().shape[-1]) / float(tts.sample_rate)
+            seconds.append(max(reported, actual))
         except Exception as e:  # noqa: BLE001 - 줄 하나 실패는 무음으로
             print(f"supertonic 줄 {i} 실패: {e}", file=sys.stderr)
             files.append(None)

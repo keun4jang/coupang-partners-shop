@@ -162,7 +162,11 @@ const Title: React.FC<{ text: string }> = ({ text }) => {
   const { fps } = useVideoConfig();
   const k = spring({ frame, fps, config: { damping: 12, stiffness: 200 } });
   return (
-    <div style={{ position: "absolute", top: H * 0.15, left: 60, right: 60, textAlign: "center" }}>
+    <div style={{ position: "absolute", top: H * 0.135, left: 60, right: 60, textAlign: "center" }}>
+      {/* 2026-10-31 사장님: 제목 위에 "오늘의 꿀팁" 같은 말 - 꿀팁 영상 첫 화면과 같은 문구로 채널 느낌을 맞춘다 */}
+      <div style={{ color: INK.ink, opacity: 0.7, fontFamily, fontWeight: 800, fontSize: 40, marginBottom: 16 }}>
+        오늘의 살림 꿀팁
+      </div>
       <span
         style={{
           background: INK.accent,
