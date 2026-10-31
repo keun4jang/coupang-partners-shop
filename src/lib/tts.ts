@@ -194,7 +194,11 @@ const SUPERTONIC_VOICE = "M1";
 /** 말 속도 - 10/13 승인 샘플 1.15 → 2026-10-22 사장님 "말 속도 살짝 빠르게" 1.25 (약 9% 빠르게, 모든 영상 공통) */
 const SUPERTONIC_SPEED = 1.25;
 
-function synthesizeSupertonic(lines: string[], voiceOverride?: string): (NarrationLine | null)[] | null {
+function synthesizeSupertonic(
+  lines: string[],
+  voiceOverride?: string,
+  extra?: { speed?: number; trim?: boolean }
+): (NarrationLine | null)[] | null {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "supertonic-"));
   try {
     const python = optionalEnv("TTS_PYTHON") ?? (process.platform === "win32" ? "python" : "python3");
@@ -203,7 +207,8 @@ function synthesizeSupertonic(lines: string[], voiceOverride?: string): (Narrati
         lines: lines.map((l) => (l.trim() ? naturalizePhrasing(ttsReadable(l.trim())) : "")),
         outDir,
         voice: voiceOverride ?? optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE,
-        speed: SUPERTONIC_SPEED,
+        speed: extra?.speed ?? SUPERTONIC_SPEED,
+        trim: extra?.trim ?? false,
       }),
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -234,13 +239,13 @@ function synthesizeSupertonic(lines: string[], voiceOverride?: string): (Narrati
 export async function generateNarration(
   lines: string[],
   /** Supertonic 목소리 지정 (대화형 드라마의 두 목소리 - 2026-10-31). 없으면 기본 M1 */
-  opts?: { voice?: string }
+  opts?: { voice?: string; speed?: number; trim?: boolean }
 ): Promise<(NarrationLine | null)[] | null> {
   if (optionalEnv("TTS_DISABLED") === "1") return null;
 
   // 0) Supertonic
   if (optionalEnv("TTS_ENGINE") !== "legacy") {
-    const st = synthesizeSupertonic(lines, opts?.voice);
+    const st = synthesizeSupertonic(lines, opts?.voice, { speed: opts?.speed, trim: opts?.trim });
     if (st) {
       console.log(`Supertonic 음성 사용 (${opts?.voice ?? optionalEnv("SUPERTONIC_VOICE") ?? SUPERTONIC_VOICE})`);
       return st;

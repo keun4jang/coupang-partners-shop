@@ -1868,18 +1868,21 @@ async function runDramaDemo(): Promise<void> {
   const ctaSpoken = heading
     ? `${TIP_PRODUCT_INTRO} ${heading}, 프로필 링크에서 ${n}번이에요`
     : `${TIP_PRODUCT_INTRO} 프로필 링크에서 ${n}번이에요`;
-  // 목소리 셋: 인물 a(F1)·인물 b(M2)·채널(M1). 목소리별로 합성한 뒤 줄 순서대로 합친다.
+  // 목소리: 엄마(a)·아들(b) 둘만 - 팔로우·상품 안내는 아들이 시청자에게 (dramaScripts DRAMA_VOICES).
+  // 앞뒤 무음을 잘라(trim) 대사 사이를 0.15초로 - 사이가 1초 넘게 비면 말이 뚝뚝 끊겨 들린다 (2026-10-31 사장님)
   const texts = drama.lines.map((l) => l.text);
-  const byVoice = async (who: "a" | "b") =>
-    generateNarration(drama!.lines.map((l) => (l.who === who ? l.text : "")), { voice: DRAMA_VOICES[who] });
-  const [va, vb, vn] = [await byVoice("a"), await byVoice("b"), await generateNarration([TIP_FOLLOW_LINE, ctaSpoken], { voice: DRAMA_VOICES.narrator })];
-  const lineNarr = drama.lines.map((l, i) => (l.who === "a" ? va?.[i] : vb?.[i]) ?? null);
-  const narr = [...lineNarr, vn?.[0] ?? null, vn?.[1] ?? null];
-  // 대사 사이는 0.25초만 - 주고받는 맛이 나게
+  const tail = [TIP_FOLLOW_LINE, ctaSpoken];
+  const byVoice = async (who: "a" | "b") => {
+    const lines = [...drama!.lines.map((l) => (l.who === who ? l.text : "")), ...(who === "b" ? tail : ["", ""])];
+    return generateNarration(lines, { ...DRAMA_VOICES[who], trim: true });
+  };
+  const va = await byVoice("a");
+  const vb = await byVoice("b");
+  const narr = [...drama.lines.map((l, i) => (l.who === "a" ? va?.[i] : vb?.[i]) ?? null), vb?.[texts.length] ?? null, vb?.[texts.length + 1] ?? null];
   const segments = narr.map((l, i) => {
     const sec = l?.seconds ?? 0;
-    if (i < texts.length) return Math.max(1.3, sec + 0.25);
-    return Math.max(i === texts.length ? 1.8 : 3.0, sec + 0.3);
+    if (i < texts.length) return Math.max(1.0, sec + 0.15);
+    return i === texts.length ? Math.max(1.6, sec + 0.35) : Math.max(3.0, sec + 0.6);
   });
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
   const inputProps = {

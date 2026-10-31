@@ -13,6 +13,19 @@ import os
 import sys
 
 
+def trim_silence(wav, sr: int, pad: float = 0.06):
+    """앞뒤 무음 자르기 - 대화형 드라마는 대사 사이가 비면 말이 뚝뚝 끊겨 들린다 (2026-10-31 사장님 "멘트가 끊긴다")"""
+    import numpy as np
+
+    a = np.abs(wav)
+    thr = max(1e-4, float(a.max()) * 0.02)
+    idx = np.where(a > thr)[0]
+    if len(idx) == 0:
+        return wav
+    p = int(sr * pad)
+    return wav[max(0, idx[0] - p): min(len(wav), idx[-1] + p)]
+
+
 def main() -> None:
     req = json.loads(sys.stdin.buffer.read().decode("utf-8"))  # 윈도우 기본 인코딩(cp949) 회피
     import soundfile as sf
@@ -31,6 +44,9 @@ def main() -> None:
             continue
         try:
             wav, dur = tts.synthesize(line, voice_style=style, lang="ko", speed=speed)
+            if req.get("trim"):
+                wav = trim_silence(wav.squeeze(), tts.sample_rate)
+                dur = float(wav.shape[-1]) / float(tts.sample_rate)
             # wav(44.1kHz)는 줄마다 수백 KB 라 렌더 props 가 커진다(롱폼 9줄) → mp3 로 약 1/4
             path = os.path.join(out_dir, f"line{i}.mp3")
             sf.write(path, wav.squeeze(), tts.sample_rate, format="MP3")
