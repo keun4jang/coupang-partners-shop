@@ -45,7 +45,7 @@ import { hasYoutubeEnv, uploadShortToYoutube, youtubeTitle, suppressAutoCaptions
 import { DISCLOSURE_SHORT_TEXT, disclosureEdgesOn } from "../remotion/config/videoConfig";
 import { instagramCaption, tipCaptionBody, youtubeShortsDescription, youtubeTipDescription, youtubeTipTitle } from "../src/lib/publishCopy";
 import { reviewedTip } from "../src/lib/tipScripts";
-import { DRAMA_VOICES, checkDramaSafety, dramaForTopic } from "../src/lib/dramaScripts";
+import { DRAMA_VOICES, type DramaScript, checkDramaSafety, dramaForTopic } from "../src/lib/dramaScripts";
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
 import { findOwn, inPhotoCutsArm, makeImageCuts, ownGalleryImages, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
 import { cutoutProduct } from "../src/lib/cutout";
@@ -1748,6 +1748,18 @@ async function renderTipProductVideo(
   // 첫 문장의 답 단계를 맨 끝으로 (궁금증을 끝까지)
   const atip = arrangeAnswerLast(tip);
   const n = item.display_number;
+  // 대화형 드라마 시험 (2026-11-01 사장님 "추천대로" - 11/1~11/14 하루 1~2편, 11/15 재판정): 어울림 검사를 통과한 주제에
+  // 검수 드라마 대본이 있고 번호가 3의 배수면 드라마로 만든다(하루 6편 중 최대 2편). 실패하면 꿀팁 영상으로 계속.
+  // broll_origin 에 "[드라마]"를 남겨 꿀팁 영상과 따로 잴 수 있게 한다. 끄기: DRAMA_FORMAT=off
+  const drama = dramaForTopic(atip.topic);
+  if (drama && n % 3 === 0 && optionalEnv("DRAMA_FORMAT") !== "off") {
+    try {
+      const r = await renderDramaVideo(item, product, drama);
+      return { videoPath: r.videoPath, brollOrigin: `대화형 드라마 [드라마] ${TIP_ORIGIN_TAG}${atip.topic}`, brollFiles: [], tipTopic: atip.topic, seconds: r.seconds };
+    } catch (e) {
+      console.warn(`드라마 렌더 실패 → 꿀팁 영상으로: ${(e as Error).message.slice(0, 160)}`);
+    }
+  }
   const own = isOwnProduct(product);
   // 마지막 상품 소개: "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님 "상품이 띡 나오기보다 어떤 분한테 필요한 상품인지").
   // 상품 문구 만들 때 같이 만든 '누구에게' 줄(hook_text 첫 줄, 정책 검사 거침)을 쓴다. 없으면 예전 문장.
@@ -1822,6 +1834,65 @@ async function renderTipProductVideo(
 }
 
 /**
+ * 대화형 드라마 렌더 (데모·운영 공통). 대본 안전 검사 → 엄마/누나(a)·나(b) 두 목소리 → TemplateChat.
+ * 상품 어울림 검사는 호출부가 이미 통과시킨 주제만 넘긴다.
+ */
+async function renderDramaVideo(row: VideoItem, product: Product, drama: DramaScript): Promise<{ videoPath: string; seconds: number }> {
+  const n = row.display_number;
+  const issues = checkDramaSafety(drama);
+  if (issues.length) throw new Error(`드라마 대본 안전 검사 탈락: ${issues.join(", ")}`);
+
+  const own = isOwnProduct(product);
+  const heading = tipProductHeading(row.hook_text);
+  const ctaSpoken = heading
+    ? `${TIP_PRODUCT_INTRO} ${heading}, 프로필 링크에서 ${n}번이에요`
+    : `${TIP_PRODUCT_INTRO} 프로필 링크에서 ${n}번이에요`;
+  // 목소리: 엄마(a)·아들(b) 둘만 - 팔로우·상품 안내는 아들이 시청자에게 (dramaScripts DRAMA_VOICES).
+  // 앞뒤 무음을 잘라(trim) 대사 사이를 0.15초로 - 사이가 1초 넘게 비면 말이 뚝뚝 끊겨 들린다 (2026-10-31 사장님)
+  const texts = drama.lines.map((l) => l.text);
+  const tail = [TIP_FOLLOW_LINE, ctaSpoken];
+  const byVoice = async (who: "a" | "b") => {
+    const lines = [...drama.lines.map((l) => (l.who === who ? l.text : "")), ...(who === "b" ? tail : ["", ""])];
+    return generateNarration(lines, { ...DRAMA_VOICES[who], trim: true });
+  };
+  const va = await byVoice("a");
+  const vb = await byVoice("b");
+  const narr = [...drama.lines.map((l, i) => (l.who === "a" ? va?.[i] : vb?.[i]) ?? null), vb?.[texts.length] ?? null, vb?.[texts.length + 1] ?? null];
+  const segments = narr.map((l, i) => {
+    const sec = l?.seconds ?? 0;
+    // 0.1초(말풍선 소리 뒤 지연) + 끝 여유 0.2초
+    if (i < texts.length) return Math.max(1.0, sec + 0.3);
+    return i === texts.length ? Math.max(1.6, sec + 0.35) : Math.max(3.0, sec + 0.6);
+  });
+  const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
+  const inputProps = {
+    title: drama.title,
+    names: drama.names,
+    lines: drama.lines,
+    narration: narr.map((l) => l?.uri ?? null),
+    segments,
+    followText: TIP_FOLLOW_LINE,
+    product: { displayNumber: n, imageUrl, ctaText: `프로필 링크에서 ${n}번`, heading },
+    disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
+    disclosureMode: own ? "off" : disclosureEdgesOn() ? "edges" : "always",
+  };
+  const serveUrl = await getBundle();
+  const composition = await selectComposition({
+    serveUrl,
+    id: "TemplateChat",
+    inputProps,
+    browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
+  });
+  const outDir = path.join(RENDER_DIR, `${n}_drama`);
+  fs.mkdirSync(outDir, { recursive: true });
+  const videoPath = path.join(outDir, `${n}번_드라마.mp4`);
+  const seconds = segments.reduce((a, b) => a + b, 0);
+  console.log(`렌더링 시작: TemplateChat(대화형 드라마) · ${seconds.toFixed(1)}초 → ${videoPath}`);
+  await renderMedia({ composition, serveUrl, codec: "h264", outputLocation: videoPath, inputProps, browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE") });
+  return { videoPath, seconds };
+}
+
+/**
  * 대화형 드라마 샘플 (2026-10-31 사장님 "스토리가 들어간 드라마 타이즈 릴스" → "추천대로 해봐"). 게시·DB 기록 없음.
  * 상품에 맞는 검수 꿀팁 주제를 고르고(어울림 검사 4점 이상 - 사장님 10/31 "소개 상품이 내용이랑 상관없으면 그렇다"),
  * 그 주제의 검수 드라마 대본이 있을 때만 만든다. 없으면 만들지 않는다(엉뚱한 상품 소개 금지).
@@ -1860,56 +1931,7 @@ async function runDramaDemo(): Promise<void> {
     if (process.env.DEMO_SEND_TELEGRAM === "1") await sendTelegramMessage(`🎭 ${msg}`).catch(() => {});
     return;
   }
-  const issues = checkDramaSafety(drama);
-  if (issues.length) throw new Error(`드라마 대본 안전 검사 탈락: ${issues.join(", ")}`);
-
-  const own = isOwnProduct(product);
-  const heading = tipProductHeading(row.hook_text);
-  const ctaSpoken = heading
-    ? `${TIP_PRODUCT_INTRO} ${heading}, 프로필 링크에서 ${n}번이에요`
-    : `${TIP_PRODUCT_INTRO} 프로필 링크에서 ${n}번이에요`;
-  // 목소리: 엄마(a)·아들(b) 둘만 - 팔로우·상품 안내는 아들이 시청자에게 (dramaScripts DRAMA_VOICES).
-  // 앞뒤 무음을 잘라(trim) 대사 사이를 0.15초로 - 사이가 1초 넘게 비면 말이 뚝뚝 끊겨 들린다 (2026-10-31 사장님)
-  const texts = drama.lines.map((l) => l.text);
-  const tail = [TIP_FOLLOW_LINE, ctaSpoken];
-  const byVoice = async (who: "a" | "b") => {
-    const lines = [...drama!.lines.map((l) => (l.who === who ? l.text : "")), ...(who === "b" ? tail : ["", ""])];
-    return generateNarration(lines, { ...DRAMA_VOICES[who], trim: true });
-  };
-  const va = await byVoice("a");
-  const vb = await byVoice("b");
-  const narr = [...drama.lines.map((l, i) => (l.who === "a" ? va?.[i] : vb?.[i]) ?? null), vb?.[texts.length] ?? null, vb?.[texts.length + 1] ?? null];
-  const segments = narr.map((l, i) => {
-    const sec = l?.seconds ?? 0;
-    // 0.1초(말풍선 소리 뒤 지연) + 끝 여유 0.2초
-    if (i < texts.length) return Math.max(1.0, sec + 0.3);
-    return i === texts.length ? Math.max(1.6, sec + 0.35) : Math.max(3.0, sec + 0.6);
-  });
-  const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
-  const inputProps = {
-    title: drama.title,
-    names: drama.names,
-    lines: drama.lines,
-    narration: narr.map((l) => l?.uri ?? null),
-    segments,
-    followText: TIP_FOLLOW_LINE,
-    product: { displayNumber: n, imageUrl, ctaText: `프로필 링크에서 ${n}번`, heading },
-    disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
-    disclosureMode: own ? "off" : disclosureEdgesOn() ? "edges" : "always",
-  };
-  const serveUrl = await getBundle();
-  const composition = await selectComposition({
-    serveUrl,
-    id: "TemplateChat",
-    inputProps,
-    browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE"),
-  });
-  const outDir = path.join(RENDER_DIR, `${n}_drama`);
-  fs.mkdirSync(outDir, { recursive: true });
-  const videoPath = path.join(outDir, `${n}번_드라마.mp4`);
-  const seconds = segments.reduce((a, b) => a + b, 0);
-  console.log(`렌더링 시작: TemplateChat(대화형 드라마) · ${seconds.toFixed(1)}초 → ${videoPath}`);
-  await renderMedia({ composition, serveUrl, codec: "h264", outputLocation: videoPath, inputProps, browserExecutable: optionalEnv("REMOTION_BROWSER_EXECUTABLE") });
+  const { videoPath, seconds } = await renderDramaVideo(row, product, drama);
   console.log(`\n=== [드라마 데모] 완료 (업로드/DB 기록 없음) ===\n${videoPath}`);
   if (process.env.DEMO_SEND_TELEGRAM === "1") {
     await sendTelegramVideo(videoPath, `🎭 대화형 드라마 샘플 (게시 안 됨) ${n}번 ${product.product_name.slice(0, 40)}\n이야기: ${drama.title} · 꿀팁: ${drama.topic} · ${seconds.toFixed(0)}초`);
