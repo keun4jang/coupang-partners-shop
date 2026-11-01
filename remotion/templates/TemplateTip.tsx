@@ -397,6 +397,9 @@ const ProgressBar: React.FC = () => {
 };
 
 /** 장면 전환 효과음 (ffmpeg 로 직접 만든 소리 - public/sfx, 저작권 없음) */
+/** 목소리 시작 지연(프레임) - 효과음과 첫 글자가 겹치면 끊겨 들린다. 무음을 잘라 낸 뒤라 필요 (2026-11-01, 드라마와 같은 방식) */
+const VOICE_DELAY = 3;
+
 const Sfx: React.FC<{ name: "pop" | "whoosh"; volume?: number }> = ({ name, volume = 0.35 }) => (
   <Audio src={staticFile(`sfx/${name}.mp3`)} volume={volume} />
 );
@@ -434,21 +437,21 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
         <Shade hook />
         <Hook text={props.hook} count={props.steps.length} answer={props.answer} />
         <Sfx name="pop" />
-        <Narration src={props.narration?.[0]} />
+        <Sequence from={VOICE_DELAY}><Narration src={props.narration?.[0]} /></Sequence>
       </Sequence>
       {props.steps.map((st, i) => (
         <Sequence key={i} from={f(starts[i + 1])} durationInFrames={f(seg[i + 1])}>
           <Shade />
           <StepCard n={i + 1} step={st} segFrames={f(seg[i + 1])} isAnswer={i + 1 === (props.answer ?? -1)} />
           <Sfx name="whoosh" volume={0.3} />
-          <Narration src={props.narration?.[i + 1]} />
+          <Sequence from={VOICE_DELAY}><Narration src={props.narration?.[i + 1]} /></Sequence>
         </Sequence>
       ))}
       <Sequence from={f(starts[outroIdx])} durationInFrames={f(seg[outroIdx])}>
         <Shade />
         <Recap steps={props.steps} answer={props.answer} />
         <Sfx name="whoosh" volume={0.3} />
-        <Narration src={props.narration?.[outroIdx]} />
+        <Sequence from={VOICE_DELAY}><Narration src={props.narration?.[outroIdx]} /></Sequence>
       </Sequence>
       {props.product && (
         <Sequence from={f(starts[productIdx])} durationInFrames={f(seg[productIdx])}>
@@ -459,7 +462,7 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
             heading={props.product.heading}
             large
           />
-          <Narration src={props.narration?.[productIdx]} />
+          <Sequence from={VOICE_DELAY}><Narration src={props.narration?.[productIdx]} /></Sequence>
         </Sequence>
       )}
       {/* 끝에서 첫 장면이 서서히 떠올라 처음으로 이어지게 (다시 보기) */}

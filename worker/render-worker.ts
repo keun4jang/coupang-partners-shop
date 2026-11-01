@@ -1782,11 +1782,13 @@ async function renderTipProductVideo(
   // 정리 화면에서는 단계를 다시 읽지 않고(아트디렉터: 방금 들은 걸 또 읽으면 이탈) 팔로우 한 마디만 - 나머지는 나레이션 + 0.3초로 촘촘하게
   const recapAt = atip.steps.length + 1;
   const spoken = [tipOpeningLine(atip), ...atip.steps.map((st) => `${st.title}. ${st.detail}`), TIP_FOLLOW_LINE, ctaSpoken];
-  const narr = await generateNarration(spoken);
+  // 줄마다 앞뒤 무음을 잘라 낸다 (2026-11-01 사장님 "꿀팁 영상도 무음 줄이는 거 적용" - 줄마다 약 1초씩 비어 늘어졌다).
+  // 장면 길이 = 소리 + 0.1초(효과음 뒤 지연, TemplateTip VOICE_DELAY) + 끝 여유 0.25초
+  const narr = await generateNarration(spoken, { trim: true });
   const segments = spoken.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;
     const min = i === 0 ? 2.0 : i === recapAt ? 1.8 : i === recapAt + 1 ? 3.0 : 2.8;
-    return Math.max(min, sec + 0.3);
+    return Math.max(min, sec + 0.35);
   });
   const inputProps = {
     topic: shortTopic(atip.topic),
