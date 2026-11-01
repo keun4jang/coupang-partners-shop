@@ -1781,13 +1781,25 @@ async function renderTipProductVideo(
   if (brollFiles.length) cachedBundle = null;
   // 정리 화면에서는 단계를 다시 읽지 않고(아트디렉터: 방금 들은 걸 또 읽으면 이탈) 팔로우 한 마디만 - 나머지는 나레이션 + 0.3초로 촘촘하게
   const recapAt = atip.steps.length + 1;
-  const spoken = [tipOpeningLine(atip), ...atip.steps.map((st) => `${st.title}. ${st.detail}`), TIP_FOLLOW_LINE, ctaSpoken];
-  // 줄마다 앞뒤 무음을 잘라 낸다 (2026-11-01 사장님 "꿀팁 영상도 무음 줄이는 거 적용" - 줄마다 약 1초씩 비어 늘어졌다).
-  // 장면 길이 = 소리 + 0.1초(효과음 뒤 지연, TemplateTip VOICE_DELAY) + 끝 여유 0.25초
-  const narr = await generateNarration(spoken, { trim: true });
+  // 단계는 제목·설명을 따로 녹음한다 - 설명 자막을 설명 목소리가 실제로 시작·끝나는 때에 맞추기 위해
+  // (2026-11-01 사장님 "말이랑 자막이랑 다른 듯": 한 줄로 녹음해 글자 수로 어림하니 자막이 목소리보다 앞서갔다).
+  // 앞뒤 무음은 잘라 낸다(11/1 "꿀팁 영상도 무음 줄이는 거"). 장면 = 0.1초(효과음 뒤 지연) + 소리 + 끝 여유
+  const k = atip.steps.length;
+  const spoken = [tipOpeningLine(atip), ...atip.steps.map((st) => st.title), TIP_FOLLOW_LINE, ctaSpoken];
+  const all = await generateNarration([...spoken, ...atip.steps.map((st) => st.detail)], { trim: true });
+  const narr = all ? all.slice(0, spoken.length) : null;
+  const detailNarr = all ? all.slice(spoken.length) : null;
+  const TITLE_GAP = 0.15;
+  const VOICE_DELAY_SEC = 0.1;
+  // 설명 목소리 시작(장면 시작 기준 초) - 템플릿이 이때 설명 소리를 틀고 자막을 띄운다
+  const detailAt = atip.steps.map((_, j) => VOICE_DELAY_SEC + (narr?.[j + 1]?.seconds ?? 0.9) + TITLE_GAP);
   const segments = spoken.map((_, i) => {
     const sec = narr?.[i]?.seconds ?? 0;
-    const min = i === 0 ? 2.0 : i === recapAt ? 1.8 : i === recapAt + 1 ? 3.0 : 2.8;
+    if (i >= 1 && i <= k) {
+      const d = detailNarr?.[i - 1]?.seconds ?? 0;
+      return Math.max(2.8, detailAt[i - 1] + d + 0.3);
+    }
+    const min = i === 0 ? 2.0 : i === recapAt ? 1.8 : 3.0;
     return Math.max(min, sec + 0.35);
   });
   const inputProps = {
@@ -1798,6 +1810,9 @@ async function renderTipProductVideo(
     brollFiles: brollFiles.length ? brollFiles : null,
     brollDurations: brollFiles.length ? brollFileDurations(brollFiles) : null,
     narration: narr ? narr.map((l) => l?.uri ?? null) : null,
+    detailNarration: detailNarr ? detailNarr.map((l) => l?.uri ?? null) : null,
+    detailAt: narr ? detailAt : null,
+    detailSeconds: detailNarr ? detailNarr.map((l) => l?.seconds ?? null) : null,
     segments,
     answer: atip.answer,
     product: { displayNumber: n, imageUrl, ctaText, heading },

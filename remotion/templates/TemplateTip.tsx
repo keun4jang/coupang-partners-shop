@@ -31,6 +31,12 @@ export type TipProps = {
   brollDurations?: number[] | null;
   /** [훅, 단계1..N, 마무리] 나레이션 (data URI) */
   narration?: (string | null)[] | null;
+  /** 단계 설명 목소리(단계별) - 있으면 narration 의 단계 칸은 제목 목소리만 담는다 (2026-11-01 자막·목소리 맞추기) */
+  detailNarration?: (string | null)[] | null;
+  /** 단계 장면 시작부터 설명 목소리가 시작되는 때(초) */
+  detailAt?: number[] | null;
+  /** 단계 설명 목소리 길이(초) - 자막을 이 동안만 넘긴다 */
+  detailSeconds?: (number | null)[] | null;
   /** [훅, 단계1..N, 마무리(, 상품)] 장면 길이(초) */
   segments?: number[] | null;
   /** 꿀팁 + 상품 마무리 영상이면 마지막 상품 화면 (없으면 순수 정보 영상 - 고지 없음) */
@@ -207,12 +213,12 @@ const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number
   const span = Math.max(1, endFrame - startFrame);
   const lens = chunks.map((c) => c.join(" ").length);
   const total = lens.reduce((a, b) => a + b, 0);
-  // 묶음별 시작 프레임 (글자 수 비율, 최소 14프레임)
+  // 묶음별 시작 프레임 (글자 수 비율, 최소 10프레임 - 너무 길면 목소리보다 뒤처진다)
   const startsF: number[] = [];
   let accF = startFrame;
   for (const l of lens) {
     startsF.push(accF);
-    accF += Math.max(14, Math.round((l / total) * span));
+    accF += Math.max(10, Math.round((l / total) * span));
   }
   let ci = 0;
   for (let i = 0; i < startsF.length; i++) if (frame >= startsF[i]) ci = i;
@@ -255,18 +261,27 @@ const WordCaption: React.FC<{ text: string; startFrame: number; endFrame: number
   );
 };
 
-const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number; isAnswer?: boolean }> = ({ n, step, segFrames, isAnswer }) => {
+const StepCard: React.FC<{ n: number; step: TipStep; segFrames: number; isAnswer?: boolean; detailFrom?: number; detailTo?: number }> = ({
+  n,
+  step,
+  segFrames,
+  isAnswer,
+  detailFrom,
+  detailTo,
+}) => {
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
   const rise = spring({ frame, fps, config: { damping: 15, stiffness: 170 } });
   // 나레이션은 "제목. 설명" - 설명이 시작되는 때를 글자 수 비율로 어림
   const titleShare = step.title.length / (step.title.length + step.detail.length + 2);
   // 제목만 있는 빈 구간은 0.4초 이하로 (아트디렉터 3차: 위쪽이 텅 빈다)
-  const detailStart = Math.min(12, Math.round(segFrames * titleShare * 0.9));
+  // 설명 목소리 시작·끝을 알면(2026-11-01~) 그대로 쓴다 - 자막이 목소리와 같이 간다. 모르면 예전 어림
+  const detailStart = detailFrom ?? Math.min(12, Math.round(segFrames * titleShare * 0.9));
+  const detailEnd = detailTo ?? segFrames - 12;
   return (
     <AbsoluteFill>
       {/* 자막은 카드 바로 위(28px)에 붙여 한 덩어리로 */}
-      <WordCaption text={step.detail} startFrame={detailStart} endFrame={segFrames - 12} bottomPx={Math.round(H - H * 0.53 + 28)} />
+      <WordCaption text={step.detail} startFrame={detailStart} endFrame={detailEnd} bottomPx={Math.round(H - H * 0.53 + 28)} />
       <div
         style={{
           position: "absolute",
@@ -442,9 +457,21 @@ export const TemplateTip: React.FC<TipProps> = (props) => {
       {props.steps.map((st, i) => (
         <Sequence key={i} from={f(starts[i + 1])} durationInFrames={f(seg[i + 1])}>
           <Shade />
-          <StepCard n={i + 1} step={st} segFrames={f(seg[i + 1])} isAnswer={i + 1 === (props.answer ?? -1)} />
+          <StepCard
+            n={i + 1}
+            step={st}
+            segFrames={f(seg[i + 1])}
+            isAnswer={i + 1 === (props.answer ?? -1)}
+            detailFrom={props.detailAt?.[i] != null ? f(props.detailAt[i]) : undefined}
+            detailTo={props.detailAt?.[i] != null && props.detailSeconds?.[i] ? f(props.detailAt[i] + (props.detailSeconds[i] as number)) : undefined}
+          />
           <Sfx name="whoosh" volume={0.3} />
           <Sequence from={VOICE_DELAY}><Narration src={props.narration?.[i + 1]} /></Sequence>
+          {props.detailAt?.[i] != null && (
+            <Sequence from={f(props.detailAt[i])}>
+              <Narration src={props.detailNarration?.[i]} />
+            </Sequence>
+          )}
         </Sequence>
       ))}
       <Sequence from={f(starts[outroIdx])} durationInFrames={f(seg[outroIdx])}>
