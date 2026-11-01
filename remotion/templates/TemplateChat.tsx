@@ -12,7 +12,7 @@ import { FontFaceStyle } from "../components/FontFaceStyle";
  * 메신저 대화가 한 줄씩 올라오고 두 목소리가 주고받는다. 이야기 속에서 검수본 꿀팁이 풀리고,
  * 마지막에 "팔로우" 한 마디 → "오늘의 추천 상품도 알려드릴게요" → 상품 사진·번호.
  * - "연출된 이야기" 표시는 2026-10-31 사장님 요청으로 뺐다. 대신 등장인물이 상품을 써 봤다·좋았다고 말하지 않는다(후기로 오인 방지 - 대본 검사가 막는다).
- * - 특정 메신저 모양·색(상표)을 흉내 내지 않고 메모지 팔레트(MEMO)만 쓴다.
+ * - 대화방 색은 카톡 기본색과 같게(2026-11-01 사장님). 로고·이름·말풍선 꼬리 모양은 쓰지 않는다.
  */
 export type ChatLine = { who: "a" | "b"; text: string };
 
@@ -55,6 +55,9 @@ export function chatDurationSeconds(p: ChatProps): number {
 }
 
 const H = VIDEO.height;
+/** 대화방 색 - 카톡 기본 대화방과 같은 색 (2026-11-01 사장님 "배경도 흰색, 말풍선도 흰색이라 구분이 안 돼, 카톡 기본색이랑 똑같이").
+ *  로고·이름은 쓰지 않고 색만. 내 말풍선 노랑·상대 흰색·배경 하늘빛 회색 */
+const CHAT = { bg: "#B2C7D9", mine: "#FEE500", other: "#FFFFFF", text: "#191919" } as const;
 /** 대사 소리 시작 지연(프레임) - 렌더 워커는 장면 길이에 이만큼(0.1초)을 더해 둔다 */
 export const VOICE_DELAY = 3;
 const W = VIDEO.width;
@@ -108,8 +111,8 @@ const Bubble: React.FC<{ line: ChatLine; name: string; showName: boolean; enterF
         style={{
           maxWidth: BUBBLE_MAX,
           padding: `${PAD_Y}px ${PAD_X}px`,
-          background: mine ? INK.ink : "#FFFFFF",
-          color: mine ? INK.paper : INK.ink,
+          background: mine ? CHAT.mine : CHAT.other,
+          color: CHAT.text,
           fontFamily,
           fontWeight: 700,
           fontSize: FONT,
@@ -137,7 +140,7 @@ const Typing: React.FC<{ mine: boolean }> = ({ mine }) => {
           display: "flex",
           gap: 10,
           padding: "22px 28px",
-          background: mine ? INK.ink : "#FFFFFF",
+          background: mine ? CHAT.mine : CHAT.other,
           borderRadius: 30,
           boxShadow: "0 6px 18px rgba(36,33,28,0.10)",
         }}
@@ -149,7 +152,7 @@ const Typing: React.FC<{ mine: boolean }> = ({ mine }) => {
               width: 14,
               height: 14,
               borderRadius: 7,
-              background: mine ? INK.paper : INK.ink,
+              background: CHAT.text,
               opacity: 0.35 + 0.65 * Math.max(0, Math.sin((frame - i * 4) / 4)),
             }}
           />
@@ -253,12 +256,12 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
   const typingOn = nextIdx > 0 && nextIdx < n && frame >= starts[nextIdx] - f(0.35);
 
   return (
-    <AbsoluteFill style={{ background: INK.paper }}>
+    <AbsoluteFill style={{ background: CHAT.bg }}>
       <FontFaceStyle />
       {/* 아주 옅은 줄 - 메모지 느낌 */}
       <AbsoluteFill
         style={{
-          backgroundImage: "repeating-linear-gradient(0deg, rgba(36,33,28,0.045) 0 2px, transparent 2px 96px)",
+          backgroundImage: "none",
         }}
       />
       <Title text={props.title} />
