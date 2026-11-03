@@ -81,6 +81,9 @@ export function countWord(n: number): string {
 /** 강조 노랑 */
 const HILITE = INK.accent;
 const H = VIDEO.height;
+/** 글자 기준선 - 첫 화면 문구·단계 자막·"정리" 글씨의 세로 가운데를 모두 여기에 맞춘다
+ *  (2026-11-03 사장님 "자막 위아래 위치가 달라 시선이 왔다 갔다 해서 불편, 가운데 정렬로"). 단계 자막 칸 가운데(카드 위 28px, 높이 220)와 같은 줄 */
+const TEXT_CENTER_Y = Math.round(H * 0.53 - 28 - 110);
 
 /**
  * 2026-10-28 아트디렉터 검토(4/10 "PPT 슬라이드 - 볼 장면이 없다") 반영 개편:
@@ -129,7 +132,8 @@ const Hook: React.FC<{ text: string; count: number; answer?: number | null }> = 
   void frame;
   const parts = splitPhrase(text);
   return (
-    <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: H * 0.3 }}>
+    <AbsoluteFill>
+      <div style={{ position: "absolute", left: 0, width: "100%", top: TEXT_CENTER_Y, transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{ color: "rgba(255,253,248,0.85)", fontFamily, fontWeight: 700, fontSize: 40, letterSpacing: "0.08em", marginBottom: 36 }}>
         오늘의 살림 꿀팁
       </div>
@@ -159,6 +163,7 @@ const Hook: React.FC<{ text: string; count: number; answer?: number | null }> = 
       {/* 한 가지 말만 - '세 가지'는 목소리와 진행 막대가 알려 준다 (아트디렉터 3차) */}
       <div style={{ marginTop: 44, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 56, textShadow: INK.textShadow }}>
         핵심은 {answer ?? count}번
+      </div>
       </div>
     </AbsoluteFill>
   );
@@ -348,7 +353,7 @@ const Recap: React.FC<{ steps: TipStep[]; answer?: number | null }> = ({ steps, 
   const { fps, width } = useVideoConfig();
   return (
     <AbsoluteFill>
-      <div style={{ position: "absolute", top: H * 0.425, width: "100%", textAlign: "center", color: INK.paper, fontFamily: tapeFontFamily, fontSize: 76, textShadow: INK.textShadow }}>
+      <div style={{ position: "absolute", top: TEXT_CENTER_Y, transform: "translateY(-50%)", width: "100%", textAlign: "center", color: INK.paper, fontFamily: tapeFontFamily, fontSize: 76, lineHeight: 1.2, textShadow: INK.textShadow }}>
         정리
       </div>
       <div style={{ position: "absolute", top: H * 0.51, left: width * 0.06, width: width * 0.88, display: "flex", flexDirection: "column", gap: 20 }}>
