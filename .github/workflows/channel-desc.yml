@@ -1,0 +1,50 @@
+# 유튜브 채널 소개 보기/바꾸기 (2026-11-03 사장님 "유튜브 채널 소개도 바꿔줘"). 문구는 scripts/channel-description.ts.
+name: channel-desc
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "off = 지금 소개와 새 소개를 보기만 / on = 실제로 바꾸기"
+        required: true
+        default: "off"
+        type: choice
+        options: ["off", "on"]
+
+jobs:
+  desc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 워커 환경변수 확인
+        id: check
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then echo "ready=false" >> "$GITHUB_OUTPUT"; else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+      - name: .env.local 생성 (시크릿에서)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: printf '%s\n' "$WORKER_ENV" > .env.local
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+      - name: node_modules 캐시
+        if: steps.check.outputs.ready == 'true'
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true' && steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: 채널 소개
+        if: steps.check.outputs.ready == 'true'
+        env:
+          APPLY: ${{ github.event.inputs.apply == 'on' && '1' || '0' }}
+        run: npx tsx scripts/channel-description.ts
