@@ -38,3 +38,17 @@ export function unpackHookText(hookText: string | null | undefined): {
   if (lines.length === 1) return { forWho: null, hook: lines[0] };
   return { forWho: cleanForWho(lines[0]), hook: lines.slice(1).join(" ") };
 }
+
+/**
+ * 마무리 화면 소개 줄 - "캠핑 자주 가는 분께 필요한 물건" (2026-10-22 사장님).
+ * 문구 지시문이 "~하는 분께"와 "~하는 집" 두 형태를 허용하는데, 예전엔 "께"로 끝나는 것만 받아 "~집" 형태는 소개 줄이 사라졌다
+ * (2026-11-04 사장님 540번 "원인 찾아서 고쳐줘"). 이제 둘 다 받는다. 알 수 없는 형태면 null.
+ */
+export function forWhoHeading(hookText: string | null | undefined): string | null {
+  const who = unpackHookText(hookText).forWho;
+  if (!who) return null;
+  if (/께$/.test(who)) return `${who} 필요한 물건`;
+  if (/(집|가정|댁)$/.test(who)) return `${who}에 필요한 물건`;
+  if (/(분|분들)$/.test(who)) return `${who}께 필요한 물건`;
+  return null;
+}

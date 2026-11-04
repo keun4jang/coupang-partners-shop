@@ -49,7 +49,7 @@ import { DRAMA_VOICES, type DramaScript, checkDramaSafety, dramaForTopic } from 
 import { isOwnProduct, OWN_SCREEN_DISCLOSURE } from "../src/lib/ownProducts";
 import { findOwn, inPhotoCutsArm, makeImageCuts, ownGalleryImages, PHOTO_CUTS_ORIGIN, PHOTO_CUTS_START } from "../src/lib/photoCuts";
 import { cutoutProduct } from "../src/lib/cutout";
-import { packHookText, unpackHookText } from "../src/lib/coverText";
+import { forWhoHeading, packHookText, unpackHookText } from "../src/lib/coverText";
 import { backfillSubLinks, ensureSubLink } from "../src/lib/subLinks";
 import { shortsVariantOf } from "../src/lib/tracking";
 import {
@@ -104,9 +104,9 @@ function tipRecapLine(tip: { steps: { title: string }[] }): string {
 }
 /** "캠핑 자주 가는 분께" → "캠핑 자주 가는 분께 필요한 물건" (누구에게 줄이 없거나 "~께"로 안 끝나면 null) */
 function tipProductHeading(hookText: string | null | undefined): string | null {
-  const who = unpackHookText(hookText).forWho;
-  if (!who || !/께$/.test(who)) return null;
-  return `${who} 필요한 물건`;
+  const h = forWhoHeading(hookText);
+  if (!h) console.log(`마무리 소개 줄 없음 (누구에게 줄: ${unpackHookText(hookText).forWho ?? "없음"})`);
+  return h;
 }
 function tipTopicOf(brollOrigin: string | null | undefined): string | null {
   const i = brollOrigin?.lastIndexOf(TIP_ORIGIN_TAG) ?? -1;

@@ -6,7 +6,7 @@
  *
  * 실행: npx tsx scripts/cover-text-selftest.ts
  */
-import { cleanForWho, packHookText, unpackHookText, FOR_WHO_MAX } from "../src/lib/coverText";
+import { cleanForWho, forWhoHeading, packHookText, unpackHookText, FOR_WHO_MAX } from "../src/lib/coverText";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -40,6 +40,15 @@ function check(label: string, cond: boolean, detail = ""): void {
 {
   const r = unpackHookText(null);
   check("null 은 둘 다 null", r.hook === null && r.forWho === null);
+}
+
+// 5. 마무리 소개 줄 (2026-11-04: "~하는 집" 형태가 버려져 540번 소개 줄이 사라졌다)
+{
+  check("분께 형태", forWhoHeading(packHookText("캠핑 자주 가는 분께", "훅")) === "캠핑 자주 가는 분께 필요한 물건");
+  check("집 형태", forWhoHeading(packHookText("외풍 심한 오래된 집", "훅")) === "외풍 심한 오래된 집에 필요한 물건");
+  check("분 형태", forWhoHeading(packHookText("겨울이 추운 분", "훅")) === "겨울이 추운 분께 필요한 물건");
+  check("누구에게 줄 없음", forWhoHeading("훅만 있음") === null);
+  check("알 수 없는 형태", forWhoHeading(packHookText("겨울 대비", "훅")) === null);
 }
 
 if (failures > 0) {
