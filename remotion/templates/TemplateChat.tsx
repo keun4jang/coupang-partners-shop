@@ -29,6 +29,8 @@ export type ChatProps = {
   disclosureMode?: DisclosureMode | null;
   /** 대화 뒤 팔로우 한 줄 (2026-10-31 사장님) */
   followText?: string | null;
+  /** 대화 뒤 "정리" 카드 - 검수 꿀팁 단계 제목 (2026-11-04 사장님 "스토리 → 마지막에 정리 → 추천 상품 → 끝") */
+  recap?: string[] | null;
 };
 
 export const defaultChatProps: ChatProps = {
@@ -219,6 +221,76 @@ const FollowPill: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+/** 대화가 끝난 뒤 "정리" - 하늘빛 위 흰 카드 + 노란 번호 (대화방 색과 같은 한 벌) */
+const RecapScene: React.FC<{ items: string[] }> = ({ items }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const cover = interpolate(frame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
+  const t = spring({ frame, fps, config: { damping: 14 } });
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{ background: CHAT.bg, opacity: cover }} />
+      <div
+        style={{
+          position: "absolute",
+          top: H * 0.3,
+          width: "100%",
+          textAlign: "center",
+          color: CHAT.text,
+          fontFamily: tapeFontFamily,
+          fontSize: 84,
+          opacity: Math.min(1, t * 1.5),
+          transform: `scale(${1.1 - 0.1 * t})`,
+        }}
+      >
+        정리
+      </div>
+      <div style={{ position: "absolute", top: H * 0.39, left: 70, right: 70, display: "flex", flexDirection: "column", gap: 26 }}>
+        {items.map((it, i) => {
+          const k = spring({ frame: frame - 6 - i * 6, fps, config: { damping: 15 } });
+          return (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 26,
+                background: CHAT.other,
+                borderRadius: 26,
+                padding: "26px 32px",
+                boxShadow: "0 6px 18px rgba(36,33,28,0.10)",
+                opacity: Math.min(1, k * 2),
+                transform: `translateX(${(1 - k) * 80}px)`,
+              }}
+            >
+              <span
+                style={{
+                  flex: "0 0 auto",
+                  background: CHAT.mine,
+                  color: CHAT.text,
+                  fontFamily: tapeFontFamily,
+                  fontSize: 52,
+                  lineHeight: 1,
+                  width: 74,
+                  height: 74,
+                  borderRadius: 37,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingTop: 6,
+                }}
+              >
+                {i + 1}
+              </span>
+              <span style={{ color: CHAT.text, fontFamily, fontWeight: 800, fontSize: 52, lineHeight: 1.25, wordBreak: "keep-all" }}>{it}</span>
+            </div>
+          );
+        })}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 const ProductCover: React.FC = () => {
   const frame = useCurrentFrame();
   // 대화방과 같은 하늘빛으로 덮는다 - 검정으로 바뀌면 흐름이 끊긴다 (2026-11-04 사장님 "마지막에 검정 배경 이거 맞나")
@@ -302,7 +374,11 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
         </Sequence>
       ))}
       <Sequence from={starts[n]} durationInFrames={f(seg[n])}>
-        <FollowPill text={props.followText ?? "도움 됐다면 팔로우해 두세요"} />
+        {props.recap?.length ? (
+          <RecapScene items={props.recap} />
+        ) : (
+          <FollowPill text={props.followText ?? "도움 됐다면 팔로우해 두세요"} />
+        )}
         <Narration src={props.narration?.[n]} />
       </Sequence>
       {props.product && (

@@ -1904,7 +1904,8 @@ async function renderDramaVideo(row: VideoItem, product: Product, drama: DramaSc
     const sec = l?.seconds ?? 0;
     // 0.1초(말풍선 소리 뒤 지연) + 끝 여유 0.2초
     if (i < texts.length) return Math.max(1.0, sec + 0.3);
-    return i === texts.length ? Math.max(1.6, sec + 0.35) : Math.max(3.0, sec + 0.6);
+    // 정리 화면은 세 줄을 읽을 시간(최소 3초) - 목소리는 그동안 팔로우 한 마디 (2026-11-04 사장님 "스토리 → 정리 → 추천 상품")
+    return Math.max(3.0, sec + 0.6);
   });
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
   const inputProps = {
@@ -1914,6 +1915,8 @@ async function renderDramaVideo(row: VideoItem, product: Product, drama: DramaSc
     narration: narr.map((l) => l?.uri ?? null),
     segments,
     followText: TIP_FOLLOW_LINE,
+    // 정리 카드는 검수 꿀팁의 단계 제목 그대로 (대사와 같은 내용, 새 정보 없음)
+    recap: reviewedTip(drama.topic)?.steps.map((st) => st.title) ?? null,
     product: { displayNumber: n, imageUrl, ctaText: `프로필 링크에서 ${n}번`, heading },
     disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
     disclosureMode: own ? "off" : disclosureEdgesOn() ? "edges" : "always",
