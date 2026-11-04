@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { shortenProductName } from "@/lib/format";
@@ -74,7 +73,7 @@ async function findByNumber(q: string): Promise<VideoItemWithProduct | null> {
 /**
  * 그리드 카드: 회색 사진 칸 + 남색 번호 라벨, 아래 제품명. 카드 전체가 /n/[번호] 링크.
  * 2026-10-17 디자인 개편: 홈(/)·안내 페이지(/n)와 같은 모양 (그림자·둥근 카드 없음).
- * 2026-10-20 사장님 "가격을 미리 다 적어놓으면 안 누른다": 목록에서는 가격을 빼고, 눌러서 들어간 안내 페이지(/n)에서만 보인다.
+ * 2026-10-20 사장님 "가격을 미리 다 적어놓으면 안 누른다": 목록에서는 가격을 뺀다. 11/4~ 가격은 쿠팡에서만 (안내 페이지도 가격 없음).
  */
 function HubCard({
   item,
@@ -84,9 +83,11 @@ function HubCard({
   platform: HubPlatform;
 }) {
   const product: Product = item.products;
-  const href = `/n/${item.display_number}?${trackingQuery(HUB_TRACKING[platform])}`;
+  // 2026-11-04 사장님 "누르면 이 페이지(/n)가 아니라 바로 쿠팡이 떠야 해": 카드는 /go(집계·봇 거르기 후 쿠팡 직행)로.
+  // 고지는 이 페이지 카드 위에 있다. Link 대신 <a> - 미리 불러오기(prefetch)가 /go 를 건드리지 않게.
+  const href = `/go/${item.display_number}?${trackingQuery(HUB_TRACKING[platform])}`;
   return (
-    <Link href={href} className="block">
+    <a href={href} rel="sponsored nofollow" className="block">
       <div className="relative aspect-square bg-[#eef1f0] flex items-center justify-center">
         {product.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -109,7 +110,7 @@ function HubCard({
           {shortenProductName(product.product_name, 28)}
         </h3>
       </div>
-    </Link>
+    </a>
   );
 }
 

@@ -224,13 +224,7 @@ export default async function NumberPage({
         <h1 className="text-[22px] leading-[1.4] font-bold tracking-[-0.01em] break-keep">
           {shortenProductName(product.product_name, 44)}
         </h1>
-        {product.price_text && (
-          <p className="mt-3 text-[20px] font-bold">{product.price_text}</p>
-        )}
-        {/* 가격은 상품 수집 시점 스냅샷이라 지금과 다를 수 있다. 오인 소지를 없앤다. */}
-        <p className="mt-1 text-[12.5px] text-[#676b66]">
-          영상 만들 때 가격이에요. 지금 가격은 판매 페이지에서 확인해 주세요.
-        </p>
+        {/* 가격은 보여 주지 않는다 - 쿠팡에서만 확인 (2026-11-04 사장님). 저장해 둔 가격은 지금과 다를 수도 있다. */}
 
         {points.length > 0 && (
           <section>
