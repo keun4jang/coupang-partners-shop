@@ -46,7 +46,10 @@ const SLUG_TO_PLATFORM: Record<string, HubPlatform> = {
   facebook: "facebook",
 };
 
-const RECENT_LIMIT = 24;
+/** 전체 상품을 아래로 내리며 다 볼 수 있게 (2026-11-04 사장님 "아래로 내리면 전체 상품 다 볼 수 있도록"). 예전 24개. 사진은 지연 로딩 */
+const RECENT_LIMIT = 1000;
+/** 첫 화면에 보이는 카드만 사진을 바로 불러온다 */
+const EAGER_IMAGES = 6;
 
 async function recentItems(): Promise<VideoItemWithProduct[]> {
   const { data } = await supabaseAdmin()
@@ -78,9 +81,11 @@ async function findByNumber(q: string): Promise<VideoItemWithProduct | null> {
 function HubCard({
   item,
   platform,
+  eager = false,
 }: {
   item: VideoItemWithProduct;
   platform: HubPlatform;
+  eager?: boolean;
 }) {
   const product: Product = item.products;
   // 2026-11-04 사장님 "누르면 이 페이지(/n)가 아니라 바로 쿠팡이 떠야 해": 카드는 /go(집계·봇 거르기 후 쿠팡 직행)로.
@@ -94,6 +99,8 @@ function HubCard({
           <img
             src={product.image_url}
             alt={product.product_name}
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
             className="w-[84%] h-[84%] object-contain mix-blend-multiply"
           />
         )}
@@ -210,11 +217,11 @@ export default async function HubPage({
       {dbReady && items.length > 0 && (
         <section className="px-5">
           <h2 className="text-[13px] font-medium text-[#676b66] pb-2 mb-3 border-b-[3px]" style={{ borderColor: TAPE }}>
-            최근 영상 상품
+            전체 영상 상품
           </h2>
           <div className="grid grid-cols-2 gap-x-3 gap-y-6">
-            {items.map((item) => (
-              <HubCard key={item.id} item={item} platform={platform} />
+            {items.map((item, i) => (
+              <HubCard key={item.id} item={item} platform={platform} eager={i < EAGER_IMAGES} />
             ))}
           </div>
         </section>
