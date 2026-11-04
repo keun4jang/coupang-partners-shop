@@ -23,6 +23,7 @@ on:
           - shelf-candidates
           - shelf-publish
           - wing-images
+          - hub-check
           - own-desc-fix
 
 concurrency:
