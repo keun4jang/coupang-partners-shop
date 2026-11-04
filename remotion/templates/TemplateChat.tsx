@@ -221,7 +221,8 @@ const FollowPill: React.FC<{ text: string }> = ({ text }) => {
 
 const ProductCover: React.FC = () => {
   const frame = useCurrentFrame();
-  return <AbsoluteFill style={{ background: "#2A2621", opacity: interpolate(frame, [0, 6], [0, 1], { extrapolateRight: "clamp" }) }} />;
+  // 대화방과 같은 하늘빛으로 덮는다 - 검정으로 바뀌면 흐름이 끊긴다 (2026-11-04 사장님 "마지막에 검정 배경 이거 맞나")
+  return <AbsoluteFill style={{ background: CHAT.bg, opacity: interpolate(frame, [0, 6], [0, 1], { extrapolateRight: "clamp" }) }} />;
 };
 
 const Sfx: React.FC<{ name: "pop" | "whoosh"; volume?: number }> = ({ name, volume = 0.3 }) => (
@@ -314,13 +315,14 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
             productImageUrl={props.product.imageUrl}
             heading={props.product.heading}
             large
+            onLight
           />
           <Sfx name="whoosh" />
           <Narration src={props.narration?.[productAt]} />
         </Sequence>
       )}
       {/* 끝 3초는 상품 화면(어두운 바탕)이라 흰 글자, 앞쪽은 메모지 바탕이라 먹색 */}
-      <Disclosure bottomPx={H * 0.26} onLight={!props.product || frame < starts[productAt]} />
+      <Disclosure bottomPx={H * 0.26} onLight />
     </AbsoluteFill>
   );
 };

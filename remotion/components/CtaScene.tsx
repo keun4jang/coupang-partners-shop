@@ -33,7 +33,9 @@ export const CtaScene: React.FC<{
   heading?: string | null;
   /** 꿀팁 영상 마무리용 큰 판 (2026-10-28 아트디렉터): 사진 크게, 번호 크게 한 번만, 아래 문장 없음 */
   large?: boolean;
-}> = ({ displayNumber, ctaText, productImageUrl, heading, large }) => {
+  /** 밝은 바탕 위(대화형 드라마의 하늘빛 대화방)에서 쓸 때 - 어두운 덮개 없이 먹색 글자 (2026-11-04 사장님 "마지막에 검정 배경 이거 맞나") */
+  onLight?: boolean;
+}> = ({ displayNumber, ctaText, productImageUrl, heading, large, onLight }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -53,28 +55,28 @@ export const CtaScene: React.FC<{
   if (large) {
     const H = 1920;
     return (
-      <AbsoluteFill style={{ background: MEMO.scrim, fontFamily }}>
-        {heading && (
-          <div
-            style={{
-              position: "absolute",
-              top: H * 0.205,
-              width: "100%",
-              textAlign: "center",
-              color: MEMO.onVideo,
-              fontWeight: 800,
-              fontSize: 54,
-              letterSpacing: "-0.02em",
-              wordBreak: "keep-all",
-              textShadow: MEMO.textShadow,
-              opacity: Math.min(1, pop * 1.5),
-            }}
-          >
-            {/* 2026-10-31 사장님: "오늘의 추천 상품도 알려드릴게요" - 목소리와 같은 말을 작게 */}
-            <div style={{ fontSize: 36, fontWeight: 700, opacity: 0.78, marginBottom: 10 }}>오늘의 추천 상품</div>
-            {heading}
-          </div>
-        )}
+      <AbsoluteFill style={{ background: onLight ? "transparent" : MEMO.scrim, fontFamily }}>
+        {/* "오늘의 추천 상품"은 소개 줄이 없어도 늘 띄운다 - 목소리가 늘 같은 말을 한다 (2026-11-04) */}
+        <div
+          style={{
+            position: "absolute",
+            top: H * 0.205,
+            width: "100%",
+            textAlign: "center",
+            color: onLight ? MEMO.ink : MEMO.onVideo,
+            fontWeight: 800,
+            fontSize: 54,
+            letterSpacing: "-0.02em",
+            wordBreak: "keep-all",
+            textShadow: onLight ? "none" : MEMO.textShadow,
+            opacity: Math.min(1, pop * 1.5),
+            paddingTop: heading ? 0 : 40,
+          }}
+        >
+          {/* 2026-10-31 사장님: "오늘의 추천 상품도 알려드릴게요" - 목소리와 같은 말 */}
+          <div style={{ fontSize: heading ? 36 : 48, fontWeight: 700, opacity: heading ? 0.78 : 0.9, marginBottom: 10 }}>오늘의 추천 상품</div>
+          {heading}
+        </div>
         <div
           style={{
             position: "absolute",
