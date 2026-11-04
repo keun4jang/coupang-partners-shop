@@ -1748,13 +1748,15 @@ async function renderTipProductVideo(
   // 첫 문장의 답 단계를 맨 끝으로 (궁금증을 끝까지)
   const atip = arrangeAnswerLast(tip);
   const n = item.display_number;
-  // 대화형 드라마 시험 (2026-11-01 사장님 "추천대로" - 11/1~11/14 하루 1~2편, 11/15 재판정): 어울림 검사를 통과한 주제에
-  // 검수 드라마 대본이 있고 번호가 3의 배수면 드라마로 만든다(하루 6편 중 최대 2편). 실패하면 꿀팁 영상으로 계속.
+  // 대화형 드라마 시험 (2026-11-01 사장님 "추천대로" - 11/1~11/14, 11/15 재판정): 어울림 검사를 통과한 주제에
+  // 검수 드라마 대본이 있으면 드라마로 만든다 - 하루(KST) 최대 2편. 실패하면 꿀팁 영상으로 계속.
+  // 11/4 주간 판정 뒤 사장님 "추천대로 진행": 예전 "번호 3의 배수" 조건은 대본 주제와 겹치는 일이 드물어 드라마가 0편이라 뺐다.
   // broll_origin 에 "[드라마]"를 남겨 꿀팁 영상과 따로 잴 수 있게 한다. 끄기: DRAMA_FORMAT=off
   const drama = dramaForTopic(atip.topic);
-  if (drama && n % 3 === 0 && optionalEnv("DRAMA_FORMAT") !== "off") {
+  if (drama && optionalEnv("DRAMA_FORMAT") !== "off" && (await dramaSlotsToday()) > 0) {
     try {
       const r = await renderDramaVideo(item, product, drama);
+      dramaRenderedThisRun++;
       return { videoPath: r.videoPath, brollOrigin: `대화형 드라마 [드라마] ${TIP_ORIGIN_TAG}${atip.topic}`, brollFiles: [], tipTopic: atip.topic, seconds: r.seconds };
     } catch (e) {
       console.warn(`드라마 렌더 실패 → 꿀팁 영상으로: ${(e as Error).message.slice(0, 160)}`);
@@ -1848,6 +1850,29 @@ async function renderTipProductVideo(
     tipTopic: atip.topic,
     seconds,
   };
+}
+
+/** 하루(KST) 드라마 상한 - 하루 6편 중 최대 2편 (2026-11-04) */
+const DRAMA_DAILY_MAX = 2;
+let dramaRenderedThisRun = 0;
+/** 오늘 남은 드라마 칸 수. DB 의 오늘(KST) "[드라마]" 영상 수 + 이번 실행에서 만든 수(아직 DB 에 안 들어갔을 수 있다). 조회 실패면 0(꿀팁 영상으로) */
+async function dramaSlotsToday(): Promise<number> {
+  try {
+    const kstMidnight = new Date(Date.now() + 9 * 3600_000);
+    kstMidnight.setUTCHours(0, 0, 0, 0);
+    const since = new Date(kstMidnight.getTime() - 9 * 3600_000).toISOString();
+    const { count } = await supabaseAdmin()
+      .from("video_items")
+      .select("id", { count: "exact", head: true })
+      .ilike("broll_origin", "%[드라마]%")
+      .gte("updated_at", since);
+    const used = Math.max(count ?? 0, dramaRenderedThisRun);
+    console.log(`드라마 오늘 ${used}/${DRAMA_DAILY_MAX}편`);
+    return DRAMA_DAILY_MAX - used;
+  } catch (e) {
+    console.warn(`드라마 칸 조회 실패 → 꿀팁 영상으로: ${(e as Error).message.slice(0, 80)}`);
+    return 0;
+  }
 }
 
 /**
