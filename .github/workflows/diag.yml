@@ -24,6 +24,7 @@ on:
           - shelf-publish
           - wing-images
           - hub-check
+          - tip-miss-report
           - own-desc-fix
 
 concurrency:
