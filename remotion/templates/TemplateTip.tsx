@@ -3,6 +3,7 @@ import { AbsoluteFill, Audio, Sequence, interpolate, spring, staticFile, useCurr
 import { Background } from "../components/Background";
 import { Narration } from "../components/Narration";
 import { MEMO as INK, VIDEO } from "../config/videoConfig";
+import { keywordSpans } from "../config/stepKeywords";
 import { fontFamily, tapeFontFamily } from "../fonts";
 import { CtaScene } from "../components/CtaScene";
 import { breakTier, gluedNext, splitPhrase } from "../components/phraseBreak";
@@ -379,7 +380,14 @@ const Recap: React.FC<{ steps: TipStep[]; answer?: number | null }> = ({ steps, 
               <span style={{ background: INK.ink, color: INK.paper, fontFamily: tapeFontFamily, fontSize: 52, lineHeight: 1, padding: "10px 18px 6px", borderRadius: 3 }}>
                 {i + 1}
               </span>
-              <span style={{ color: INK.ink, fontFamily: tapeFontFamily, fontSize: 58, wordBreak: "keep-all" }}>{st.title}</span>
+              {/* 핵심 낱말만 진하게 - 굵기가 하나뿐인 제목 글꼴 대신 본문 글꼴 900/400 (2026-11-05 사장님) */}
+              <span style={{ color: INK.ink, fontFamily, fontSize: 54, lineHeight: 1.25, wordBreak: "keep-all" }}>
+                {keywordSpans(st.title).map((p, j) => (
+                  <span key={j} style={{ fontWeight: p.strong ? 900 : 400 }}>
+                    {p.t}
+                  </span>
+                ))}
+              </span>
             </div>
           );
         })}

@@ -6,6 +6,7 @@ import { fontFamily, tapeFontFamily } from "../fonts";
 import { CtaScene } from "../components/CtaScene";
 import { Disclosure, type DisclosureMode } from "../components/Disclosure";
 import { FontFaceStyle } from "../components/FontFaceStyle";
+import { keywordSpans } from "../config/stepKeywords";
 
 /**
  * 대화형 드라마 쇼츠 (2026-10-31 사장님 "스토리가 들어간 드라마 타이즈 릴스" → 추천안 "대화형" 샘플).
@@ -282,7 +283,14 @@ const RecapScene: React.FC<{ items: string[] }> = ({ items }) => {
               >
                 {i + 1}
               </span>
-              <span style={{ color: CHAT.text, fontFamily, fontWeight: 800, fontSize: 52, lineHeight: 1.25, wordBreak: "keep-all" }}>{it}</span>
+              {/* 핵심 낱말만 진하게 (2026-11-05 사장님) */}
+              <span style={{ color: CHAT.text, fontFamily, fontSize: 52, lineHeight: 1.25, wordBreak: "keep-all" }}>
+                {keywordSpans(it).map((p, j) => (
+                  <span key={j} style={{ fontWeight: p.strong ? 900 : 400 }}>
+                    {p.t}
+                  </span>
+                ))}
+              </span>
             </div>
           );
         })}

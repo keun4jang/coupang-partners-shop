@@ -8,6 +8,7 @@ import { TIP_SCRIPTS, TIP_HOOKS, TIP_ANSWER, reviewedTip } from "../src/lib/tipS
 import { matchTipTopicByRule, matchTipTopicsByRule } from "../src/lib/tipMatch";
 import { OWN_PRODUCTS } from "../src/lib/ownProducts";
 import { DRAMA_SCRIPTS, checkDramaSafety } from "../src/lib/dramaScripts";
+import { STEP_KEYWORDS } from "../remotion/config/stepKeywords";
 
 let fail = 0;
 const check = (label: string, ok: boolean) => {
@@ -97,5 +98,10 @@ for (const d of DRAMA_SCRIPTS) {
   check(`드라마 대본 ${d.title}${iss.length ? `: ${iss.join(", ")}` : ""}`, !iss.length && TIP_SCRIPTS.some((t) => t.topic === d.topic));
 }
 check("드라마 검사: 사용 후기 대사는 반려", checkDramaSafety({ ...DRAMA_SCRIPTS[0], lines: [...DRAMA_SCRIPTS[0].lines, { who: "b", text: "이 제품 써봤는데 좋더라" }] }).length > 0);
+// 정리 카드 진한 낱말 (2026-11-05): 모든 단계 제목에 있고, 낱말이 제목 안에 그대로 있어야 한다
+for (const t of TIP_SCRIPTS) for (const st of t.steps) {
+  const k = STEP_KEYWORDS[st.title];
+  if (!k?.length || !k.every((w) => st.title.includes(w))) check(`정리 카드 진한 낱말 - ${st.title}`, false);
+}
 console.log(fail ? `❌ ${fail}건 실패` : "✅ 전부 통과");
 process.exit(fail ? 1 : 0);
