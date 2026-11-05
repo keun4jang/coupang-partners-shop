@@ -758,6 +758,94 @@ export const TIP_SCRIPTS: ReviewedTip[] = [
     outro: "바닥이 비면 청소도 쉬워져요",
     stockQueries: ["desk cable management", "home office desk", "power strip cables"],
   },
+  {
+    topic: "옷 어깨 자국 안 생기게 거는 법",
+    hook: "옷 어깨에 뿔처럼 튀어나온 자국, 옷걸이 탓이에요",
+    steps: [
+      { title: "어깨에 맞는 옷걸이", detail: "옷걸이가 어깨보다 좁거나 넓으면 자국이 생겨요" },
+      { title: "니트는 접어서 보관", detail: "무거운 니트는 걸어 두면 늘어나 어깨가 튀어나와요" },
+      { title: "가는 철 옷걸이 피하기", detail: "가는 옷걸이는 한 곳에 무게가 몰려 자국이 남아요" },
+    ],
+    outro: "생긴 자국은 물을 살짝 뿌려 펴 말려요",
+    stockQueries: ["clothes hangers closet", "organized wardrobe", "folding sweater"],
+  },
+  {
+    topic: "선풍기·에어컨 틈새 먼지 청소 순서",
+    hook: "선풍기 날개 사이 먼지, 물부터 쓰면 더 붙어요",
+    steps: [
+      { title: "전원 플러그 먼저 뽑기", detail: "청소하다 갑자기 켜지거나 감전되는 걸 막아요" },
+      { title: "마른 솔로 먼지 털기", detail: "물을 먼저 쓰면 먼지가 뭉쳐 틈에 붙어요" },
+      { title: "다 마른 뒤에 켜기", detail: "물기가 남은 채 켜면 고장 날 수 있어요" },
+    ],
+    outro: "에어컨 필터는 설명서 주기대로 씻어요",
+    stockQueries: ["cleaning fan dust", "air conditioner cleaning", "dusting blinds"],
+  },
+  {
+    topic: "차 유리 김서림 줄이는 법",
+    hook: "겨울 아침 차 유리 김서림, 이렇게 줄여요",
+    steps: [
+      { title: "에어컨 켜서 습기 빼기", detail: "에어컨은 겨울에도 공기 속 습기를 줄여요" },
+      { title: "유리 안쪽 깨끗이 닦기", detail: "손자국과 기름때가 있으면 김이 더 잘 서려요" },
+      { title: "외부 공기로 바꾸기", detail: "내부 순환만 하면 습기가 차 안에 갇혀요" },
+    ],
+    outro: "젖은 우산과 옷은 트렁크에 둬요",
+    stockQueries: ["foggy car windshield", "car interior winter", "driving winter morning"],
+  },
+  {
+    topic: "공기청정기 필터 관리 습관",
+    hook: "공기청정기 필터, 물로 씻으면 안 되는 것도 있어요",
+    steps: [
+      { title: "겉 망은 자주 청소하기", detail: "큰 먼지를 거르는 앞쪽 망에 먼지가 쌓여요" },
+      { title: "교체 주기 지키기", detail: "알림이나 설명서 주기에 맞춰 바꿔요" },
+      { title: "헤파 필터는 물세척 금지", detail: "대부분 젖으면 거르는 힘이 떨어져요" },
+    ],
+    outro: "벽에서 조금 띄워 둬야 공기가 잘 돌아요",
+    stockQueries: ["air purifier home", "living room clean air", "replacing air filter"],
+  },
+  {
+    topic: "가스레인지 기름때 닦는 순서",
+    hook: "가스레인지 기름때, 굳기 전에 닦으면 금방이에요",
+    steps: [
+      { title: "완전히 식힌 뒤 닦기", detail: "뜨거울 때 닦으면 데일 수 있어요" },
+      { title: "받침은 따뜻한 물에 불리기", detail: "눌어붙은 기름때가 불어서 잘 떨어져요" },
+      { title: "쓴 날 바로 닦기", detail: "기름이 굳기 전에 닦으면 금방 지워져요" },
+    ],
+    outro: "긁어낼 땐 표면이 상하지 않게 살살요",
+    stockQueries: ["cleaning gas stove", "kitchen stove cleaning", "wiping kitchen counter"],
+  },
+  {
+    topic: "변기 청소 순서",
+    hook: "변기 냄새, 여기를 안 닦아서예요",
+    steps: [
+      { title: "변기 바깥과 바닥도", detail: "튄 물이 마르면 냄새가 남아요" },
+      { title: "솔은 물기 털어 말리기", detail: "젖은 채 두면 냄새가 나기 쉬워요" },
+      { title: "안쪽 테두리 밑 닦기", detail: "물이 나오는 테두리 밑에 때가 잘 껴요" },
+    ],
+    outro: "물을 내릴 땐 뚜껑을 닫아요",
+    stockQueries: ["cleaning bathroom toilet", "bathroom cleaning", "clean white bathroom"],
+  },
+  {
+    topic: "전자레인지로 데울 때 덮개 쓰는 법",
+    hook: "전자레인지 덮개, 꽉 닫으면 튀어 올라요",
+    steps: [
+      { title: "전자레인지용인지 확인", detail: "덮개에 전자레인지 사용 표시가 있어야 해요" },
+      { title: "중간에 한 번 저어 주기", detail: "가운데까지 고르게 데워져요" },
+      { title: "덮개는 살짝 틈 두기", detail: "김이 빠질 틈이 있어야 덮개가 안 튀어요" },
+    ],
+    outro: "꺼낼 땐 김이 뜨거우니 조심해요",
+    stockQueries: ["microwave reheating food", "microwave kitchen", "warming leftovers"],
+  },
+  {
+    topic: "캠핑 버너 안전하게 쓰는 법",
+    hook: "캠핑 버너, 텐트 안에서 켜면 안 되는 이유",
+    steps: [
+      { title: "바람막이로 불꽃 지키기", detail: "불이 꺼지면 가스만 새어 나올 수 있어요" },
+      { title: "버너보다 큰 냄비 피하기", detail: "넘친 열이 가스통을 데워 위험해요" },
+      { title: "텐트 안에서 쓰지 않기", detail: "환기가 안 되면 일산화탄소가 쌓여요" },
+    ],
+    outro: "가스통은 서늘한 곳에 보관해요",
+    stockQueries: ["camping stove cooking", "campsite cooking outdoors", "camping morning coffee"],
+  },
 ];
 
 /**
@@ -833,6 +921,14 @@ export const TIP_HOOKS: Record<string, string> = {
   "겨울 수도 동파 막는 법": "한파 예보엔 수도를 조금 틀어 두세요",
   "전기장판 안전하게 쓰는 법": "전기장판을 접어서 쓰면 열선이 상해요",
   "책상 밑 전선 정리하는 법": "멀티탭을 바닥에서 띄우면 달라져요",
+  "옷 어깨 자국 안 생기게 거는 법": "철사 옷걸이에 걸면 어깨 뿔이 생겨요",
+  "선풍기·에어컨 틈새 먼지 청소 순서": "틈새 먼지는 마른 솔이 먼저예요",
+  "차 유리 김서림 줄이는 법": "김서림, 내부 순환만 켜 둬서일 수 있어요",
+  "공기청정기 필터 관리 습관": "헤파 필터, 물로 씻으면 안 돼요",
+  "가스레인지 기름때 닦는 순서": "기름때는 굳기 전에 닦는 게 답이에요",
+  "변기 청소 순서": "변기 냄새, 테두리 밑을 안 닦아서예요",
+  "전자레인지로 데울 때 덮개 쓰는 법": "덮개는 꽉 닫지 말고 틈을 둬요",
+  "캠핑 버너 안전하게 쓰는 법": "버너는 텐트 안에서 켜면 안 돼요",
 };
 
 /**
@@ -907,6 +1003,14 @@ export const TIP_ANSWER: Record<string, number> = {
   "겨울 수도 동파 막는 법": 1,
   "전기장판 안전하게 쓰는 법": 1,
   "책상 밑 전선 정리하는 법": 1,
+  "옷 어깨 자국 안 생기게 거는 법": 3,
+  "선풍기·에어컨 틈새 먼지 청소 순서": 2,
+  "차 유리 김서림 줄이는 법": 3,
+  "공기청정기 필터 관리 습관": 3,
+  "가스레인지 기름때 닦는 순서": 3,
+  "변기 청소 순서": 3,
+  "전자레인지로 데울 때 덮개 쓰는 법": 3,
+  "캠핑 버너 안전하게 쓰는 법": 3,
 };
 /** 단계 순서를 바꾸면 말이 안 되는 주제 ("~순서" 주제는 따로 자동 제외) */
 export const KEEP_ORDER = new Set(["남은 밥 맛있게 얼리고 데우는 법", "해먹 편하게 치는 요령"]);

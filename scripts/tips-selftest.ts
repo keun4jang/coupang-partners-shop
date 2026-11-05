@@ -91,7 +91,7 @@ for (const t of TIP_SCRIPTS) {
 }
 check(`후킹 첫 문장 ${Object.keys(TIP_HOOKS).length}개 = 주제 ${TIP_SCRIPTS.length}개`, Object.keys(TIP_HOOKS).length === TIP_SCRIPTS.length);
 // 답 단계 지정 (2026-10-29): 모든 주제에 있고 단계 수 안
-check("답 단계 지정 67개 전부", TIP_SCRIPTS.every((t) => (TIP_ANSWER[t.topic] ?? 0) >= 1 && TIP_ANSWER[t.topic] <= t.steps.length));
+check(`답 단계 지정 ${TIP_SCRIPTS.length}개 전부`, TIP_SCRIPTS.every((t) => (TIP_ANSWER[t.topic] ?? 0) >= 1 && TIP_ANSWER[t.topic] <= t.steps.length));
 // 대화형 드라마 대본 (2026-10-31): 검수 꿀팁 주제에 묶여 있고 안전 검사 통과
 for (const d of DRAMA_SCRIPTS) {
   const iss = checkDramaSafety(d);

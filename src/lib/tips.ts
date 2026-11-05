@@ -92,6 +92,14 @@ export const TIP_TOPICS: TipTopic[] = [
   { topic: "겨울 수도 동파 막는 법", season: "winter", group: "계절" },
   { topic: "전기장판 안전하게 쓰는 법", season: "winter", group: "계절" },
   { topic: "책상 밑 전선 정리하는 법", group: "정리" },
+  { topic: "옷 어깨 자국 안 생기게 거는 법", group: "정리" },
+  { topic: "선풍기·에어컨 틈새 먼지 청소 순서", group: "청소" },
+  { topic: "차 유리 김서림 줄이는 법", group: "계절", season: "winter" },
+  { topic: "공기청정기 필터 관리 습관", group: "청소" },
+  { topic: "가스레인지 기름때 닦는 순서", group: "청소" },
+  { topic: "변기 청소 순서", group: "청소" },
+  { topic: "전자레인지로 데울 때 덮개 쓰는 법", group: "주방" },
+  { topic: "캠핑 버너 안전하게 쓰는 법", group: "캠핑" },
 ];
 
 export type TipScript = {
