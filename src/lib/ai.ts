@@ -622,6 +622,41 @@ function negativeToneRetryNote(badLines: string[]): string {
   ].join("\n");
 }
 
+/**
+ * Gemini 호출 - 잠깐 몰리는 오류(429·5xx·네트워크)는 10·30·60초 쉬고 다시, 그래도 503 이면 다른 무료 모델로 한 번 더
+ * (2026-11-06 사장님 "난리났네 해결해": 580·582번이 503 "high demand" 한 번에 실패로 끝났다). 비용 0원 - 무료 등급 모델만.
+ */
+const GEMINI_FALLBACK_MODEL = "gemini-flash-latest";
+const GEMINI_RETRY_WAITS_MS = [10_000, 30_000, 60_000];
+export function isTransientAiError(message: string): boolean {
+  return /Gemini API 오류 (429|500|502|503|504)|fetch failed|ETIMEDOUT|ECONNRESET|UND_ERR|socket hang up/i.test(message);
+}
+async function geminiPost(model: string, apiKey: string, body: unknown): Promise<Response> {
+  const call = (m: string) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify(body),
+    });
+  let last: Response | null = null;
+  for (let attempt = 0; attempt <= GEMINI_RETRY_WAITS_MS.length; attempt++) {
+    try {
+      last = await call(model);
+      if (last.ok || ![429, 500, 502, 503, 504].includes(last.status)) return last;
+      console.warn(`Gemini 일시 오류 ${last.status} (${attempt + 1}번째)`);
+    } catch (e) {
+      if (attempt === GEMINI_RETRY_WAITS_MS.length) throw e;
+      console.warn(`Gemini 연결 오류 (${attempt + 1}번째): ${(e as Error).message.slice(0, 80)}`);
+    }
+    if (attempt < GEMINI_RETRY_WAITS_MS.length) await new Promise((r) => setTimeout(r, GEMINI_RETRY_WAITS_MS[attempt]));
+  }
+  if (last && (last.status === 503 || last.status === 429) && model !== GEMINI_FALLBACK_MODEL) {
+    console.warn(`Gemini ${model} 계속 몰림 → ${GEMINI_FALLBACK_MODEL} 로 한 번 더`);
+    return call(GEMINI_FALLBACK_MODEL);
+  }
+  return last!;
+}
+
 /** Gemini(무료 등급 가능) 로 문구 생성. 실패 시 throw → 상위에서 폴백 */
 async function generateWithGemini(
   apiKey: string,
@@ -629,14 +664,7 @@ async function generateWithGemini(
 ): Promise<VideoCopy | null> {
   // flash-lite = 무료 등급·최저비용, -latest 별칭은 모델 폐기 시 자동으로 현행 모델로 이동
   const model = optionalEnv("GEMINI_MODEL") ?? "gemini-flash-lite-latest";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
+  const res = await geminiPost(model, apiKey, {
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       generationConfig: {
@@ -644,7 +672,6 @@ async function generateWithGemini(
         responseMimeType: "application/json",
         responseSchema: GEMINI_COPY_SCHEMA,
       },
-    }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -703,11 +730,7 @@ export async function geminiGenerateJson<T>(opts: {
 
   const model =
     opts.model ?? optionalEnv("GEMINI_MODEL") ?? "gemini-flash-lite-latest";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
+  const res = await geminiPost(model, apiKey, {
       ...(opts.system
         ? { systemInstruction: { parts: [{ text: opts.system }] } }
         : {}),
@@ -734,7 +757,6 @@ export async function geminiGenerateJson<T>(opts: {
         responseMimeType: "application/json",
         responseSchema: opts.schema,
       },
-    }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");

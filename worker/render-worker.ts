@@ -80,7 +80,7 @@ import {
   shortenProductName,
 } from "../src/lib/format";
 import { fillVideoCopy } from "../src/lib/videoItems";
-import { ctaLine, generateVideoCopy, composeScriptText } from "../src/lib/ai";
+import { ctaLine, generateVideoCopy, composeScriptText, isTransientAiError } from "../src/lib/ai";
 import { generateNarration } from "../src/lib/tts";
 import { fetchStockBrolls, fetchStockBrollsByQueries } from "../src/lib/broll";
 import { TIP_TOPICS, arrangeAnswerLast, generateTip, generateTipDraft, pickTopic, shortTopic } from "../src/lib/tips";
@@ -677,6 +677,19 @@ async function reclaimStaleGenerating(): Promise<void> {
   for (const row of data ?? []) {
     console.warn(`정체된 항목을 재시도 대기로 되돌림: ${formatDisplayNumber(row.display_number)}`);
   }
+
+  // AI(Gemini) 일시 오류로 실패한 항목은 다시 대기로 (2026-11-06 580·582번 "503 high demand") - 최근 2일만
+  const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const { data: transient } = await db
+    .from("video_items")
+    .update({ video_status: "pending", error_message: "AI 일시 오류로 실패했던 항목 - 자동으로 다시 시도합니다." })
+    .eq("video_status", "failed")
+    .gte("updated_at", twoDaysAgo)
+    .or("error_message.ilike.%Gemini API 오류 503%,error_message.ilike.%Gemini API 오류 429%,error_message.ilike.%Gemini API 오류 500%,error_message.ilike.%fetch failed%")
+    .select("id, display_number");
+  for (const row of transient ?? []) {
+    console.warn(`AI 일시 오류 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
+  }
 }
 
 interface SnsResult {
@@ -1171,6 +1184,15 @@ async function processItem(row: VideoItemWithProduct): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${number} 처리 실패:`, error);
+    // AI 일시 오류(재시도·다른 모델까지 실패)는 실패로 남기지 않고 다음 실행에 다시 (2026-11-06) - 알림도 보내지 않는다
+    if (isTransientAiError(message)) {
+      await db
+        .from("video_items")
+        .update({ video_status: "pending", error_message: `AI 일시 오류 - 다음 실행에 다시 시도: ${message.slice(0, 200)}` })
+        .eq("id", row.id);
+      console.warn(`${number}: AI 일시 오류라 다시 대기로 돌림`);
+      return;
+    }
     await db
       .from("video_items")
       // landing_visible 도 내린다 - 영상 없는 번호가 랜딩에 남으면 안 된다
