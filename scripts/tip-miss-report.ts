@@ -29,6 +29,9 @@ async function main() {
   const cand = all.filter((r) => r.status === "candidate");
   const candFit = cand.filter((r) => matchTipTopicsByRule(r.product_name).length > 0);
   console.log(`전체 상품 ${all.length}개 · 꿀팁없음으로 빠진 상품 ${missed.length}개 · 남은 후보 ${cand.length}개 (꿀팁 규칙 맞음 ${candFit.length}개)`);
+  const revived = missed.filter((r) => r.status === "candidate");
+  console.log(`꿀팁없음 기록이 있지만 다시 후보로 돌아온 상품 ${revived.length}개 (규칙 맞음 ${revived.filter((r) => matchTipTopicsByRule(r.product_name).length > 0).length}개)`);
+  for (const r of revived.slice(0, 40)) console.log(`  · ${r.product_name.slice(0, 36)} → ${matchTipTopicsByRule(r.product_name)[0]?.topic ?? "없음"}`);
 
   const days = tally(missed, (r) => (r.source_memo ?? "").match(/꿀팁없음 (\d{4}-\d{2}-\d{2})/)?.[1] ?? "?");
   console.log("\n── 꿀팁없음 날짜별 ──");
