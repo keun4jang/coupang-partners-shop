@@ -690,6 +690,20 @@ async function reclaimStaleGenerating(): Promise<void> {
   for (const row of transient ?? []) {
     console.warn(`AI 일시 오류 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
   }
+
+  // 한 번만: 어울림 검사가 '물건 자체 관리법' 꿀팁을 낮게 매겨 실패한 항목(581번 등)을 고친 뒤 다시 대기로.
+  // 고친 시각 이전 실패만 대상이라 다시 실패해도 반복되지 않는다 (2026-11-06)
+  const { data: fitFixed } = await db
+    .from("video_items")
+    .update({ video_status: "pending", error_message: "어울림 검사 수정 후 다시 시도합니다." })
+    .eq("video_status", "failed")
+    .gte("updated_at", twoDaysAgo)
+    .lt("updated_at", "2026-11-06T14:00:00Z")
+    .ilike("error_message", "%정보 꿀팁 주제가 맞지 않아%")
+    .select("id, display_number");
+  for (const row of fitFixed ?? []) {
+    console.warn(`어울림 검사 수정 전 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
+  }
 }
 
 interface SnsResult {
@@ -1758,6 +1772,12 @@ async function renderTipProductVideo(
       tip = t;
       break;
     }
+  }
+  // 사장님 본인 상품은 다른 상품으로 바꿀 수 없다 - 사람이 고른 규칙 주제가 있으면 그걸 쓴다
+  // (2026-11-06 581번 승마 안장 패드: '안장 패드 관리법'이 3점으로 탈락해 영상이 아예 안 나왔다)
+  if (!tip && isOwnProduct(product) && match.how === "낱말 규칙" && ordered[0]) {
+    tip = await generateTip(ordered[0]);
+    if (tip) console.log(`꿀팁 주제: 본인 상품이라 규칙 주제로 진행 - ${tip.topic}`);
   }
   if (!tip) {
     console.log("꿀팁 주제: 상품과 제대로 이어지는 꿀팁 없음");
