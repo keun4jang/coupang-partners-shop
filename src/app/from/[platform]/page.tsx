@@ -82,10 +82,13 @@ function HubCard({
   item,
   platform,
   eager = false,
+  big = false,
 }: {
   item: VideoItemWithProduct;
   platform: HubPlatform;
   eager?: boolean;
+  /** 맨 위 "방금 올라온 영상" 첫 카드 - 가로 꽉 차게, 번호·이름 크게 */
+  big?: boolean;
 }) {
   const product: Product = item.products;
   // 2026-11-04 사장님 "누르면 이 페이지(/n)가 아니라 바로 쿠팡이 떠야 해": 카드는 /go(집계·봇 거르기 후 쿠팡 직행)로.
@@ -93,7 +96,7 @@ function HubCard({
   const href = `/go/${item.display_number}?${trackingQuery(HUB_TRACKING[platform])}`;
   return (
     <a href={href} rel="sponsored nofollow" className="block">
-      <div className="relative aspect-square bg-[#eef1f0] flex items-center justify-center">
+      <div className={`relative ${big ? "aspect-[4/3]" : "aspect-square"} bg-[#eef1f0] flex items-center justify-center`}>
         {product.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -105,7 +108,7 @@ function HubCard({
           />
         )}
         <span
-          className={`absolute left-2 top-2.5 -rotate-[4deg] text-white rounded-[2px] px-2 pt-[3px] pb-[1px] text-[17px] tracking-[0.05em] shadow-[0_1px_0_rgba(0,0,0,0.18)] ${tapeFont.className}`}
+          className={`absolute left-2 top-2.5 -rotate-[4deg] text-white rounded-[2px] px-2 pt-[3px] pb-[1px] ${big ? "text-[26px]" : "text-[17px]"} tracking-[0.05em] shadow-[0_1px_0_rgba(0,0,0,0.18)] ${tapeFont.className}`}
           style={{ background: TAPE }}
         >
           {item.display_number}
@@ -113,8 +116,8 @@ function HubCard({
         </span>
       </div>
       <div className="pt-2.5">
-        <h3 className="font-medium text-[14px] leading-snug line-clamp-2 break-keep">
-          {shortenProductName(product.product_name, 28)}
+        <h3 className={`font-medium ${big ? "text-[17px]" : "text-[14px]"} leading-snug line-clamp-2 break-keep`}>
+          {shortenProductName(product.product_name, big ? 40 : 28)}
         </h3>
       </div>
     </a>
@@ -145,6 +148,11 @@ export default async function HubPage({
   }
 
   const hasAli = items.some((it) => it.products.source === "aliexpress");
+  // 맨 위 3개는 번호가 아니라 실제로 올라간 시각 순 - 다시 만든 옛 번호(예: 560번)도 방금 올라왔으면 위로
+  const latest = [...items]
+    .filter((it) => it.published_at)
+    .sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""))
+    .slice(0, 3);
 
   return (
     <div className={`bg-white min-h-screen text-[#1e1f1c] ${bodyFont.className}`}>
@@ -170,6 +178,23 @@ export default async function HubPage({
         <p className="px-5 text-[#676b66] text-[15px] mt-8">
           목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.
         </p>
+      )}
+
+      {/* 방금 올라온 영상 상품 3개를 먼저 크게 - 프로필로 오는 사람은 대개 방금 본 영상의 상품을 찾는다
+          (2026-11-08 사장님 "얍": 선택 과부하·기본값 효과. 541개 전체 목록은 아래에 그대로) */}
+      {dbReady && !q && latest.length > 0 && (
+        <section className="px-5 pt-6">
+          <h2 className="text-[15px] font-bold pb-2 mb-3 border-b-[3px]" style={{ borderColor: TAPE }}>
+            방금 올라온 영상
+          </h2>
+          <HubCard item={latest[0]} platform={platform} eager big />
+          {latest.length > 2 && (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-6 mt-6">
+              <HubCard item={latest[1]} platform={platform} eager />
+              <HubCard item={latest[2]} platform={platform} eager />
+            </div>
+          )}
+        </section>
       )}
 
       {/* 번호를 이미 기억하는 방문자를 위한 보조 검색 (주된 동선은 아래 그리드) */}
