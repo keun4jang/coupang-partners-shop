@@ -385,7 +385,7 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
         {props.recap?.length ? (
           <RecapScene items={props.recap} />
         ) : (
-          <FollowPill text={props.followText ?? "도움 됐다면 팔로우해 두세요"} />
+          <FollowPill text={props.followText ?? "필요할 때 보게 저장해 두세요"} />
         )}
         <Narration src={props.narration?.[n]} />
       </Sequence>

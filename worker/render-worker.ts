@@ -89,7 +89,8 @@ import { selectProductsForVideos } from "../src/lib/productSelector";
 /** 정보·꿀팁 영상 첫 나레이션 여는 말 (2026-10-22 사장님 "처음에 오늘의 꿀팁이라는 말을") - 화면 꼬리표와 같은 말 */
 const TIP_OPENER = "오늘의 살림 꿀팁";
 /** 정리 화면 한 마디 · 상품 소개 첫마디 (2026-10-31 사장님 "팔로우하라고 말하고, 그다음 오늘의 추천 상품도 알려드릴게요") */
-const TIP_FOLLOW_LINE = "도움 됐다면 팔로우해 두세요";
+// 2026-11-08 사장님 "저장 유도 멘트도 진행해": 꿀팁은 저장되는 콘텐츠라 저장을 먼저, 팔로우(10/31 사장님)는 이어서
+const TIP_FOLLOW_LINE = "필요할 때 보게 저장해 두세요. 팔로우하면 매일 꿀팁이 와요";
 const TIP_PRODUCT_INTRO = "오늘의 추천 상품도 알려드릴게요.";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
 const TIP_ORIGIN_TAG = "꿀팁:";
