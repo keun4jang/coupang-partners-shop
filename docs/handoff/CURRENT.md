@@ -4,7 +4,7 @@
 > 작업을 마칠 때마다 Claude 가 이 파일을 최신으로 고쳐 커밋·push 한다. 오래된 줄은 지운다(1페이지 유지).
 > 운영 규칙은 CLAUDE.md, 전략·실측은 docs/growth-plan.md. 지난 기록은 git 이력에 있다(11/4 정리 전 버전: 커밋 bd9c4ce 무렵).
 
-마지막 갱신: 2026-11-06
+마지막 갱신: 2026-11-08
 
 ## 지금 운영 중인 것 (사장님 확정)
 - **영상 형식**: 하루 6편 = 꿀팁+상품(TemplateTip) + 대화형 드라마(TemplateChat, 하루 최대 2편). 상품만 설명하는 영상 금지(10/26).
@@ -18,6 +18,7 @@
     단계 제목·설명 따로 녹음해 자막 동기화, 끝 "도움 됐다면 팔로우해 두세요" → "오늘의 추천 상품도 알려드릴게요" → 상품(번호 한 번만,
     "오늘의 추천 상품"은 늘 표시, 소개 줄은 forWhoHeading - "~분께/~집" 둘 다).
 - **허브**(/from/instagram·/from/youtube-shorts): 전체 상품(약 540개) 그리드, 카드 누르면 /go 로 쿠팡 직행, 가격은 어디에도 안 보임(11/4).
+  11/8 사장님 "얍"(심리 원리 릴스 보고 제안 1번 - 선택 과부하·기본값): 맨 위 "방금 올라온 영상" 3개 크게(발행 시각 순). 다음 후보: 끝 멘트를 저장 유도로(피크엔드).
 - **프로필**: 사진 docs/brand/profile-bulb-house.png(전구 속 집), 유튜브 소개는 channel-desc 워크플로, 인스타 소개는 사장님이 직접 바꿈(11/4 완료).
 - **샘플 보기**: render-demo(mode product+tipformat on / drama / voices) → demo-samples 브랜치 sample.mp4 → git 으로 받아 대화창에 보여 줌.
   사이트 점검은 diag hub-check(읽기만). 이 작업 환경에서 vercel.app·HuggingFace·Actions 보관함은 막혀 있다.
