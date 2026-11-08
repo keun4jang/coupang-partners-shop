@@ -9,6 +9,8 @@ async function main() {
     const go = html.match(/href="\/go\/(\d+)/g) ?? [];
     const n = html.match(/href="\/n\/(\d+)/g) ?? [];
     console.log(`/from/${p}: 카드 → /go ${go.length}개 · /n ${n.length}개 (예: ${go[0] ?? "-"})`);
+    const top = html.split("방금 올라온 영상")[1];
+    console.log(`  맨 위 '방금 올라온 영상': ${top ? (top.match(/href="\/go\/(\d+)/g) ?? []).slice(0, 3).map((h) => h.replace(/\D/g, "") + "번").join(", ") : "없음"}`);
   }
   const html = await (await fetch(`${BASE}/from/instagram`)).text();
   const num = html.match(/href="\/go\/(\d+)/)?.[1];
