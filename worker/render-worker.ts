@@ -705,6 +705,19 @@ async function reclaimStaleGenerating(): Promise<void> {
   for (const row of fitFixed ?? []) {
     console.warn(`어울림 검사 수정 전 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
   }
+
+  // 한 번만: 본인 상품이라 교체가 막혀 실패한 항목(600번 등)을 교체 허용 뒤 다시 대기로 (2026-11-11 사장님 "근사장 상품이 아니어도 돼")
+  const { data: ownFixed } = await db
+    .from("video_items")
+    .update({ video_status: "pending", error_message: "본인 상품 교체 허용 후 다시 시도합니다." })
+    .eq("video_status", "failed")
+    .gte("updated_at", "2026-11-09T00:00:00Z")
+    .lt("updated_at", "2026-11-11T09:05:00Z")
+    .ilike("error_message", "%정보 꿀팁 주제가 맞지 않아%")
+    .select("id, display_number");
+  for (const row of ownFixed ?? []) {
+    console.warn(`본인 상품 교체 허용 전 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
+  }
 }
 
 interface SnsResult {
@@ -928,13 +941,17 @@ async function publishToSns(
  * 수동 요청·본인 상품은 바꾸지 않는다(false → 호출부가 실패로 남김).
  */
 async function swapToTipProduct(item: VideoItem, product: Product): Promise<boolean> {
-  if (item.manual || isOwnProduct(product)) return false;
+  if (item.manual) return false;
   const db = supabaseAdmin();
-  const memo = `${product.source_memo ?? ""} [꿀팁없음 ${new Date().toISOString().slice(0, 10)}]`.trim();
-  const { error: pErr } = await db.from("products").update({ status: "paused", source_memo: memo }).eq("id", product.id);
-  if (pErr) {
-    console.warn(`꿀팁 없는 상품 빼기 실패: ${pErr.message.slice(0, 100)}`);
-    return false;
+  // 본인 상품(근사장)도 꿀팁이 안 맞으면 일반 상품으로 바꾼다 - 2026-11-11 사장님 "상품이 근사장 상품이 아니어도 돼"(600번).
+  // 본인 상품은 목록에서 빼지 않는다(paused 안 함) - 다른 날 다른 꿀팁으로 다시 쓸 수 있게.
+  if (!isOwnProduct(product)) {
+    const memo = `${product.source_memo ?? ""} [꿀팁없음 ${new Date().toISOString().slice(0, 10)}]`.trim();
+    const { error: pErr } = await db.from("products").update({ status: "paused", source_memo: memo }).eq("id", product.id);
+    if (pErr) {
+      console.warn(`꿀팁 없는 상품 빼기 실패: ${pErr.message.slice(0, 100)}`);
+      return false;
+    }
   }
   const [alt] = await selectProductsForVideos(1);
   if (!alt) {
