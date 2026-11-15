@@ -1814,14 +1814,18 @@ async function renderTipProductVideo(
   // broll_origin 에 "[드라마]"를 남겨 꿀팁 영상과 따로 잴 수 있게 한다. 끄기: DRAMA_FORMAT=off
   // 11/15 사장님 "추천대로 진행": 드라마 자리는 병맛형(짧은 농담 → 진짜 꿀팁 → 상품)을 먼저 - 상품이 대본 규칙에 맞을 때만,
   // 아니면 기존 이야기형. 2주 시험(~11/29), broll_origin "[병맛]"으로 따로 잰다. 병맛만 끄기: DRAMA_JOKE=off
+  // 같은 대본(=똑같은 대화·목소리) 영상은 30일에 한 번만 (2026-11-15 hit-analysis: 같은 드라마 두 번째 597번 0회·588번 1회 -
+  // 유튜브가 반복 영상으로 보고 안 보여 준 것으로 보인다). 이미 썼으면 다른 형식(병맛 → 이야기형 → 꿀팁 영상)으로.
+  const jokeCand = optionalEnv("DRAMA_JOKE") !== "off" ? dramaForTopic(atip.topic, "joke", product.product_name) : null;
+  const storyCand = dramaForTopic(atip.topic);
   const drama =
-    (optionalEnv("DRAMA_JOKE") !== "off" ? dramaForTopic(atip.topic, "joke", product.product_name) : null) ?? dramaForTopic(atip.topic);
+    (jokeCand && !(await dramaUsedRecently(jokeCand)) ? jokeCand : null) ??
+    (storyCand && !(await dramaUsedRecently(storyCand)) ? storyCand : null);
   if (drama && optionalEnv("DRAMA_FORMAT") !== "off" && (await dramaSlotsToday()) > 0) {
     try {
       const r = await renderDramaVideo(item, product, drama);
       dramaRenderedThisRun++;
-      const tag = drama.kind === "joke" ? "[드라마][병맛]" : "[드라마]";
-      return { videoPath: r.videoPath, brollOrigin: `대화형 드라마 ${tag} ${TIP_ORIGIN_TAG}${atip.topic}`, brollFiles: [], tipTopic: atip.topic, seconds: r.seconds };
+      return { videoPath: r.videoPath, brollOrigin: dramaOriginTag(drama), brollFiles: [], tipTopic: atip.topic, seconds: r.seconds };
     } catch (e) {
       console.warn(`드라마 렌더 실패 → 꿀팁 영상으로: ${(e as Error).message.slice(0, 160)}`);
     }
@@ -1917,6 +1921,29 @@ async function renderTipProductVideo(
 }
 
 /** 하루(KST) 드라마 상한 - 하루 6편 중 최대 2편 (2026-11-04) */
+/** broll_origin 기록 - 형식별 집계(format-compare·hit-analysis)와 같은 대본 반복 막기에 쓴다 */
+function dramaOriginTag(d: DramaScript): string {
+  return `대화형 드라마 ${d.kind === "joke" ? "[드라마][병맛]" : "[드라마]"} ${TIP_ORIGIN_TAG}${d.topic}`;
+}
+
+/** 같은 대본 영상을 최근 30일 안에 이미 만들었나. 조회 실패면 "썼다"로 본다(반복 영상보다 꿀팁 영상이 낫다) */
+async function dramaUsedRecently(d: DramaScript): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const { count, error } = await supabaseAdmin()
+      .from("video_items")
+      .select("id", { count: "exact", head: true })
+      .eq("broll_origin", dramaOriginTag(d))
+      .gte("updated_at", since);
+    if (error) throw error;
+    if ((count ?? 0) > 0) console.log(`드라마 "${d.title}" 최근 30일에 이미 씀 → 건너뜀`);
+    return (count ?? 0) > 0;
+  } catch (e) {
+    console.warn(`드라마 반복 조회 실패 → 건너뜀: ${(e as Error).message.slice(0, 80)}`);
+    return true;
+  }
+}
+
 const DRAMA_DAILY_MAX = 2;
 let dramaRenderedThisRun = 0;
 /** 오늘 남은 드라마 칸 수. DB 의 오늘(KST) "[드라마]" 영상 수 + 이번 실행에서 만든 수(아직 DB 에 안 들어갔을 수 있다). 조회 실패면 0(꿀팁 영상으로) */
