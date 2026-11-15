@@ -26,6 +26,7 @@ on:
           - hub-check
           - tip-miss-report
           - format-compare
+          - hit-analysis
           - own-desc-fix
 
 concurrency:
