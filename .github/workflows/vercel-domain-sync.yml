@@ -30,7 +30,8 @@ env:
 jobs:
   sync-domain:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 배포 대기 최대 15분 + 설치·승격 여유 (예전 10분은 대기 루프 15분보다 짧았다)
+    timeout-minutes: 20
     steps:
       - name: 토큰 확인
         id: check
@@ -43,6 +44,7 @@ jobs:
           fi
 
       - name: 이 커밋의 배포가 준비될 때까지 대기 후 도메인 재연결
+        id: sync
         if: steps.check.outputs.ready == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -51,9 +53,16 @@ jobs:
           set -e
           echo "커밋 $GIT_SHA 의 Vercel 배포 대기 중..."
           URL=""
+          HICCUPS=0
           for i in $(seq 1 90); do
-            RESP=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=10&teamId=$VERCEL_TEAM_ID")
+            # Vercel API 가 한 번 응답 없이 멈추면(curl 28) set -e 때문에 잡 전체가 죽었다 - 2026-11-15 실측.
+            # 한 번의 일시 오류는 "아직 준비 안 됨"으로 보고 다음 차례에 다시 묻는다(20초 제한).
+            if ! RESP=$(curl -sS --max-time 20 -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=10&teamId=$VERCEL_TEAM_ID"); then
+              HICCUPS=$((HICCUPS + 1))
+              echo "[$i/90] Vercel API 일시 오류 - 10초 후 다시 시도 (누적 $HICCUPS회)"
+              RESP='{}'
+            fi
             URL=$(GIT_SHA="$GIT_SHA" node -e "
               const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
               const sha = process.env.GIT_SHA;
@@ -100,11 +109,16 @@ jobs:
           # (옛 하드코딩 상수)이었고, 이미 지운 키워드로 상품이 등록됐다.
           # 배포를 프로덕션으로 승격시켜 둘을 다시 맞춘다.
           if [ -n "$DEP_ID" ]; then
-            CODE=$(curl -s -o /tmp/promote.json -w '%{http_code}' -X POST \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$DEP_ID?teamId=$VERCEL_TEAM_ID")
+            # 승격 호출도 일시 오류면 최대 3번 (2026-11-15)
+            for k in 1 2 3; do
+              CODE=$(curl -s --max-time 30 -o /tmp/promote.json -w '%{http_code}' -X POST \
+                -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$DEP_ID?teamId=$VERCEL_TEAM_ID" || echo 000)
+              case "$CODE" in 000|5??) HICCUPS=$((HICCUPS + 1)); echo "승격 일시 오류(HTTP $CODE) - 15초 후 다시 ($k/3)"; sleep 15 ;; *) break ;; esac
+            done
             if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
               echo "✅ 프로덕션 승격 완료 ($DEP_ID) - 크론이 이 코드로 돈다"
+              echo "hiccups=$HICCUPS" >> "$GITHUB_OUTPUT"
             elif [ "$CODE" = "409" ] && grep -q "already the current production deployment" /tmp/promote.json; then
               # 이미 프로덕션인 배포를 다시 승격시키려 한 것뿐이다(목표 상태는 이미
               # 달성됨) - 실측 2026-08-23: Vercel 이 push 를 이미 프로덕션으로 반영해둔
@@ -112,6 +126,7 @@ jobs:
               # (배포 버전 실측으로 확인). 이 조건만 성공으로 본다 - 다른 409(예: 배포가
               # 실패 상태라 승격 불가)까지 삼키지 않도록 메시지 내용을 반드시 확인한다.
               echo "✅ 이미 프로덕션 배포였다 ($DEP_ID) - 승격 불필요"
+              echo "hiccups=$HICCUPS" >> "$GITHUB_OUTPUT"
             else
               echo "::error::프로덕션 승격 실패(HTTP $CODE) - 크론이 옛 배포로 돕니다"
               cat /tmp/promote.json || true
@@ -120,6 +135,25 @@ jobs:
           else
             echo "::error::배포 ID를 못 찾아 프로덕션 승격을 건너뜁니다"
             exit 1
+          fi
+
+      # 일시 오류가 있었지만 스스로 다시 시도해 해결됐으면 "해결됨"도 알린다
+      # (2026-11-15 사장님 "문제를 말해 주고, 알아서 고쳐서 고친 것까지 말해 주면 좋겠다")
+      - name: 자동 복구 알림
+        if: success() && steps.sync.outputs.hiccups != '' && steps.sync.outputs.hiccups != '0'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+          HICCUPS: ${{ steps.sync.outputs.hiccups }}
+        run: |
+          BOT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_BOT_TOKEN=' | cut -d= -f2-)
+          CHAT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_ALLOWED_CHAT_ID=' | cut -d= -f2-)
+          if [ -n "$BOT" ] && [ -n "$CHAT" ]; then
+            curl -s -o /dev/null --max-time 20 -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+              --data-urlencode "chat_id=${CHAT}" \
+              --data-urlencode "text=🔧 자동 복구됨 (조치 필요 없음)
+
+          어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
+          무엇이: Vercel 응답이 ${HICCUPS}번 멈췄지만 자동으로 다시 시도해 최신 배포 연결·프로덕션 승격까지 끝냈어요."
           fi
 
       # 실패 시 텔레그램 알림 (웹사이트가 옛 버전에 멈추는 문제 조기 감지)
