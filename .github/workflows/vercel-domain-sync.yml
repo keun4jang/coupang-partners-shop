@@ -11,6 +11,13 @@
 # 필요한 것: 저장소 Settings → Secrets and variables → Actions 에
 #   VERCEL_TOKEN = Vercel 개인 액세스 토큰 (https://vercel.com/account/tokens)
 # 이 시크릿이 없으면 아무것도 하지 않고 조용히 종료한다.
+#
+# 문제를 만나면(2026-11-15 사장님 "문제를 텔레그램에 보내면서 해결도 하고 해결된 것까지 보내줘"):
+#   🚨 문제 알림 → 스스로 고치기(운영 브랜치 맨 위 커밋 배포로 다시 연결·승격) → ✅ 해결됨 / ❌ 못 고침 알림.
+#   못 고친 뒤 다음 실행이 성공하면 그때 ✅ 해결됨을 보낸다.
+# 거짓 경보 막기: 커밋이 연달아 올라오면 Vercel 은 앞 커밋 배포를 건너뛴다(11/15 15:31 실측 -
+#   14초 뒤 커밋이 올라와 앞 커밋 배포가 안 생겼고, 15분 기다리다 🚨가 갔지만 사이트는 이미 최신이었다).
+#   그래서 ① 새 실행이 오면 옛 실행은 취소하고 ② 기다리는 동안 더 새 커밋이 올라왔으면 조용히 넘긴다.
 
 name: vercel-domain-sync
 
@@ -27,11 +34,24 @@ env:
   VERCEL_TEAM_ID: team_K9RrJcr1OyeJodEA9g34IAKO
   VERCEL_DOMAIN: momitemmom.vercel.app
 
+# 커밋이 연달아 올라오면 앞 실행은 취소 - 새 실행이 더 새 배포를 연결한다(취소는 알림 없음)
+concurrency:
+  group: vercel-domain-sync
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   sync-domain:
     runs-on: ubuntu-latest
-    # 배포 대기 최대 15분 + 설치·승격 여유 (예전 10분은 대기 루프 15분보다 짧았다)
-    timeout-minutes: 20
+    # 배포 대기 15분 + 문제 때 스스로 고치기 10분 + 설치·승격 여유
+    timeout-minutes: 32
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: ${{ github.ref_name }}
+      SH: scripts/vercel-domain-sync.sh
     steps:
       - name: 토큰 확인
         id: check
@@ -43,133 +63,139 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 이 커밋의 배포가 준비될 때까지 대기 후 도메인 재연결
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          sparse-checkout: scripts/vercel-domain-sync.sh
+          sparse-checkout-cone-mode: false
+
+      - name: 이 커밋의 배포가 준비될 때까지 대기 후 도메인 재연결 (문제면 스스로 고침)
         id: sync
         if: steps.check.outputs.ready == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
           GIT_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set -e
           echo "커밋 $GIT_SHA 의 Vercel 배포 대기 중..."
-          URL=""
-          HICCUPS=0
+          URL=""; DEP_ID=""; HICCUPS=0; PROBLEM=""
           for i in $(seq 1 90); do
-            # Vercel API 가 한 번 응답 없이 멈추면(curl 28) set -e 때문에 잡 전체가 죽었다 - 2026-11-15 실측.
-            # 한 번의 일시 오류는 "아직 준비 안 됨"으로 보고 다음 차례에 다시 묻는다(20초 제한).
-            if ! RESP=$(curl -sS --max-time 20 -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=10&teamId=$VERCEL_TEAM_ID"); then
-              HICCUPS=$((HICCUPS + 1))
-              echo "[$i/90] Vercel API 일시 오류 - 10초 후 다시 시도 (누적 $HICCUPS회)"
-              RESP='{}'
+            read -r STATE U ID <<< "$(bash $SH find "$GIT_SHA")"
+            case "${STATE:-}" in
+              READY) URL="$U"; DEP_ID="$ID"; echo "배포 준비됨: $URL"; break ;;
+              ERR) HICCUPS=$((HICCUPS + 1)); echo "[$i/90] Vercel API 일시 오류 - 다음 차례에 다시 (누적 $HICCUPS회)" ;;
+              ERROR) PROBLEM="이 커밋의 배포(빌드)가 실패했어요"; break ;;
+              CANCELED) PROBLEM="이 커밋의 배포가 취소됐어요"; break ;;
+              *) echo "[$i/90] 아직 준비 안 됨 - 10초 후 재시도" ;;
+            esac
+            # 1분마다: 더 새 커밋이 올라왔으면 이 커밋은 건너뛴다 - 새 커밋의 실행이 연결한다
+            if [ $((i % 6)) = 0 ]; then
+              H=$(bash $SH head)
+              if [ -n "$H" ] && [ "$H" != "$GIT_SHA" ]; then
+                echo "더 새 커밋(${H:0:7})이 올라왔어요 - 이 커밋은 건너뛰고 새 실행에 맡깁니다(문제 아님)"
+                exit 0
+              fi
             fi
-            URL=$(GIT_SHA="$GIT_SHA" node -e "
-              const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
-              const sha = process.env.GIT_SHA;
-              const dep = (data.deployments || []).find(
-                (d) => d.meta && d.meta.githubCommitSha === sha && d.state === 'READY'
-              );
-              if (dep) process.stdout.write(dep.url);
-            " <<< "$RESP")
-            DEP_ID=$(GIT_SHA="$GIT_SHA" node -e "
-              const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
-              const sha = process.env.GIT_SHA;
-              const dep = (data.deployments || []).find(
-                (d) => d.meta && d.meta.githubCommitSha === sha && d.state === 'READY'
-              );
-              if (dep) process.stdout.write(dep.uid || dep.id || '');
-            " <<< "$RESP")
-            if [ -n "$URL" ]; then
-              echo "배포 준비됨: $URL"
-              break
-            fi
-            echo "[$i/90] 아직 준비 안 됨 - 10초 후 재시도"
             sleep 10
           done
+          [ -n "$URL" ] || [ -n "$PROBLEM" ] || PROBLEM="15분 기다려도 이 커밋의 배포가 준비되지 않았어요"
 
-          if [ -z "$URL" ]; then
-            # 여기서 exit 0 하면 잡이 green 이라 아래 실패 알림이 안 울린다.
-            # 이 워크플로가 옛 배포 장애를 막는 유일한 안전장치인데, 조용히
-            # 넘어가면 사이트·크론이 옛 코드에 멈춘 걸 아무도 모른다(실제로
-            # 2026-08-21 까지 크론이 옛 배포로 돌고 있었다). 반드시 실패시킨다.
-            echo "::error::15분 내에 배포가 준비되지 않아 도메인 재연결·프로덕션 승격을 못 했습니다."
-            exit 1
-          fi
-
-          npm install -g vercel@latest --no-progress >/dev/null 2>&1
-          vercel alias set "https://$URL" "$VERCEL_DOMAIN" \
-            --token="$VERCEL_TOKEN" --scope="$VERCEL_TEAM_SCOPE"
-          echo "✅ $VERCEL_DOMAIN → $URL 연결 완료"
-
-          # 도메인만 바꾸면 크론이 안 따라온다.
-          #
-          # Vercel 크론은 "프로젝트의 현재 프로덕션 배포"에서 실행되는데, alias set 은
-          # 도메인이 가리키는 곳만 바꾸고 그 포인터는 건드리지 않는다. 그래서 사이트는
-          # 최신인데 크론은 옛 배포 코드로 돌았다 - 실측 2026-08-21: 큐잉이 계속 3편
-          # (옛 하드코딩 상수)이었고, 이미 지운 키워드로 상품이 등록됐다.
-          # 배포를 프로덕션으로 승격시켜 둘을 다시 맞춘다.
-          if [ -n "$DEP_ID" ]; then
-            # 승격 호출도 일시 오류면 최대 3번 (2026-11-15)
-            for k in 1 2 3; do
-              CODE=$(curl -s --max-time 30 -o /tmp/promote.json -w '%{http_code}' -X POST \
-                -H "Authorization: Bearer $VERCEL_TOKEN" \
-                "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$DEP_ID?teamId=$VERCEL_TEAM_ID" || echo 000)
-              case "$CODE" in 000|5??) HICCUPS=$((HICCUPS + 1)); echo "승격 일시 오류(HTTP $CODE) - 15초 후 다시 ($k/3)"; sleep 15 ;; *) break ;; esac
-            done
-            if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
-              echo "✅ 프로덕션 승격 완료 ($DEP_ID) - 크론이 이 코드로 돈다"
+          if [ -z "$PROBLEM" ]; then
+            if bash $SH link "$URL" "$DEP_ID"; then
               echo "hiccups=$HICCUPS" >> "$GITHUB_OUTPUT"
-            elif [ "$CODE" = "409" ] && grep -q "already the current production deployment" /tmp/promote.json; then
-              # 이미 프로덕션인 배포를 다시 승격시키려 한 것뿐이다(목표 상태는 이미
-              # 달성됨) - 실측 2026-08-23: Vercel 이 push 를 이미 프로덕션으로 반영해둔
-              # 상태에서 이 호출이 겹쳐 409 를 받았는데, 그때도 사이트·크론은 최신이었다
-              # (배포 버전 실측으로 확인). 이 조건만 성공으로 본다 - 다른 409(예: 배포가
-              # 실패 상태라 승격 불가)까지 삼키지 않도록 메시지 내용을 반드시 확인한다.
-              echo "✅ 이미 프로덕션 배포였다 ($DEP_ID) - 승격 불필요"
-              echo "hiccups=$HICCUPS" >> "$GITHUB_OUTPUT"
-            else
-              echo "::error::프로덕션 승격 실패(HTTP $CODE) - 크론이 옛 배포로 돕니다"
-              cat /tmp/promote.json || true
-              exit 1
+              exit 0
             fi
-          else
-            echo "::error::배포 ID를 못 찾아 프로덕션 승격을 건너뜁니다"
-            exit 1
+            PROBLEM="최신 배포에 도메인 연결·프로덕션 승격이 안 됐어요"
           fi
 
-      # 일시 오류가 있었지만 스스로 다시 시도해 해결됐으면 "해결됨"도 알린다
-      # (2026-11-15 사장님 "문제를 말해 주고, 알아서 고쳐서 고친 것까지 말해 주면 좋겠다")
+          # 더 새 커밋이 올라와서 생긴 일이면 문제가 아니다
+          H=$(bash $SH head)
+          if [ -n "$H" ] && [ "$H" != "$GIT_SHA" ] && [ -z "$URL" ]; then
+            echo "더 새 커밋(${H:0:7})이 올라와 이 커밋 배포가 건너뛰어졌어요 - 새 실행에 맡깁니다(문제 아님)"
+            exit 0
+          fi
+
+          # ① 문제 알림 → ② 스스로 고치기 → ③ 결과 알림 (사장님 2026-11-15)
+          bash $SH tg "🚨 시스템 문제 발생 → 지금 자동으로 고치는 중
+
+          어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
+          무엇이: ${PROBLEM}. 그대로 두면 사이트·크론이 옛 배포에 멈춰요.
+          지금: 운영 브랜치 맨 위 커밋 배포로 다시 연결해 볼게요(최대 10분). 결과도 바로 알려드려요."
+          echo "::warning::${PROBLEM} - 스스로 고치기 시작"
+          H=$(bash $SH head); H=${H:-$GIT_SHA}
+          WHY=""
+          if OUT=$(bash $SH wait "$H" 600 2>/tmp/why); then
+            read -r U2 ID2 <<< "$OUT"
+            if bash $SH link "$U2" "$ID2"; then
+              bash $SH tg "✅ 해결됨 (조치 필요 없음)
+
+          어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
+          무엇을 했나: 커밋 ${H:0:7} 배포로 도메인을 다시 연결하고 프로덕션으로 올렸어요. 사이트·크론 모두 최신이에요."
+              echo "fixed=1" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            WHY="도메인 연결·승격이 계속 실패"
+          else
+            case "$(cat /tmp/why)" in
+              build_error) WHY="맨 위 커밋도 빌드가 실패했어요 - 코드 문제일 가능성이 커요" ;;
+              canceled) WHY="맨 위 커밋 배포도 취소됐어요" ;;
+              *) WHY="맨 위 커밋 배포도 10분 안에 준비되지 않았어요 - Vercel 쪽 지연일 수 있어요" ;;
+            esac
+          fi
+          echo "why=$WHY" >> "$GITHUB_OUTPUT"
+          echo "::error::스스로 못 고침: $WHY"
+          exit 1
+
+      # 일시 오류가 있었지만 다시 시도해 해결됐으면 "해결됨"도 알린다
       - name: 자동 복구 알림
         if: success() && steps.sync.outputs.hiccups != '' && steps.sync.outputs.hiccups != '0'
         env:
           WORKER_ENV: ${{ secrets.WORKER_ENV }}
           HICCUPS: ${{ steps.sync.outputs.hiccups }}
         run: |
-          BOT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_BOT_TOKEN=' | cut -d= -f2-)
-          CHAT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_ALLOWED_CHAT_ID=' | cut -d= -f2-)
-          if [ -n "$BOT" ] && [ -n "$CHAT" ]; then
-            curl -s -o /dev/null --max-time 20 -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
-              --data-urlencode "chat_id=${CHAT}" \
-              --data-urlencode "text=🔧 자동 복구됨 (조치 필요 없음)
+          bash $SH tg "🔧 자동 복구됨 (조치 필요 없음)
 
           어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
           무엇이: Vercel 응답이 ${HICCUPS}번 멈췄지만 자동으로 다시 시도해 최신 배포 연결·프로덕션 승격까지 끝냈어요."
+
+      # 지난번에 못 고치고 끝났는데(빨간 실행) 이번에 됐으면 "해결됨"을 보낸다
+      - name: 지난 문제 해결 알림
+        if: success() && steps.check.outputs.ready == 'true' && steps.sync.outputs.fixed != '1'
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          LAST=$(curl -sS --max-time 20 -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/vercel-domain-sync.yml/runs?status=completed&per_page=20" \
+            | RUN_ID="$RUN_ID" node -e "
+              try {
+                const runs = JSON.parse(require('fs').readFileSync(0, 'utf8')).workflow_runs || [];
+                // 끝난 순서로 본다. 취소된 건 문제가 아니라 빼고 본다.
+                const done = runs.filter((r) => String(r.id) !== process.env.RUN_ID && ['success', 'failure'].includes(r.conclusion))
+                  .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+                if (done[0] && done[0].conclusion === 'failure') process.stdout.write(done[0].html_url);
+              } catch {}
+            ") || true
+          if [ -n "$LAST" ]; then
+            bash $SH tg "✅ 해결됨 (조치 필요 없음)
+
+          어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
+          무엇이: 지난번 실패(${LAST}) 뒤 이번 실행에서 최신 배포 연결·프로덕션 승격까지 끝났어요. 사이트·크론 모두 최신이에요."
+          else
+            echo "지난 실행에 남은 문제 없음"
           fi
 
-      # 실패 시 텔레그램 알림 (웹사이트가 옛 버전에 멈추는 문제 조기 감지)
-      - name: 실패 시 텔레그램 알림
+      # 스스로 못 고쳤을 때만 (사람이 봐야 함)
+      - name: 못 고쳤을 때 텔레그램 알림
         if: failure()
         env:
           WORKER_ENV: ${{ secrets.WORKER_ENV }}
+          WHY: ${{ steps.sync.outputs.why }}
         run: |
-          BOT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_BOT_TOKEN=' | cut -d= -f2-)
-          CHAT=$(printf '%s\n' "$WORKER_ENV" | grep '^TELEGRAM_ALLOWED_CHAT_ID=' | cut -d= -f2-)
-          if [ -n "$BOT" ] && [ -n "$CHAT" ]; then
-            curl -s -o /dev/null -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
-              --data-urlencode "chat_id=${CHAT}" \
-              --data-urlencode "text=🚨 시스템 문제 발생
+          bash $SH tg "❌ 자동으로 못 고쳤어요 - 확인이 필요해요
 
           어디서: 웹사이트 도메인 동기화 (vercel-domain-sync)
-          무엇이: 사이트/크론이 옛 배포에 멈췄을 수 있음 (도메인 재연결 또는 프로덕션 승격 실패)
+          이유: ${WHY:-워크플로가 도중에 멈췄어요}
+          그래서: 사이트·크론이 옛 배포에 멈춰 있을 수 있어요. 다음 커밋이 올라오면 다시 시도하고, 되면 ✅로 알려드려요.
           로그: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          fi
