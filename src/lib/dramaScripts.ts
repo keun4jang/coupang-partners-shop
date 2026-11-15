@@ -30,6 +30,11 @@ export type DramaScript = {
    * joke 도 엉뚱한 사용 → "그렇게 쓰는 게 아니야"로 바른 쓰임만 말하고, 써 봤다·좋았다는 말은 하지 않는다.
    */
   kind?: "story" | "joke";
+  /**
+   * 병맛형 전용: 상품 이름이 이 규칙에 맞을 때만 쓴다. 대사가 "그거 뽁뽁이잖아"처럼 사진 속 물건을 콕 집어 말하므로
+   * 다른 물건(예: 문풍지)이 걸리면 말과 사진이 어긋난다 - 그때는 기존 이야기형(story)으로 간다.
+   */
+  productMatch?: RegExp;
 };
 
 export const DRAMA_VOICES = {
@@ -406,6 +411,7 @@ export const DRAMA_SCRIPTS: DramaScript[] = [
   {
     topic: "겨울 난방비 아끼는 집안 습관",
     kind: "joke",
+    productMatch: /뽁뽁이|에어캡|단열\s*시트/,
     title: "아들의 겨울 신상 패딩",
     names: { a: "엄마", b: "나" },
     lines: [
@@ -417,11 +423,183 @@ export const DRAMA_SCRIPTS: DramaScript[] = [
       { who: "b", text: "그래서 엘리베이터에서 다들 나를 쳐다봤구나" },
     ],
   },
+  {
+    topic: "책상 밑 전선 정리하는 법",
+    kind: "joke",
+    productMatch: /멀티탭\s*정리|(케이블|전선)\s*정리\s*(함|박스)/,
+    title: "아들의 비밀 금고",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 드디어 비밀 금고가 생겼어" },
+      { who: "b", text: "짠. 용돈은 이제 여기다 숨길 거야", photo: true },
+      { who: "a", text: "그거 멀티탭 정리함이잖아" },
+      { who: "b", text: "뚜껑도 있고 구멍도 있어서 딱이던데" },
+      { who: "a", text: "그 구멍은 전선 빼라고 있는 거야. 돈 넣는 데가 아니라" },
+      { who: "b", text: "그래서 아까 지폐가 옆으로 삐져나왔구나" },
+    ],
+  },
+  {
+    topic: "가습기 깨끗하게 쓰는 습관",
+    kind: "joke",
+    productMatch: /가습기(?!.*(세정|필터))/,
+    title: "아들의 아이돌 데뷔 준비",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 방에 연기 나오는 기계 들였어" },
+      { who: "b", text: "짠. 이걸로 아이돌처럼 등장할 거야", photo: true },
+      { who: "a", text: "그거 가습기잖아" },
+      { who: "b", text: "문 열고 들어올 때 앞에 두면 멋있어" },
+      { who: "a", text: "그건 공기 마르지 말라고 트는 거야. 등장용이 아니라" },
+      { who: "b", text: "그래서 아까 내 앞머리만 다 젖었구나" },
+    ],
+  },
+  {
+    topic: "텀블러 냄새 안 배게 쓰는 법",
+    kind: "joke",
+    productMatch: /텀블러/,
+    title: "아들의 새 마이크",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 새 마이크 장만했어" },
+      { who: "b", text: "짠. 노래방에서 이걸로 부를 거야", photo: true },
+      { who: "a", text: "그거 텀블러잖아" },
+      { who: "b", text: "대고 부르면 소리가 울려서 가수 같아" },
+      { who: "a", text: "그건 물 담아 다니는 거야. 노래 담는 게 아니라" },
+      { who: "b", text: "그래서 뚜껑 열 때마다 내 노래가 쏟아지는구나" },
+    ],
+  },
+  {
+    topic: "도마 냄새 줄이는 관리 순서",
+    kind: "joke",
+    productMatch: /도마(?!.*(꽂이|거치|스탠드))/,
+    title: "아들의 새 스케이트보드",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 스케이트보드 하나 생겼어" },
+      { who: "b", text: "짠. 바퀴만 달면 완성이야", photo: true },
+      { who: "a", text: "그거 도마잖아" },
+      { who: "b", text: "납작하고 단단해서 타기 딱 좋아 보여" },
+      { who: "a", text: "그건 칼질할 때 받치는 거야. 발 올리는 게 아니라" },
+      { who: "b", text: "그래서 바퀴 달 구멍을 아무리 찾아도 없었구나" },
+    ],
+  },
+  {
+    topic: "전기장판 안전하게 쓰는 법",
+    kind: "joke",
+    productMatch: /전기\s*(장판|요|매트)|온열\s*매트/,
+    title: "아들의 하늘 나는 양탄자",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 하늘 나는 양탄자가 생겼어" },
+      { who: "b", text: "짠. 오늘 밤에 이거 타고 날아 볼 거야", photo: true },
+      { who: "a", text: "그거 전기장판이잖아" },
+      { who: "b", text: "깔고 앉으니까 따뜻해서 날 수 있을 것 같아" },
+      { who: "a", text: "그건 깔고 자는 거야. 타고 나는 게 아니라" },
+      { who: "b", text: "그래서 주문을 아무리 외워도 안 떴구나" },
+    ],
+  },
+  {
+    topic: "옷 보풀 덜 생기게 하는 법",
+    kind: "joke",
+    productMatch: /보풀/,
+    title: "강아지의 새 장난감",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 강아지 장난감 하나 생겼어" },
+      { who: "b", text: "짠. 소리 나는 거라 좋아할 거야", photo: true },
+      { who: "a", text: "그거 보풀 제거기잖아" },
+      { who: "b", text: "웅웅거려서 공처럼 굴리면 될 줄 알았어" },
+      { who: "a", text: "그건 니트 보풀 미는 거야. 강아지 공이 아니라" },
+      { who: "b", text: "그래서 강아지가 보자마자 숨었구나" },
+    ],
+  },
+  {
+    topic: "옷 어깨 자국 안 생기게 거는 법",
+    kind: "joke",
+    productMatch: /옷걸이/,
+    title: "아들의 활쏘기 연습",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 활 하나 만들었어" },
+      { who: "b", text: "짠. 이걸로 활쏘기 연습할 거야", photo: true },
+      { who: "a", text: "그거 옷걸이잖아" },
+      { who: "b", text: "모양이 딱 활처럼 휘어 있던데" },
+      { who: "a", text: "그건 옷 거는 거야. 화살 쏘는 게 아니라" },
+      { who: "b", text: "그래서 줄을 걸 데가 아무 데도 없었구나" },
+    ],
+  },
+  {
+    topic: "공기청정기 필터 관리 습관",
+    kind: "joke",
+    productMatch: /공기\s*청정기(?!.*필터)/,
+    title: "아들의 로봇 친구",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 로봇 친구가 생겼어" },
+      { who: "b", text: "짠. 하루 종일 숨만 쉬어", photo: true },
+      { who: "a", text: "그거 공기청정기잖아" },
+      { who: "b", text: "말 걸면 바람으로 대답해 줘" },
+      { who: "a", text: "그건 공기 걸러 주는 거야. 대화 상대가 아니라" },
+      { who: "b", text: "그래서 고민 말할 때마다 바람만 세졌구나" },
+    ],
+  },
+  {
+    topic: "전자레인지로 데울 때 덮개 쓰는 법",
+    kind: "joke",
+    productMatch: /전자\s*레인지\s*(덮개|커버|뚜껑)/,
+    title: "아들의 우주인 헬멧",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 우주인 헬멧이 생겼어" },
+      { who: "b", text: "짠. 쓰면 바로 우주인이야", photo: true },
+      { who: "a", text: "그거 전자레인지 덮개잖아" },
+      { who: "b", text: "동그래서 머리에 딱 맞던데" },
+      { who: "a", text: "그건 음식 데울 때 덮는 거야. 머리 말고" },
+      { who: "b", text: "그래서 아까부터 팝콘 냄새가 났구나" },
+    ],
+  },
+  {
+    topic: "변기 청소 순서",
+    kind: "joke",
+    productMatch: /변기\s*(솔|브러시|청소\s*솔)/,
+    title: "아들의 요술 지팡이",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 요술 지팡이가 생겼어" },
+      { who: "b", text: "짠. 휘두르면 소원이 이뤄질 거야", photo: true },
+      { who: "a", text: "그거 변기 솔이잖아" },
+      { who: "b", text: "손잡이가 길어서 딱 지팡이 같던데" },
+      { who: "a", text: "그건 변기 닦는 거야. 소원 비는 게 아니라" },
+      { who: "b", text: "그래서 소원 빌 때마다 다들 도망갔구나" },
+    ],
+  },
+  {
+    topic: "싱크대 배수구 냄새 줄이는 습관",
+    kind: "joke",
+    productMatch: /(배수구|싱크대?)\s*거름망/,
+    title: "아들의 여름 모자",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 여름 모자 하나 생겼어" },
+      { who: "b", text: "짠. 구멍이 많아서 시원해", photo: true },
+      { who: "a", text: "그거 배수구 거름망이잖아" },
+      { who: "b", text: "머리에 딱 맞고 바람도 잘 통해" },
+      { who: "a", text: "그건 음식 찌꺼기 거르는 거야. 머리에 쓰는 게 아니라" },
+      { who: "b", text: "그래서 쓸 때마다 다들 코를 막았구나" },
+    ],
+  },
 ];
 
-/** 운영은 story 만 쓴다(기본값). joke 는 샘플(render-demo mode joke)로 사장님 확인 뒤에 켠다. */
-export function dramaForTopic(topic: string, kind: "story" | "joke" = "story"): DramaScript | null {
-  return DRAMA_SCRIPTS.find((d) => d.topic === topic && (d.kind ?? "story") === kind) ?? null;
+/**
+ * kind 기본은 story. joke 는 상품 이름(productName)이 대본의 productMatch 에 맞을 때만 돌려준다.
+ * 운영(2026-11-15 사장님 "추천대로 진행" - 드라마 자리 2편을 병맛형으로 2주 시험)은 joke 를 먼저 찾고 없으면 story.
+ */
+export function dramaForTopic(topic: string, kind: "story" | "joke" = "story", productName = ""): DramaScript | null {
+  return (
+    DRAMA_SCRIPTS.find(
+      (d) => d.topic === topic && (d.kind ?? "story") === kind && (kind !== "joke" || !!d.productMatch?.test(productName))
+    ) ?? null
+  );
 }
 
 /** 대본 안전 검사 - 효능·과장(policy), 상품 권유, 건강 원리, 통계, 대사 길이. 빈 배열이면 통과 */

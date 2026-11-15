@@ -7,7 +7,7 @@ import { findPolicyIssues } from "../src/lib/policy";
 import { TIP_SCRIPTS, TIP_HOOKS, TIP_ANSWER, reviewedTip } from "../src/lib/tipScripts";
 import { matchTipTopicByRule, matchTipTopicsByRule } from "../src/lib/tipMatch";
 import { OWN_PRODUCTS } from "../src/lib/ownProducts";
-import { DRAMA_SCRIPTS, checkDramaSafety } from "../src/lib/dramaScripts";
+import { DRAMA_SCRIPTS, checkDramaSafety, dramaForTopic } from "../src/lib/dramaScripts";
 import { STEP_KEYWORDS } from "../remotion/config/stepKeywords";
 
 let fail = 0;
@@ -97,6 +97,13 @@ for (const d of DRAMA_SCRIPTS) {
   const iss = checkDramaSafety(d);
   check(`드라마 대본 ${d.title}${iss.length ? `: ${iss.join(", ")}` : ""}`, !iss.length && TIP_SCRIPTS.some((t) => t.topic === d.topic));
 }
+// 병맛형 (2026-11-15): 상품 규칙 필수, 사진 메시지 한 번, 짧게(5~8줄)
+for (const d of DRAMA_SCRIPTS.filter((x) => x.kind === "joke")) {
+  check(`병맛형 ${d.title}: 상품 규칙·사진 1장·5~8줄`, !!d.productMatch && d.lines.filter((l) => l.photo).length === 1 && d.lines.length >= 5 && d.lines.length <= 8);
+}
+check("병맛형 고르기: 뽁뽁이 상품 → 병맛", dramaForTopic("겨울 난방비 아끼는 집안 습관", "joke", "단열 뽁뽁이 에어캡 1m")?.kind === "joke");
+check("병맛형 고르기: 문풍지 상품 → 병맛 없음", dramaForTopic("겨울 난방비 아끼는 집안 습관", "joke", "문풍지 틈막이 5m") === null);
+check("병맛형 고르기: 공기청정기 필터 → 병맛 없음", dramaForTopic("공기청정기 필터 관리 습관", "joke", "공기청정기 호환 필터") === null);
 check("드라마 검사: 사용 후기 대사는 반려", checkDramaSafety({ ...DRAMA_SCRIPTS[0], lines: [...DRAMA_SCRIPTS[0].lines, { who: "b", text: "이 제품 써봤는데 좋더라" }] }).length > 0);
 // 정리 카드 진한 낱말 (2026-11-05): 모든 단계 제목에 있고, 낱말이 제목 안에 그대로 있어야 한다
 for (const t of TIP_SCRIPTS) for (const st of t.steps) {

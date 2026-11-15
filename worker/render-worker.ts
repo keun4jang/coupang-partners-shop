@@ -1812,12 +1812,16 @@ async function renderTipProductVideo(
   // 검수 드라마 대본이 있으면 드라마로 만든다 - 하루(KST) 최대 2편. 실패하면 꿀팁 영상으로 계속.
   // 11/4 주간 판정 뒤 사장님 "추천대로 진행": 예전 "번호 3의 배수" 조건은 대본 주제와 겹치는 일이 드물어 드라마가 0편이라 뺐다.
   // broll_origin 에 "[드라마]"를 남겨 꿀팁 영상과 따로 잴 수 있게 한다. 끄기: DRAMA_FORMAT=off
-  const drama = dramaForTopic(atip.topic);
+  // 11/15 사장님 "추천대로 진행": 드라마 자리는 병맛형(짧은 농담 → 진짜 꿀팁 → 상품)을 먼저 - 상품이 대본 규칙에 맞을 때만,
+  // 아니면 기존 이야기형. 2주 시험(~11/29), broll_origin "[병맛]"으로 따로 잰다. 병맛만 끄기: DRAMA_JOKE=off
+  const drama =
+    (optionalEnv("DRAMA_JOKE") !== "off" ? dramaForTopic(atip.topic, "joke", product.product_name) : null) ?? dramaForTopic(atip.topic);
   if (drama && optionalEnv("DRAMA_FORMAT") !== "off" && (await dramaSlotsToday()) > 0) {
     try {
       const r = await renderDramaVideo(item, product, drama);
       dramaRenderedThisRun++;
-      return { videoPath: r.videoPath, brollOrigin: `대화형 드라마 [드라마] ${TIP_ORIGIN_TAG}${atip.topic}`, brollFiles: [], tipTopic: atip.topic, seconds: r.seconds };
+      const tag = drama.kind === "joke" ? "[드라마][병맛]" : "[드라마]";
+      return { videoPath: r.videoPath, brollOrigin: `대화형 드라마 ${tag} ${TIP_ORIGIN_TAG}${atip.topic}`, brollFiles: [], tipTopic: atip.topic, seconds: r.seconds };
     } catch (e) {
       console.warn(`드라마 렌더 실패 → 꿀팁 영상으로: ${(e as Error).message.slice(0, 160)}`);
     }
@@ -2042,7 +2046,7 @@ async function runDramaDemo(): Promise<void> {
   const kind = process.env.DRAMA_KIND === "joke" ? "joke" : "story";
   let drama: ReturnType<typeof dramaForTopic> = null;
   for (const cand of match.topics) {
-    const d = dramaForTopic(cand.topic, kind);
+    const d = dramaForTopic(cand.topic, kind, product.product_name);
     const t = reviewedTip(cand.topic);
     if (!d || !t) continue;
     const fit = await tipFitsProduct(product.product_name, t, match.how === "낱말 규칙");

@@ -34,7 +34,7 @@ async function main() {
   const now = Date.now();
   const rows = ((data ?? []) as Row[]).filter((r) => r.published_at && now - Date.parse(r.published_at) >= 3 * 86_400_000);
   const group = (r: Row) =>
-    (r.broll_origin ?? "").includes("[드라마]") ? "드라마" : (r.broll_origin ?? "").includes("꿀팁:") ? "꿀팁" : "예전 상품 영상";
+    (r.broll_origin ?? "").includes("[병맛]") ? "병맛 드라마" : (r.broll_origin ?? "").includes("[드라마]") ? "드라마" : (r.broll_origin ?? "").includes("꿀팁:") ? "꿀팁" : "예전 상품 영상";
 
   type Stat = { n: number; views7: number; engaged7: number };
   const per: Record<string, Stat[]> = {};
@@ -53,13 +53,13 @@ async function main() {
     }
   }
   console.log("── 형식별 비교 (게시 후 7일, 게시 3일 이상 지난 유튜브 영상) ──");
-  for (const g of ["예전 상품 영상", "꿀팁", "드라마"]) {
+  for (const g of ["예전 상품 영상", "꿀팁", "드라마", "병맛 드라마"]) {
     const s = per[g] ?? [];
     const v = s.map((x) => x.views7);
     const tv = v.reduce((a, b) => a + b, 0);
     const te = s.reduce((a, b) => a + b.engaged7, 0);
     console.log(`${g.padEnd(10)} ${String(s.length).padStart(3)}편 · 조회 중앙값 ${isNaN(median(v)) ? "-" : median(v)} · 평균 ${s.length ? Math.round(tv / s.length) : "-"} · 유효 조회 비율 ${tv ? ((te / tv) * 100).toFixed(1) : "-"}%`);
-    if (g === "드라마") for (const x of s) console.log(`    ${x.n}번 조회 ${x.views7} · 유효 ${x.views7 ? ((x.engaged7 / x.views7) * 100).toFixed(0) : "-"}%`);
+    if (g === "드라마" || g === "병맛 드라마") for (const x of s) console.log(`    ${x.n}번 조회 ${x.views7} · 유효 ${x.views7 ? ((x.engaged7 / x.views7) * 100).toFixed(0) : "-"}%`);
   }
 }
 main().catch((e) => {
