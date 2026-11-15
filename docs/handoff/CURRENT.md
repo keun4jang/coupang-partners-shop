@@ -31,8 +31,10 @@
   (드라마는 양극단 - 561번 985·560번 541, 8편은 0~4회). /go 14일 4건. (가)(나)(다) 제안 → 사장님 답 대신 아래 병맛 방향 요청.
 - **11/15 사장님 새 방향**: "리뷰가 아니라 상품으로 재밌는 농담따먹기로 시선 → 마지막에 짧게 상품 소개"(병맛 스토리).
   참고 릴스 instagram.com/reel/DfvnyXliENi(@youchoiceyou, 영상은 로그인 필요 - 썸네일·캡션만 읽음. 환경에 www.instagram.com·scontent-ord5-1.cdninstagram.com 허용, 사장님 승인).
-  구현: dramaScripts kind "joke"(+사진 메시지 말풍선 photo), 정리 카드 없이 "재밌었다면 팔로우해 두세요" → 추천 상품. 운영은 아직 story 만(dramaForTopic 기본값).
-  샘플: render-demo mode joke 540번(뽁뽁이 "아들의 겨울 신상 패딩") → 사장님 확인 뒤 운영 적용 여부 결정.
+  같은 날 사장님 "병맛 스토리 잠깐 보여주고 꿀팁 말해주고 상품 말하면 되겠다" → 순서 확정: 짧은 농담(6줄, 상품 사진 메시지 포함)
+  → "진짜 꿀팁" 카드(엄마 목소리로 검수 꿀팁 첫 문장+단계 제목+저장 한 마디, 줄이 목소리에 맞춰 뜸) → 추천 상품.
+  구현: dramaScripts kind "joke"·photo, TemplateChat recapHeading·recapAt. 운영은 아직 story 만(dramaForTopic 기본값).
+  샘플 v2: render-demo mode joke 540번(뽁뽁이 "아들의 겨울 신상 패딩", 35초) → 사장님 확인 뒤 대본 추가·운영 시험 결정.
 
 ## 진행 중 / 다음 할 일
 - 드라마 첫 운영 영상: 559번 가습기(11/5, youtube.com/shorts/3BXIQF-eLdg) - 로그 "드라마 오늘 0/2편" 정상. 상품이 많이 걸리는 주제부터 대본 추가.
