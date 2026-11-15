@@ -25,6 +25,7 @@ on:
           - wing-images
           - hub-check
           - tip-miss-report
+          - format-compare
           - own-desc-fix
 
 concurrency:
