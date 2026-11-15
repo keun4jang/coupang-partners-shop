@@ -14,7 +14,8 @@
  */
 import { findPolicyIssues } from "./policy";
 
-export type DramaLine = { who: "a" | "b"; text: string };
+/** photo: 이 말풍선에 오늘 상품 사진을 사진 메시지로 같이 띄운다 (병맛 농담형 - "짠" 하고 엉뚱하게 쓴 장면) */
+export type DramaLine = { who: "a" | "b"; text: string; photo?: boolean };
 
 export type DramaScript = {
   /** tipScripts.ts 의 검수 꿀팁 주제 - 상품과 어울리는지 판정에 쓴다 */
@@ -22,6 +23,12 @@ export type DramaScript = {
   title: string;
   names: { a: string; b: string };
   lines: DramaLine[];
+  /**
+   * story(기본) = 대화 속에서 검수 꿀팁이 풀리고 "정리" 카드. joke = 병맛 농담형 (2026-11-15 사장님
+   * "상품을 이용해서 재밌는 농담따먹기로 시선을 잡고, 마지막에 짧게 상품 소개") - 정리 카드 없이 바로 추천 상품.
+   * joke 도 엉뚱한 사용 → "그렇게 쓰는 게 아니야"로 바른 쓰임만 말하고, 써 봤다·좋았다는 말은 하지 않는다.
+   */
+  kind?: "story" | "joke";
 };
 
 export const DRAMA_VOICES = {
@@ -394,10 +401,29 @@ export const DRAMA_SCRIPTS: DramaScript[] = [
       { who: "a", text: "다 쓰면 가스통은 서늘한 곳에 둬" },
     ],
   },
+  // ── 병맛 농담형 (kind: "joke") - 2026-11-15 사장님 샘플 요청 ──
+  {
+    topic: "겨울 난방비 아끼는 집안 습관",
+    kind: "joke",
+    title: "아들의 겨울 신상 패딩",
+    names: { a: "엄마", b: "나" },
+    lines: [
+      { who: "b", text: "엄마, 나 겨울 패딩 새로 장만했어" },
+      { who: "a", text: "어디 한번 봐" },
+      { who: "b", text: "짠. 몸에 세 바퀴 감았어", photo: true },
+      { who: "a", text: "그거 뽁뽁이잖아" },
+      { who: "b", text: "바람이 하나도 안 들어와. 걸을 때마다 소리도 나" },
+      { who: "a", text: "그래서 아까부터 집에서 톡톡 소리가 났구나" },
+      { who: "b", text: "심심하면 하나씩 터뜨리면 돼" },
+      { who: "a", text: "그건 창문에 붙이는 거야. 네 몸 말고" },
+      { who: "b", text: "그래서 엘리베이터에서 다들 나를 쳐다봤구나" },
+    ],
+  },
 ];
 
-export function dramaForTopic(topic: string): DramaScript | null {
-  return DRAMA_SCRIPTS.find((d) => d.topic === topic) ?? null;
+/** 운영은 story 만 쓴다(기본값). joke 는 샘플(render-demo mode joke)로 사장님 확인 뒤에 켠다. */
+export function dramaForTopic(topic: string, kind: "story" | "joke" = "story"): DramaScript | null {
+  return DRAMA_SCRIPTS.find((d) => d.topic === topic && (d.kind ?? "story") === kind) ?? null;
 }
 
 /** 대본 안전 검사 - 효능·과장(policy), 상품 권유, 건강 원리, 통계, 대사 길이. 빈 배열이면 통과 */

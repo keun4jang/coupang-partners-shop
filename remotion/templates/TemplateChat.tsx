@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Audio, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Narration } from "../components/Narration";
 import { MEMO as INK, VIDEO } from "../config/videoConfig";
 import { fontFamily, tapeFontFamily } from "../fonts";
@@ -15,7 +15,8 @@ import { keywordSpans } from "../config/stepKeywords";
  * - "연출된 이야기" 표시는 2026-10-31 사장님 요청으로 뺐다. 대신 등장인물이 상품을 써 봤다·좋았다고 말하지 않는다(후기로 오인 방지 - 대본 검사가 막는다).
  * - 대화방 색은 카톡 기본색과 같게(2026-11-01 사장님). 로고·이름·말풍선 꼬리 모양은 쓰지 않는다.
  */
-export type ChatLine = { who: "a" | "b"; text: string };
+/** photo: 오늘 상품 사진을 사진 메시지로 (병맛 농담형 - 2026-11-15) */
+export type ChatLine = { who: "a" | "b"; text: string; photo?: boolean };
 
 export type ChatProps = {
   title: string;
@@ -80,14 +81,18 @@ function bubbleHeight(l: ChatLine, prev?: ChatLine): number {
   const perLine = Math.floor((BUBBLE_MAX - PAD_X * 2) / (FONT * 0.96));
   const rows = Math.max(1, Math.ceil(l.text.length / perLine));
   const showName = l.who === "a" && prev?.who !== "a";
-  return rows * LINE_H + PAD_Y * 2 + (showName ? NAME_H : 0) + GAP;
+  return rows * LINE_H + PAD_Y * 2 + (showName ? NAME_H : 0) + GAP + (l.photo ? PHOTO + 14 : 0);
 }
 
-const Bubble: React.FC<{ line: ChatLine; name: string; showName: boolean; enterFrame: number }> = ({
+/** 사진 메시지 한 변 길이 */
+const PHOTO = 400;
+
+const Bubble: React.FC<{ line: ChatLine; name: string; showName: boolean; enterFrame: number; photoUrl?: string | null }> = ({
   line,
   name,
   showName,
   enterFrame,
+  photoUrl,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -108,6 +113,21 @@ const Bubble: React.FC<{ line: ChatLine; name: string; showName: boolean; enterF
       {showName && (
         <div style={{ height: NAME_H, color: INK.ink, opacity: 0.6, fontFamily, fontWeight: 700, fontSize: 32, paddingLeft: 8 }}>
           {name}
+        </div>
+      )}
+      {line.photo && photoUrl && (
+        <div
+          style={{
+            width: PHOTO,
+            height: PHOTO,
+            marginBottom: 14,
+            borderRadius: 30,
+            overflow: "hidden",
+            background: "#FFFFFF",
+            boxShadow: "0 6px 18px rgba(36,33,28,0.14)",
+          }}
+        >
+          <Img src={photoUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
       )}
       <div
@@ -366,6 +386,7 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
               name={props.names[l.who]}
               showName={l.who === "a" && props.lines[i - 1]?.who !== "a"}
               enterFrame={starts[i]}
+              photoUrl={props.product?.imageUrl}
             />
           ))}
           {typingOn && <Typing mine={props.lines[nextIdx].who === "b"} />}
