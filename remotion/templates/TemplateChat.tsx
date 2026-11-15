@@ -33,6 +33,10 @@ export type ChatProps = {
   followText?: string | null;
   /** 대화 뒤 "정리" 카드 - 검수 꿀팁 단계 제목 (2026-11-04 사장님 "스토리 → 마지막에 정리 → 추천 상품 → 끝") */
   recap?: string[] | null;
+  /** 정리 카드 제목 (기본 "정리"). 병맛형은 "진짜 꿀팁" */
+  recapHeading?: string | null;
+  /** 정리 카드 각 줄이 뜨는 시각(초, 장면 시작 기준) - 목소리가 그 줄을 읽을 때 맞춰 뜬다. 없으면 0.2초 간격 */
+  recapAt?: number[] | null;
 };
 
 export const defaultChatProps: ChatProps = {
@@ -243,7 +247,7 @@ const FollowPill: React.FC<{ text: string }> = ({ text }) => {
 };
 
 /** 대화가 끝난 뒤 "정리" - 하늘빛 위 흰 카드 + 노란 번호 (대화방 색과 같은 한 벌) */
-const RecapScene: React.FC<{ items: string[] }> = ({ items }) => {
+const RecapScene: React.FC<{ items: string[]; heading?: string | null; at?: number[] | null }> = ({ items, heading, at }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const cover = interpolate(frame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
@@ -264,11 +268,12 @@ const RecapScene: React.FC<{ items: string[] }> = ({ items }) => {
           transform: `scale(${1.1 - 0.1 * t})`,
         }}
       >
-        정리
+        {heading || "정리"}
       </div>
       <div style={{ position: "absolute", top: H * 0.39, left: 70, right: 70, display: "flex", flexDirection: "column", gap: 26 }}>
         {items.map((it, i) => {
-          const k = spring({ frame: frame - 6 - i * 6, fps, config: { damping: 15 } });
+          const from = at?.[i] != null ? Math.round(at[i] * fps) : 6 + i * 6;
+          const k = spring({ frame: frame - from, fps, config: { damping: 15 } });
           return (
             <div
               key={i}
@@ -404,7 +409,7 @@ export const TemplateChat: React.FC<ChatProps> = (props) => {
       ))}
       <Sequence from={starts[n]} durationInFrames={f(seg[n])}>
         {props.recap?.length ? (
-          <RecapScene items={props.recap} />
+          <RecapScene items={props.recap} heading={props.recapHeading} at={props.recapAt} />
         ) : (
           <FollowPill text={props.followText ?? "필요할 때 보게 저장해 두세요"} />
         )}

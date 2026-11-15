@@ -90,8 +90,6 @@ import { selectProductsForVideos } from "../src/lib/productSelector";
 const TIP_OPENER = "오늘의 살림 꿀팁";
 /** 정리 화면 한 마디 · 상품 소개 첫마디 (2026-10-31 사장님 "팔로우하라고 말하고, 그다음 오늘의 추천 상품도 알려드릴게요") */
 // 2026-11-08 사장님 "저장 유도 멘트도 진행해": 꿀팁은 저장되는 콘텐츠라 저장을 먼저, 팔로우(10/31 사장님)는 이어서
-/** 병맛 농담형 끝 한 마디 - 꿀팁이 아니라 "저장" 대신 팔로우 (2026-11-15) */
-const JOKE_FOLLOW_LINE = "재밌었다면 팔로우해 두세요";
 const TIP_FOLLOW_LINE = "필요할 때 보게 저장해 두세요. 팔로우하면 매일 꿀팁이 와요";
 const TIP_PRODUCT_INTRO = "오늘의 추천 상품도 알려드릴게요.";
 /** broll_origin 에 꿀팁 주제를 남기는 표시 - 발행 단계가 이걸 보고 꿀팁용 제목·설명·캡션을 쓴다 */
@@ -1954,23 +1952,38 @@ async function renderDramaVideo(row: VideoItem, product: Product, drama: DramaSc
   // 목소리: 엄마(a)·아들(b) 둘만 - 팔로우·상품 안내는 아들이 시청자에게 (dramaScripts DRAMA_VOICES).
   // 앞뒤 무음을 잘라(trim) 대사 사이를 0.15초로 - 사이가 1초 넘게 비면 말이 뚝뚝 끊겨 들린다 (2026-10-31 사장님)
   const texts = drama.lines.map((l) => l.text);
-  // 병맛 농담형은 꿀팁이 아니라 "저장" 대신 팔로우 한 마디, 정리 카드 없이 바로 추천 상품 (2026-11-15 사장님)
+  // 병맛 농담형 (2026-11-15 사장님 "병맛 스토리 잠깐 보여주고 꿀팁 말해주고 상품 말하면 되겠다"):
+  // 짧은 농담 → "진짜 꿀팁" 카드를 엄마 목소리가 읽음(검수 꿀팁 첫 문장 + 단계 제목 + 저장 한 마디) → 추천 상품(아들 목소리).
   const joke = drama.kind === "joke";
-  const followLine = joke ? JOKE_FOLLOW_LINE : TIP_FOLLOW_LINE;
+  const tipSteps = reviewedTip(drama.topic)?.steps.map((st) => st.title) ?? [];
+  if (joke && !tipSteps.length) throw new Error(`병맛형인데 검수 꿀팁이 없음: ${drama.topic}`);
+  const ORD = ["첫째", "둘째", "셋째", "넷째", "다섯째"];
+  const hook = reviewedTip(drama.topic)?.hook ?? "";
+  const tipIntro = hook ? (/[.?!]$/.test(hook) ? hook : `${hook}.`) : "진짜 꿀팁 알려드릴게요.";
+  const tipParts = tipSteps.map((t, i) => `${ORD[i] ?? `${i + 1}번`}, ${t}.`);
+  const tipSpoken = `${tipIntro} ${tipParts.join(" ")} 필요할 때 보게 저장해 두세요.`;
+  const followLine = joke ? tipSpoken : TIP_FOLLOW_LINE;
   const tail = [followLine, ctaSpoken];
+  const tailVoice: Array<"a" | "b"> = joke ? ["a", "b"] : ["b", "b"];
   const byVoice = async (who: "a" | "b") => {
-    const lines = [...drama.lines.map((l) => (l.who === who ? l.text : "")), ...(who === "b" ? tail : ["", ""])];
+    const lines = [...drama.lines.map((l) => (l.who === who ? l.text : "")), ...tail.map((t, j) => (tailVoice[j] === who ? t : ""))];
     return generateNarration(lines, { ...DRAMA_VOICES[who], trim: true });
   };
   const va = await byVoice("a");
   const vb = await byVoice("b");
-  const narr = [...drama.lines.map((l, i) => (l.who === "a" ? va?.[i] : vb?.[i]) ?? null), vb?.[texts.length] ?? null, vb?.[texts.length + 1] ?? null];
+  const pick = (who: "a" | "b", i: number) => (who === "a" ? va?.[i] : vb?.[i]) ?? null;
+  const narr = [...drama.lines.map((l, i) => pick(l.who, i)), pick(tailVoice[0], texts.length), pick(tailVoice[1], texts.length + 1)];
+  // "진짜 꿀팁" 줄이 목소리에 맞춰 뜨게: 글자 수 비율로 각 단계를 읽기 시작하는 시각을 어림한다
+  const tipSec = narr[texts.length]?.seconds ?? 0;
+  const recapAt = joke && tipSec
+    ? tipSteps.map((_, i) => (tipSpoken.indexOf(tipParts[i]) / tipSpoken.length) * tipSec)
+    : null;
   const segments = narr.map((l, i) => {
     const sec = l?.seconds ?? 0;
     // 0.1초(말풍선 소리 뒤 지연) + 끝 여유 0.2초
     if (i < texts.length) return Math.max(1.0, sec + 0.3);
     // 정리 화면은 세 줄을 읽을 시간(최소 3초) - 목소리는 그동안 팔로우 한 마디 (2026-11-04 사장님 "스토리 → 정리 → 추천 상품")
-    return Math.max(joke ? 2.0 : 3.0, sec + 0.6);
+    return Math.max(3.0, sec + 0.6);
   });
   const imageUrl = product.image_url ? (await fetchImageAsDataUri(product.image_url)) ?? product.image_url : null;
   const inputProps = {
@@ -1979,9 +1992,11 @@ async function renderDramaVideo(row: VideoItem, product: Product, drama: DramaSc
     lines: drama.lines,
     narration: narr.map((l) => l?.uri ?? null),
     segments,
-    followText: followLine,
-    // 정리 카드는 검수 꿀팁의 단계 제목 그대로 (대사와 같은 내용, 새 정보 없음). 농담형은 없음
-    recap: joke ? null : reviewedTip(drama.topic)?.steps.map((st) => st.title) ?? null,
+    followText: TIP_FOLLOW_LINE,
+    // 정리 카드는 검수 꿀팁의 단계 제목 그대로 (대사와 같은 내용, 새 정보 없음). 병맛형은 "진짜 꿀팁"으로 읽어 준다
+    recap: tipSteps.length ? tipSteps : null,
+    recapHeading: joke ? "진짜 꿀팁" : null,
+    recapAt,
     product: { displayNumber: n, imageUrl, ctaText: `프로필 링크에서 ${n}번`, heading },
     disclosureText: own ? OWN_SCREEN_DISCLOSURE : disclosureEdgesOn() ? DISCLOSURE_SHORT_TEXT : null,
     disclosureMode: own ? "off" : disclosureEdgesOn() ? "edges" : "always",
