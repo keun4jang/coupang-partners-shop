@@ -146,6 +146,33 @@ async function main() {
     (byDay.get(d) ?? byDay.set(d, []).get(d)!).push(s);
   }
   [...byDay.entries()].sort().forEach(([d, g]) => console.log(`  ${d} ${g.length}편 · 중앙값 ${median(g.map((x) => x.views7))} · ${g.map((x) => `${x.n}:${x.views7}${x.format === "드라마" ? "드" : ""}`).join(" ")}`));
+  // 같은 주제 몇 번째인가 (검수 꿀팁·드라마 대본은 주제당 한 벌이라 같은 주제 = 거의 같은 영상) - 중복 영상 억제 여부
+  console.log("\n[같은 주제 몇 번째 영상인가 (꿀팁·드라마, 게시 순)]");
+  const chron = [...stats].filter((s) => s.topic !== "-").sort((a, b) => {
+    const pa = rows.find((x) => x.display_number === a.n)!.published_at!;
+    const pb = rows.find((x) => x.display_number === b.n)!.published_at!;
+    return Date.parse(pa) - Date.parse(pb);
+  });
+  // 10/19 이전에 쓴 주제도 세야 정확 - 10/19 이후만 본다는 한계는 로그에 적는다
+  const seen = new Map<string, number>();
+  const seenFmt = new Map<string, number>();
+  const occ: Record<string, Stat[]> = {};
+  const dupDrama: Stat[] = [];
+  for (const s of chron) {
+    const k = (seen.get(s.topic) ?? 0) + 1;
+    seen.set(s.topic, k);
+    (occ[k >= 3 ? "3번째+" : `${k}번째`] ??= []).push(s);
+    const fk = `${s.format}|${s.topic}`;
+    const fn = (seenFmt.get(fk) ?? 0) + 1;
+    seenFmt.set(fk, fn);
+    if (s.format === "드라마" && fn >= 2) dupDrama.push(s);
+  }
+  for (const k of ["1번째", "2번째", "3번째+"]) {
+    const g = occ[k] ?? [];
+    console.log(`  ${k}: ${g.length}편 · 조회 중앙값 ${median(g.map((x) => x.views7))} · 0~4회 ${g.filter((x) => x.views7 <= 4).length}편 · 100회+ ${g.filter((x) => x.views7 >= 100).length}편`);
+  }
+  console.log(`  같은 드라마 대본 두 번째 이상(완전히 같은 대화): ${dupDrama.map((x) => `${x.n}:${x.views7}`).join(" ") || "없음"}`);
+  console.log("  (10/19 이후 게시분만 셈)");
   // 제목 첫머리 낱말 - 위/아래 비교
   const words = (g: Stat[]) => {
     const c = new Map<string, number>();
