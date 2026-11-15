@@ -63,11 +63,17 @@ async function main() {
   const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.published_at && now - Date.parse(r.published_at) >= 3 * 86_400_000);
 
   // 제목·길이 (50개씩)
-  const meta = new Map<string, { title: string; sec: number }>();
+  const meta = new Map<string, { title: string; sec: number; status: string }>();
   const ids = rows.map((r) => vid(r.youtube_url)).filter((x): x is string => !!x);
   for (let i = 0; i < ids.length; i += 50) {
-    const res = await yt.videos.list({ part: ["snippet", "contentDetails"], id: ids.slice(i, i + 50) });
-    for (const v of res.data.items ?? []) meta.set(v.id!, { title: v.snippet?.title ?? "", sec: isoSec(v.contentDetails?.duration ?? "") });
+    const res = await yt.videos.list({ part: ["snippet", "contentDetails", "status"], id: ids.slice(i, i + 50) });
+    for (const v of res.data.items ?? [])
+      meta.set(v.id!, {
+        title: v.snippet?.title ?? "",
+        sec: isoSec(v.contentDetails?.duration ?? ""),
+        // 0회 영상이 실제로 공개 상태인지 (비공개·처리 실패·아동용·지역 제한이면 노출이 안 된다)
+        status: [v.status?.privacyStatus, v.status?.uploadStatus, v.status?.rejectionReason, v.status?.madeForKids ? "아동용" : "", v.contentDetails?.regionRestriction ? "지역제한" : ""].filter(Boolean).join("/"),
+      });
   }
 
   const stats: Stat[] = [];
@@ -107,7 +113,7 @@ async function main() {
   }
   stats.sort((a, b) => b.views7 - a.views7);
   const line = (s: Stat) =>
-    `${String(s.n).padStart(4)}번 ${s.format.padEnd(3)} 조회 ${String(s.views7).padStart(5)} · 유효 ${s.views7 ? Math.round((s.engaged / s.views7) * 100) : 0}% · 끝까지 ${Math.round(s.avgPct)}% · ${s.sec}초 · ${String(s.kstHour).padStart(2)}시 | ${s.title} | 주제 ${s.topic} | ${s.product}`;
+    `[${meta.get(s.id)?.status ?? "목록에 없음"}] ${String(s.n).padStart(4)}번 ${s.format.padEnd(3)} 조회 ${String(s.views7).padStart(5)} · 유효 ${s.views7 ? Math.round((s.engaged / s.views7) * 100) : 0}% · 끝까지 ${Math.round(s.avgPct)}% · ${s.sec}초 · ${String(s.kstHour).padStart(2)}시 | ${s.title} | 주제 ${s.topic} | ${s.product}`;
   console.log(`── 10/19 이후 유튜브 ${stats.length}편 (게시 후 7일) ──`);
   console.log("\n[위 15편]");
   stats.slice(0, 15).forEach((s) => console.log(line(s)));
@@ -131,6 +137,15 @@ async function main() {
   const bot = stats.slice(-Math.ceil(stats.length / 4));
   band("위 25%", (s) => top.includes(s));
   band("아래 25%", (s) => bot.includes(s));
+  // 게시 날짜별 - 채널 전체가 어느 날부터 노출이 끊겼는지
+  console.log("\n[게시일별 (KST) 조회 중앙값]");
+  const byDay = new Map<string, Stat[]>();
+  for (const s of stats) {
+    const r = rows.find((x) => x.display_number === s.n)!;
+    const d = new Date(Date.parse(r.published_at!) + 9 * 3_600_000).toISOString().slice(5, 10);
+    (byDay.get(d) ?? byDay.set(d, []).get(d)!).push(s);
+  }
+  [...byDay.entries()].sort().forEach(([d, g]) => console.log(`  ${d} ${g.length}편 · 중앙값 ${median(g.map((x) => x.views7))} · ${g.map((x) => `${x.n}:${x.views7}${x.format === "드라마" ? "드" : ""}`).join(" ")}`));
   // 제목 첫머리 낱말 - 위/아래 비교
   const words = (g: Stat[]) => {
     const c = new Map<string, number>();
