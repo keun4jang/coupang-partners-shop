@@ -718,6 +718,19 @@ async function reclaimStaleGenerating(): Promise<void> {
   for (const row of ownFixed ?? []) {
     console.warn(`본인 상품 교체 허용 전 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
   }
+
+  // 한 번만: 후보 상품을 1000개까지만 읽어 꿀팁 맞는 상품으로 못 바꾸고 실패한 항목(626·627번)을 고친 뒤 다시 대기로 (2026-11-16)
+  const { data: pageFixed } = await db
+    .from("video_items")
+    .update({ video_status: "pending", error_message: "상품 후보 전체 조회 수정 후 다시 시도합니다." })
+    .eq("video_status", "failed")
+    .gte("updated_at", "2026-11-15T00:00:00Z")
+    .lt("updated_at", "2026-11-16T10:30:00Z")
+    .ilike("error_message", "%정보 꿀팁 주제가 맞지 않아%")
+    .select("id, display_number");
+  for (const row of pageFixed ?? []) {
+    console.warn(`후보 조회 수정 전 실패 항목을 다시 대기로: ${formatDisplayNumber(row.display_number)}`);
+  }
 }
 
 interface SnsResult {

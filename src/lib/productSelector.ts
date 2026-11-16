@@ -9,6 +9,29 @@ import { appealScore, searchabilityPenalty, spamTitleReason } from "./appeal";
  * PostgREST 는 limit 미지정 시 1000행에서 조용히 자른다. 영상이 1000개를 넘으면
  * "아직 영상 없는 상품" 판정이 그 뒤 행을 못 보고 깨지므로 페이지로 다 읽는다.
  */
+/**
+ * candidate 상품 전량 조회 (페이지로 다 읽는다).
+ * 2026-11-16 626·627번 실패 원인: candidate 가 1000개를 넘자 1000행에서 잘려, 그 1000개 중 영상 없는 479개에
+ * 꿀팁 규칙에 맞는 상품이 0개였다(뒤쪽에 맞는 상품이 있는데 못 봄) → 교체 때마다 안 맞는 상품만 뽑혀 하루 28개를 빼다가 실패.
+ */
+async function allCandidateProducts(): Promise<Product[]> {
+  const db = supabaseAdmin();
+  const out: Product[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from("products")
+      .select("*")
+      .eq("status", "candidate")
+      .order("created_at", { ascending: true })
+      .range(from, from + 999);
+    if (error) throw new Error(`상품 조회 실패: ${error.message}`);
+    const rows = (data ?? []) as Product[];
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
 async function allVideoProductIds(): Promise<string[]> {
   const db = supabaseAdmin();
   const out: string[] = [];
@@ -260,13 +283,7 @@ function score(product: Product): number {
 export async function selectProductForVideo(opts?: {
   imageCheckBudgetMs?: number;
 }): Promise<Product | null> {
-  const db = supabaseAdmin();
-
-  const { data: products, error } = await db
-    .from("products")
-    .select("*")
-    .eq("status", "candidate");
-  if (error) throw new Error(`상품 조회 실패: ${error.message}`);
+  const products = await allCandidateProducts();
   if (!products || products.length === 0) return null;
 
   const videoProductIds = await allVideoProductIds();
@@ -299,12 +316,7 @@ export async function selectProductForVideo(opts?: {
  * 몰랐던 일이 있었다. 재고는 발행이 멈추기 전에 미리 알아야 하는 유일한 지표다.
  */
 export async function freshProductCount(): Promise<number> {
-  const db = supabaseAdmin();
-  const { data: products, error } = await db
-    .from("products")
-    .select("*")
-    .eq("status", "candidate");
-  if (error) throw new Error(`상품 조회 실패: ${error.message}`);
+  const products = await allCandidateProducts();
   if (!products || products.length === 0) return 0;
 
   const usedProductIds = new Set(await allVideoProductIds());
@@ -326,13 +338,7 @@ export async function selectProductsForVideos(
   opts?: { imageCheckBudgetMs?: number }
 ): Promise<Product[]> {
   if (count <= 0) return [];
-  const db = supabaseAdmin();
-
-  const { data: products, error } = await db
-    .from("products")
-    .select("*")
-    .eq("status", "candidate");
-  if (error) throw new Error(`상품 조회 실패: ${error.message}`);
+  const products = await allCandidateProducts();
   if (!products || products.length === 0) return [];
 
   const usedProductIds = new Set(await allVideoProductIds());

@@ -17,12 +17,22 @@ async function main() {
     .order("display_number");
   for (const r of (items ?? []) as any[])
     console.log(`${r.display_number}번 ${r.video_status} manual=${r.manual} mode=${r.publish_mode} ${r.updated_at?.slice(0, 16)} | ${r.products?.product_name?.slice(0, 30)} (${r.products?.status}) | ${(r.error_message ?? "").slice(0, 60)}`);
-  const { data: cands } = await db.from("products").select("id, product_name, image_url").eq("status", "candidate");
-  const { data: used } = await db.from("video_items").select("product_id");
+  const cands: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db.from("products").select("id, product_name, image_url").eq("status", "candidate").order("created_at").range(from, from + 999);
+    cands.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
+  const used: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db.from("video_items").select("product_id").range(from, from + 999);
+    used.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
   const usedIds = new Set(((used ?? []) as any[]).map((u) => u.product_id));
   const fresh = ((cands ?? []) as any[]).filter((p) => !usedIds.has(p.id) && p.image_url);
   const ruled = fresh.filter((p) => matchTipTopicsByRule(p.product_name).length > 0);
-  console.log(`\n후보 candidate ${cands?.length ?? 0}개 · 영상 없고 사진 있음 ${fresh.length}개 · 그중 꿀팁 규칙 맞음 ${ruled.length}개`);
+  console.log(`\n후보 candidate ${cands.length}개 · 영상 없고 사진 있음 ${fresh.length}개 · 그중 꿀팁 규칙 맞음 ${ruled.length}개`);
   const { count: pausedToday } = await db
     .from("products")
     .select("id", { count: "exact", head: true })
