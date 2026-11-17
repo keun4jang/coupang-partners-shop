@@ -8,6 +8,7 @@ import { isOwnProduct, OWN_DISCLOSURE_LINE } from "@/lib/ownProducts";
 import { APP_VERSION } from "@/lib/appVersion";
 import type { VideoItemWithProduct } from "@/types/db";
 import { ViewBeacon } from "./ViewBeacon";
+import { NumberView } from "./NumberView";
 import { bodyFont, tapeFont, TAPE } from "../../brand";
 
 /*
@@ -30,7 +31,7 @@ export const dynamic = "force-dynamic";
  * 공정위 지침(고지는 "더보기" 없이 보이는 곳)과 실측 CTR 0.08% 를 함께 보면
  * 이 경로는 그대로 둘 이유가 없어서, 첫 화면에서 끝나는 전용 페이지로 바꿨다.
  *
- * 화면 순서는 고정이다: 대가성 고지 → N번/상품 → 확인할 점 → 링크 버튼.
+ * 화면 순서는 고정이다: 대가성 고지 → N번/상품 → 버튼 → 영상에서 짚은 내용 (2026-11-16 개편, NumberView.tsx).
  * 광고 고지가 항상 버튼보다 위에 온다.
  */
 
@@ -127,7 +128,7 @@ export default async function NumberPage({
   if (!item) {
     // 10/17 개편과 같은 말투: 아직 아무것도 안 넣은 서랍처럼 '빈 라벨'(점선 테이프)에 번호만 적어 둔다
     return (
-      <div className={`bg-white min-h-screen text-[#1e1f1c] ${bodyFont.className}`}>
+      <div className={`bg-white min-h-[100svh] text-[#1e1f1c] ${bodyFont.className}`}>
         <main className="max-w-[480px] mx-auto px-5 pt-16 pb-16">
           <div
             className={`inline-block -rotate-[4deg] rounded-[3px] border-2 border-dashed px-4 pt-1.5 pb-1 text-[34px] tracking-[0.06em] ${tapeFont.className}`}
@@ -169,113 +170,31 @@ export default async function NumberPage({
     rank: tracking.rank || undefined,
   })}`;
 
+  const own = isOwnProduct(product);
   return (
-    <div className={`bg-white min-h-screen text-[#1e1f1c] ${bodyFont.className}`}>
-    <main className="max-w-[480px] mx-auto pb-28">
-      <ViewBeacon
-        displayNumber={n}
-        src={tracking.source}
-        channel={tracking.channel}
-        tpl={tracking.templateVariant}
-        vid={tracking.videoId || undefined}
-        rank={tracking.rank || undefined}
-      />
-
-      {/*
-        대가성 고지 - 화면 맨 위. 버튼보다 항상 먼저 나온다.
-        공정위 「추천·보증 등에 관한 표시·광고 심사지침」은 표시문구가
-        "더보기"를 눌러야 보이는 위치에 있으면 안 된다고 본다.
-      */}
-      <p className="px-5 pt-3.5 pb-3 text-[12.5px] leading-relaxed text-[#676b66] border-b border-[#d8dcda]">
-        {/* 사장님 본인 상품은 수수료가 아니라 판매자 직접 판매라 고지가 다르다 (lib/ownProducts.ts) */}
-        {isOwnProduct(product)
-          ? OWN_DISCLOSURE_LINE
-          : "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
-        {!isOwnProduct(product) && (
-          <span className="block text-[#1e1f1c]">{FRIENDLY_DISCLOSURE_LINE}</span>
-        )}
-      </p>
-
-      {/* 사진 + 번호 라벨 테이프 (이 페이지에서 유일하게 눈에 띄는 요소) */}
-      <div className="relative bg-[#eef1f0] aspect-square flex items-center justify-center">
-        {product.image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={product.image_url}
-            alt={product.product_name}
-            className="w-[86%] h-[86%] object-contain mix-blend-multiply"
-          />
-        )}
-        <div
-          className={`absolute left-[18px] top-[22px] -rotate-[4deg] text-white rounded-[3px] px-4 pt-1.5 pb-1 text-[34px] tracking-[0.06em] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_0_rgba(0,0,0,0.18)] ${tapeFont.className}`}
-          style={{ background: TAPE }}
-        >
-          {item.display_number}
-          <span className="text-[15px] tracking-normal ml-0.5 opacity-85">번</span>
-        </div>
-        {product.source === "aliexpress" && (
-          <span className="absolute right-4 bottom-4 bg-white text-[#1e1f1c] text-xs font-medium rounded px-2 py-1">
-            해외직구 · 배송 1~2주
-          </span>
-        )}
-      </div>
-
-      <div className="px-5 pt-[22px]">
-        <h1 className="text-[22px] leading-[1.4] font-bold tracking-[-0.01em] break-keep">
-          {shortenProductName(product.product_name, 44)}
-        </h1>
-        {/* 가격은 보여 주지 않는다 - 쿠팡에서만 확인 (2026-11-04 사장님). 저장해 둔 가격은 지금과 다를 수도 있다. */}
-
-        {points.length > 0 && (
-          <section>
-            <h2 className="mt-7 mb-2 text-[13px] font-medium text-[#676b66]">영상에서 짚은 내용</h2>
-            <ul className="pl-3.5 border-l-[3px]" style={{ borderColor: TAPE }}>
-              {points.map((point, i) => (
-                <li key={i} className="py-1 text-[15.5px] leading-[1.65] break-keep">
-                  {point}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* 첫 화면 안 버튼 - 스크롤 없이 바로 닿게 하나 둔다 */}
-        <a
-          href={goHref}
-          rel="nofollow sponsored"
-          className="mt-7 block text-white font-bold text-[16.5px] rounded-md py-[17px] text-center focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#f2b705]"
-          style={{ background: TAPE }}
-        >
-          {buttonLabel}
-        </a>
-
-        <p className="text-center mt-6">
-          <Link href="/" className="text-[#676b66] text-sm underline">
-            다른 번호도 보기
-          </Link>
-        </p>
-      </div>
-
-      <footer className="mt-10 text-center text-[#676b66] text-xs leading-relaxed">
-        살림템 메모장
-        <span className="block mt-2 opacity-50">{APP_VERSION}</span>
-      </footer>
-
-      {/*
-        하단 고정 버튼 - 사진·설명을 다 읽고 내려온 사람이 다시 위로 올라가지
-        않아도 되게. 문구는 위 버튼과 같은 중립 표현을 쓴다.
-      */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-[#d8dcda] px-5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
-        <a
-          href={goHref}
-          rel="nofollow sponsored"
-          className="block max-w-[440px] mx-auto text-white font-bold rounded-md py-3.5 text-center focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#f2b705]"
-          style={{ background: TAPE }}
-        >
-          {buttonLabel}
-        </a>
-      </div>
-    </main>
-    </div>
+    <NumberView
+      displayNumber={item.display_number}
+      // 두 줄 안에 들어가게 (23px · 폭 350px ≈ 한 줄 15자)
+      productName={shortenProductName(product.product_name, 30)}
+      imageUrl={product.image_url}
+      isAliexpress={product.source === "aliexpress"}
+      // 사장님 본인 상품은 수수료가 아니라 판매자 직접 판매라 고지가 다르다 (lib/ownProducts.ts)
+      disclosure={own ? OWN_DISCLOSURE_LINE : "이 게시물은 쿠팡파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."}
+      friendlyLine={own ? null : FRIENDLY_DISCLOSURE_LINE}
+      points={points}
+      buttonLabel={buttonLabel}
+      goHref={goHref}
+      version={APP_VERSION}
+      beacon={
+        <ViewBeacon
+          displayNumber={n}
+          src={tracking.source}
+          channel={tracking.channel}
+          tpl={tracking.templateVariant}
+          vid={tracking.videoId || undefined}
+          rank={tracking.rank || undefined}
+        />
+      }
+    />
   );
 }
