@@ -12,11 +12,11 @@ async function main() {
   const db = supabaseAdmin();
   const { data: items } = await db
     .from("video_items")
-    .select("display_number, video_status, manual, publish_mode, error_message, updated_at, products(product_name, status, category)")
-    .gte("display_number", 620)
+    .select("display_number, video_status, manual, publish_mode, error_message, updated_at, published_at, youtube_url, instagram_url, products(product_name, status, category)")
+    .gte("display_number", 615)
     .order("display_number");
   for (const r of (items ?? []) as any[])
-    console.log(`${r.display_number}번 ${r.video_status} manual=${r.manual} mode=${r.publish_mode} ${r.updated_at?.slice(0, 16)} | ${r.products?.product_name?.slice(0, 30)} (${r.products?.status}) | ${(r.error_message ?? "").slice(0, 60)}`);
+    console.log(`${r.display_number}번 ${r.video_status} 게시=${r.published_at?.slice(0, 16) ?? '-'} yt=${r.youtube_url ? 'O' : '-'} ig=${r.instagram_url ? 'O' : '-'} manual=${r.manual} mode=${r.publish_mode} ${r.updated_at?.slice(0, 16)} | ${r.products?.product_name?.slice(0, 30)} (${r.products?.status}) | ${(r.error_message ?? "").slice(0, 60)}`);
   const cands: any[] = [];
   for (let from = 0; ; from += 1000) {
     const { data } = await db.from("products").select("id, product_name, image_url").eq("status", "candidate").order("created_at").range(from, from + 999);
