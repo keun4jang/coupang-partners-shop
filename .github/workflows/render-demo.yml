@@ -15,7 +15,7 @@ on:
         required: false
         default: "product"
         type: choice
-        options: ["product", "tip", "tipcheck", "drama", "joke", "voices"]
+        options: ["product", "tip", "tipv2", "tipcheck", "drama", "joke", "voices"]
       topic:
         description: "(tip 일 때) 주제 번호 또는 주제 글 일부 - 비우면 오늘 날짜로 고름"
         required: false
@@ -146,6 +146,8 @@ jobs:
             npx tsx worker/render-worker.ts --drama-demo "$NUM"
           elif [ "$MODE" = "joke" ]; then
             DRAMA_KIND=joke npx tsx worker/render-worker.ts --drama-demo "$NUM"
+          elif [ "$MODE" = "tipv2" ]; then
+            TIP_HOOK_V2=1 npx tsx worker/render-worker.ts --tip-demo "$TOPIC"
           elif [ "$MODE" = "tip" ]; then
             npx tsx worker/render-worker.ts --tip-demo "$TOPIC"
           else
