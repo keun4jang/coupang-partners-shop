@@ -24,7 +24,7 @@ async function main() {
   const { data: queued } = await db
     .from("video_items")
     .select("display_number, video_status, products(product_name, image_url)")
-    .in("display_number", [662, 676, 686, 693, 697]);
+    .in("display_number", [664, 672, 679, 681, 685, 692]);
   for (const q of (queued ?? []) as unknown as { display_number: number; video_status: string; products: { product_name: string; image_url: string | null } }[]) {
     console.log(`대기상품	${q.display_number}	${q.video_status}	${q.products.product_name}	${q.products.image_url}`);
   }
