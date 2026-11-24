@@ -31,6 +31,7 @@ on:
           - own-disclosure-check
           - funnel-audit
           - send-video-candidates
+          - product-keyword-check
           - own-desc-fix
 
 concurrency:
