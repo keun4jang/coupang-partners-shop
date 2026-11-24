@@ -28,6 +28,7 @@ on:
           - format-compare
           - hit-analysis
           - swap-check
+          - own-disclosure-check
           - own-desc-fix
 
 concurrency:
