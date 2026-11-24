@@ -15,7 +15,7 @@ on:
         required: false
         default: "product"
         type: choice
-        options: ["product", "tip", "tipv2", "tipcheck", "drama", "joke", "voices"]
+        options: ["product", "tip", "tipv2", "ttslines", "tipcheck", "drama", "joke", "voices"]
       topic:
         description: "(tip 일 때) 주제 번호 또는 주제 글 일부 - 비우면 오늘 날짜로 고름"
         required: false
@@ -131,7 +131,7 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           HERO_CUTS: ${{ github.event.inputs.hero == 'on' && '1' || '0' }}
-          DEMO_SEND_TELEGRAM: ${{ (github.event.inputs.mode == 'drama' || github.event.inputs.mode == 'joke' || github.event.inputs.mode == 'voices') && '0' || '1' }}
+          DEMO_SEND_TELEGRAM: ${{ (github.event.inputs.mode == 'drama' || github.event.inputs.mode == 'joke' || github.event.inputs.mode == 'voices' || github.event.inputs.mode == 'ttslines') && '0' || '1' }}
           TIP_FORMAT: ${{ github.event.inputs.tipformat == 'on' && '1' || '0' }}
           SCENE_CUTOUT: ${{ github.event.inputs.cutout == 'on' && '1' || '0' }}
           NUM: ${{ github.event.inputs.number }}
@@ -140,6 +140,8 @@ jobs:
         run: |
           if [ "$MODE" = "tipcheck" ]; then
             npx tsx worker/render-worker.ts --tip-check
+          elif [ "$MODE" = "ttslines" ]; then
+            python3 scripts/tts_lines.py
           elif [ "$MODE" = "voices" ]; then
             python3 scripts/voice_samples.py
           elif [ "$MODE" = "drama" ]; then
