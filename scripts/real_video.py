@@ -93,7 +93,7 @@ for m, (a, d) in enumerate(segs):
 cap_y = 140 + vh + 45
 vf += [
     "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,crop={cw}:{ch}:0:0,scale=1080:{vh},setsar=1[v]",
-    f"color=c=black:s=1080x1920:d={TOTAL:.2f}[bg]",
+    "[2:v]setsar=1[bg]",
     "[bg][v]overlay=0:140:eof_action=pass[b0]",
 ]
 last = "b0"
@@ -106,20 +106,24 @@ for i in range(k):
 on = f"enable='gte(t,{E:.2f})'"
 vf += [
     "[1:v]scale=600:600:force_original_aspect_ratio=decrease[pimg]",
-    f"[{last}]drawbox=x=0:y=0:w=1080:h=1920:color=black@1:t=fill:{on}[k]",
+    f"[{last}]null[k]",
     f"[k][pimg]overlay=(W-w)/2:500:{on}[p]",
     f"[p]drawtext=fontfile={FONT}:text='오늘의 추천 상품':fontsize=60:fontcolor=white:x=(w-text_w)/2:y=380:{on}[p2]",
     f"[p2]drawtext=fontfile={FONT}:text='프로필 링크에서':fontsize=50:fontcolor=0xDDDDDD:x=(w-text_w)/2:y=1150:{on}[p3]",
     f"[p3]drawtext=fontfile={FONT}:textfile={OUT}/num.txt:fontsize=120:fontcolor=white:x=(w-text_w)/2:y=1230:{on}[p4]",
     f"[p4]drawtext=fontfile={FONT}:textfile={OUT}/disc.txt:fontsize=36:fontcolor=white:x=(w-text_w)/2:y=1420:{on}[vout]",
 ]
-inputs = ["-i", SRC, "-loop", "1", "-t", f"{TOTAL:.2f}", "-i", IMG]
+# 바탕: 그냥 검정은 성의 없어 보여서(2026-11-24 사장님) 원본 한 장면을 크게 흐리고 어둡게 한 은은한 바탕
+BG = f"{OUT}/bg.png"
+run(["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", SRC, "-frames:v", "1", "-vf",
+     "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=45,eq=brightness=-0.32:saturation=0.75", BG])
+inputs = ["-i", SRC, "-loop", "1", "-t", f"{TOTAL:.2f}", "-i", IMG, "-loop", "1", "-t", f"{TOTAL:.2f}", "-i", BG]
 af = []
 starts = start + [E + 0.05]
 for i in range(k + 1):
     inputs += ["-i", f"{OUT}/v{i}.wav"]
     ms = int(starts[i] * 1000)
-    af.append(f"[{i + 2}:a]adelay={ms}|{ms},apad[a{i}]")
+    af.append(f"[{i + 3}:a]adelay={ms}|{ms},apad[a{i}]")
 af.append("".join(f"[a{i}]" for i in range(k + 1)) + f"amix=inputs={k + 1}:normalize=0,atrim=0:{TOTAL:.2f}[aout]")
 out = f"{OUT}/{N}번_실제영상.mp4"
 run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", ";".join(vf + af), "-map", "[vout]", "-map", "[aout]",
