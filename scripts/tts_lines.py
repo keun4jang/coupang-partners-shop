@@ -12,7 +12,13 @@ import numpy as np
 import soundfile as sf
 from supertonic import TTS
 
-req = json.load(open("docs/research/tts-lines.json", encoding="utf-8"))
+import sys
+num = sys.argv[1] if len(sys.argv) > 1 else ""
+if num and os.path.exists(f"docs/real-videos/{num}.json"):
+    spec = json.load(open(f"docs/real-videos/{num}.json", encoding="utf-8"))
+    req = {"voice": spec.get("voice"), "speed": spec.get("speed"), "lines": [ln["say"] for ln in spec["lines"]] + [spec["end"]]}
+else:
+    req = json.load(open("docs/research/tts-lines.json", encoding="utf-8"))
 tts = TTS()
 sr = tts.sample_rate
 style = tts.get_voice_style(req.get("voice") or "M1")

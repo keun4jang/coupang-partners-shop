@@ -13,14 +13,13 @@ import subprocess
 import sys
 
 import numpy as np
-import soundfile as sf
-from supertonic import TTS
 
 N, SRC, IMG = sys.argv[1], sys.argv[2], sys.argv[3]
 spec = json.load(open(f"docs/real-videos/{N}.json", encoding="utf-8"))
 OUT = "renders/real"
 os.makedirs(OUT, exist_ok=True)
-FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
+# PC(윈도우)에서는 REAL_FONT 로 맑은 고딕 굵게를 준다 (2026-11-24 사장님 "일단 PC에서 다 해도 될 것 같은데")
+FONT = os.environ.get("REAL_FONT", "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc")
 GAP = 0.12
 DISC = "쿠팡파트너스 활동으로 수수료를 받아요"
 
@@ -32,12 +31,22 @@ def run(cmd):
         sys.exit(1)
 
 
-# 1) 목소리 녹음 (앞뒤 무음 자르기)
-tts = TTS()
-sr = tts.sample_rate
-style = tts.get_voice_style(spec.get("voice") or "M1")
+# 1) 목소리: 서버에서는 직접 녹음, PC 에서는 서버 녹음(줄녹음.mp4 + 줄 길이)을 받아 자른다(REAL_VOICE_MP4, REAL_VOICE_LENS)
 says = [ln["say"] for ln in spec["lines"]] + [spec["end"]]
 lens = []
+if os.environ.get("REAL_VOICE_MP4"):
+    lens = [float(x) for x in os.environ["REAL_VOICE_LENS"].split(",")]
+    pos = 0.0
+    for i, L in enumerate(lens):
+        run(["ffmpeg", "-v", "error", "-y", "-ss", f"{pos:.3f}", "-t", f"{L:.3f}", "-i", os.environ["REAL_VOICE_MP4"], "-vn", f"{OUT}/v{i}.wav"])
+        pos += L + 0.5
+    says = []
+else:
+    import soundfile as sf
+    from supertonic import TTS
+    tts = TTS()
+    sr = tts.sample_rate
+    style = tts.get_voice_style(spec.get("voice") or "M1")
 for i, text in enumerate(says):
     wav, _ = tts.synthesize(text, voice_style=style, lang="ko", speed=float(spec.get("speed") or 1.15))
     w = wav.squeeze().astype(np.float32)

@@ -149,7 +149,8 @@ jobs:
             curl -sSfL -o /tmp/real-img.jpg "$(npx tsx scripts/real-video-image.ts "$NUM")"
             python3 scripts/real_video.py "$NUM" /tmp/real-src.mp4 /tmp/real-img.jpg
           elif [ "$MODE" = "ttslines" ]; then
-            python3 scripts/tts_lines.py
+            python3 scripts/tts_lines.py "$NUM"
+            if [ -f "docs/real-videos/$NUM.json" ]; then echo "IMGURL $(npx tsx scripts/real-video-image.ts "$NUM")"; fi
           elif [ "$MODE" = "voices" ]; then
             python3 scripts/voice_samples.py
           elif [ "$MODE" = "drama" ]; then
