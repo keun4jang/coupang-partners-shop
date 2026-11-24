@@ -20,6 +20,16 @@ async function main() {
   for (const v of (vids ?? []) as { product_id: string; display_number: number; video_status: string }[]) {
     byId.set(v.product_id, [...(byId.get(v.product_id) ?? []), `${v.display_number}번 ${v.video_status}`]);
   }
+  // 1688 공장 찾기용: 대기열 상품의 전체 이름·대표 사진 주소 (2026-11-24)
+  const { data: queued } = await db
+    .from("video_items")
+    .select("display_number, video_status, products(product_name, image_url)")
+    .in("display_number", [662, 676, 686, 693, 697]);
+  for (const q of (queued ?? []) as unknown as { display_number: number; video_status: string; products: { product_name: string; image_url: string | null } }[]) {
+    console.log(`대기상품	${q.display_number}	${q.video_status}	${q.products.product_name}	${q.products.image_url}`);
+  }
+  const lid = rows.find((r) => r.product_name.includes("수납장 상부 부착형"));
+  if (lid) console.log(`대기상품	0	후보	${lid.product_name}	${lid.image_url}`);
   console.log(`찾은 상품 ${rows.length}개`);
   for (const r of rows) console.log(`상품: [${r.status}] ${r.product_name.slice(0, 60)} | 사진 ${r.image_url ? "O" : "X"} | 영상 ${byId.get(r.id)?.join(", ") ?? "없음"}`);
 }
