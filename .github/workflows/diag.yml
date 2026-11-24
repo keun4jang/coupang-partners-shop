@@ -29,6 +29,7 @@ on:
           - hit-analysis
           - swap-check
           - own-disclosure-check
+          - funnel-audit
           - own-desc-fix
 
 concurrency:
