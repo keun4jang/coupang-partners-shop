@@ -30,6 +30,7 @@ on:
           - swap-check
           - own-disclosure-check
           - funnel-audit
+          - send-video-candidates
           - own-desc-fix
 
 concurrency:
