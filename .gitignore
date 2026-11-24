@@ -58,3 +58,6 @@ src/lib/appVersion.ts
 
 # 썸네일 미리보기 이미지 (예시용)
 thumb_*.jpg
+
+# 허락받은 원본 영상 (공개 저장소에 올리지 않는다, 2026-11-24)
+incoming-videos/
