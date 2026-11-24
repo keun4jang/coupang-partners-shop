@@ -13,6 +13,13 @@ description: 사장님이 "쿠팡 시작"(또는 "쿠팡 이어서", "쿠팡 재
 - `CLAUDE.md`(운영 규칙), `docs/handoff/CURRENT.md`(지금 상황), `docs/growth-plan.md` 상단 블록을 읽는다.
 - 절대 규칙(쿠팡 API 위반 2회, 본인 클릭 금지, 고지, 로그인·동의는 사장님이 직접)을 이번 세션 내내 지킨다.
 
+## 1-1. 대화 보관소 연결 (2026-11-24 사장님 "대화 다 남게 해주고, 이어서 진행되도록")
+- 세션 시작 메모에 "[지난 대화 끝부분]"이 있으면 그 흐름을 읽고 바로 앞 대화에서 이어간다(결정은 CURRENT.md 기준).
+- "[대화 보관소 미연결]"이 있으면: 클라우드 세션은 add_repo(keun4jang/claude-chat-archive, push) → `/home/user/claude-chat-archive` 에
+  clone → register_repo_root. PC 터미널이면 사장님께 `C:\Projects` 에서 `git clone https://github.com/keun4jang/claude-chat-archive.git`
+  한 번을 부탁한다. 연결되면 Stop 훅(.claude/hooks/chat-archive-stop.sh)이 매 응답마다 대화를 자동 저장·업로드한다.
+- 지난 대화의 특정 내용이 필요하면 `node <보관소>/tools/search.mjs <검색어> coupang-partners-shop` 로 찾는다.
+
 ## 2. 저장소·브랜치 맞추기
 - 작업 브랜치는 `claude/blissful-noether-ofm9ww`, 운영 브랜치는 `claude/coupang-partners-shortform-hinfcb`.
 - `git fetch` 후 작업 브랜치로 체크아웃하고 원격 최신으로 맞춘다(커밋 안 된 변경이 있으면 지우지 말고 보고).

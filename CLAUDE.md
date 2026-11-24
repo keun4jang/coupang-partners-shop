@@ -74,6 +74,9 @@
 - 사장님 결정(승인·거절·방향 변경)은 날짜와 함께 그 자리에서 문서에 적는다 - 대화 기록은 계정과 함께 사라진다.
 - 대화 원문 자동 저장: Stop 훅이 `claude-chat-archive` 저장소(keun4jang/claude-chat-archive)가
   있으면 거기 저장한다. 위치는 CHAT_ARCHIVE_DIR, 없으면 이 저장소 옆 폴더(../claude-chat-archive).
+  **세션마다 보관소를 연결한다**(2026-11-24 사장님 "대화 다 남게"): 클라우드 세션은 add_repo(keun4jang/claude-chat-archive, push)
+  후 /home/user/claude-chat-archive 에 clone. 10/12~11/24 사이 자동 저장이 꺼져 있었던 건 연결이 안 돼서였다.
+  SessionStart 훅이 보관소의 가장 최근 대화 끝부분을 함께 넣어 준다 - 터미널이든 웹이든 바로 앞 대화에서 이어간다.
 
 ## 새 계정에서 시작하는 법
 1. claude.ai 설정 → 커넥터에서 GitHub 연결(저장소 keun4jang/coupang-partners-shop 권한).
