@@ -40,6 +40,8 @@ const ALLOWED: Record<string, { check: (v: string) => boolean; hint: string }> =
   own_product_daily: { check: (v) => /^[0-3]$/.test(v), hint: "0~3" },
   // 파트너스 영상 '상품 사진 주인공' 컷 (2026-10-15). split=홀수 번호만(기본, 비교용) · all=전부 · off=끔
   partner_hero_cuts: { check: (v) => v === "split" || v === "all" || v === "off", hint: "split, all, off 중 하나" },
+  // 유튜브 하루 자동 업로드 상한 (src/lib/quota.ts). 실제 영상(real-upload)을 올리는 날은 3 (2026-11-25 사장님 승인)
+  youtube_daily_cap: { check: (v) => /^[1-4]$/.test(v), hint: "1~4" },
 };
 
 async function main(): Promise<void> {
