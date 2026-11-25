@@ -71,14 +71,15 @@ for i, ln in enumerate(spec["lines"]):
     dur = lens[i] + GAP + (0.15 if i == 0 else 0)
     fixed = sum(c[1] for c in ln["clips"] if len(c) > 1)
     for c in ln["clips"]:
-        segs.append((c[0], c[1] if len(c) > 1 else dur - fixed))
+        segs.append((c[0], c[1] if len(c) > 1 else dur - fixed, ln.get("y")))
 
 for i, ln in enumerate(spec["lines"]):
     open(f"{OUT}/t{i}.txt", "w", encoding="utf-8").write(ln["caption"])
 open(f"{OUT}/disc.txt", "w", encoding="utf-8").write(DISC)
 open(f"{OUT}/num.txt", "w", encoding="utf-8").write(f"{N}번")
 
-cw, ch = spec.get("crop", [720, 780])
+# crop: [너비, 높이, x, y] (x·y 생략 시 0). 문장마다 "y" 로 세로 위치를 따로 줄 수 있다(662 - 장면마다 물건 높이가 다름)
+cw, ch, cx, cy = (list(spec.get("crop", [720, 780])) + [0, 0])[:4]
 vh = round(1080 * ch / cw)
 vf = []
 src = "[0:v]"
@@ -88,11 +89,11 @@ for j, (x, y, w, h, a, b) in enumerate(spec.get("blur", [])):
     src = f"[u{j}]"
 n = len(segs)
 vf.append(f"{src}split={n}" + "".join(f"[s{m}]" for m in range(n)))
-for m, (a, d) in enumerate(segs):
-    vf.append(f"[s{m}]trim=start={a}:duration={d:.3f},setpts=PTS-STARTPTS[c{m}]")
+for m, (a, d, y) in enumerate(segs):
+    vf.append(f"[s{m}]trim=start={a}:duration={d:.3f},setpts=PTS-STARTPTS,crop={cw}:{ch}:{cx}:{cy if y is None else y}[c{m}]")
 cap_y = 140 + vh + 45
 vf += [
-    "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,crop={cw}:{ch}:0:0,scale=1080:{vh},setsar=1[v]",
+    "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,scale=1080:{vh},setsar=1[v]",
     "[2:v]setsar=1[bg]",
     "[bg][v]overlay=0:140:eof_action=pass[b0]",
 ]
