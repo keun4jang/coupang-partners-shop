@@ -50,12 +50,24 @@ async function main() {
   const issues = checkPublishTexts({ title, caption, description });
   if (issues.length > 0) throw new Error(`정책 검사에 걸려 올리지 않습니다 - ${describePublishIssues(issues)}`);
 
+  // 번호 안내 페이지(/n/번호) 열기: 자동 영상이 아직 안 나온 번호(대기열)는 landing_visible=false 라 "아직 정리하지 않았어요"가 뜬다.
+  // 실제 영상이 먼저 나가면 시청자가 빈 페이지를 보게 되므로(11/25 686번에서 실제로 발생, 사장님 승인) 게시할 때 같이 연다.
+  const openLanding = async () => {
+    const { error: e } = await supabaseAdmin().from("video_items").update({ landing_visible: true }).eq("display_number", n).eq("landing_visible", false);
+    console.log(e ? `번호 페이지 열기 실패: ${e.message.slice(0, 100)}` : `번호 페이지 열림 확인: /n/${n}`);
+  };
+  if (process.env.REAL_PUBLISH === "landing") {
+    await openLanding();
+    return;
+  }
+
   console.log(`[제목]\n${title}\n\n[유튜브 설명]\n${description}\n\n[인스타 캡션]\n${caption}\n`);
   if (process.env.REAL_PUBLISH !== "yes") {
     console.log("미리보기만 했습니다 (올리려면 publish=yes).");
     return;
   }
 
+  await openLanding();
   let youtubeUrl = "";
   let youtubeNote = "";
   await loadYoutubeCredsFromSettings();

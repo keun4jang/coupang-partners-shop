@@ -13,11 +13,11 @@ on:
         description: "영상 번호 (예: 686)"
         required: true
       publish:
-        description: "yes 면 실제 게시, no 면 문구 미리보기만"
+        description: "yes 면 실제 게시, no 면 문구 미리보기만, landing 이면 번호 페이지만 연다(영상 없이)"
         required: true
         default: "no"
         type: choice
-        options: ["no", "yes"]
+        options: ["no", "yes", "landing"]
 
 concurrency:
   group: real-upload
@@ -55,6 +55,7 @@ jobs:
         run: npm ci
 
       - name: 영상 받기 (real-uploads 브랜치)
+        if: github.event.inputs.publish != 'landing'
         env:
           NUM: ${{ github.event.inputs.number }}
         run: |
@@ -68,7 +69,9 @@ jobs:
         env:
           NUM: ${{ github.event.inputs.number }}
           REAL_PUBLISH: ${{ github.event.inputs.publish }}
-        run: npx tsx scripts/real-upload.ts "$NUM" "renders/real/${NUM}.mp4"
+        run: |
+          if [ "$REAL_PUBLISH" = "landing" ]; then mkdir -p renders/real; : > "renders/real/${NUM}.mp4"; fi
+          npx tsx scripts/real-upload.ts "$NUM" "renders/real/${NUM}.mp4"
 
       - name: 올린 영상 파일 지우기
         if: success() && github.event.inputs.publish == 'yes'
