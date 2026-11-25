@@ -1,0 +1,86 @@
+# 허락받은 실제 제품 영상 게시 (2026-11-25 사장님 "2" - PC 에서 만든 영상을 올릴 길).
+# PC 에서 만든 영상을 real-uploads 브랜치에 {번호}.mp4 로 올린 뒤 이 워크플로를 돌린다.
+# - docs/real-videos/{번호}.json 의 permission 이 approved 가 아니면 올리지 않는다(scripts/real-upload.ts).
+# - publish=no(기본)면 제목·설명·캡션 미리보기만. publish=yes 일 때만 유튜브·인스타에 올린다.
+# - 둘 다 올라가면 real-uploads 브랜치의 영상 파일을 지운다(11/25 사장님 "업로드되면 파일은 지워도 돼").
+# 사람이 직접 돌릴 때만 실행된다(예약 없음).
+name: real-upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      number:
+        description: "영상 번호 (예: 686)"
+        required: true
+      publish:
+        description: "yes 면 실제 게시, no 면 문구 미리보기만"
+        required: true
+        default: "no"
+        type: choice
+        options: ["no", "yes"]
+
+concurrency:
+  group: real-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .env.local 생성 (시크릿에서)
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then echo "WORKER_ENV 시크릿 없음"; exit 1; fi
+          printf '%s\n' "$WORKER_ENV" > .env.local
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node_modules 캐시
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: 영상 받기 (real-uploads 브랜치)
+        env:
+          NUM: ${{ github.event.inputs.number }}
+        run: |
+          case "$NUM" in ''|*[!0-9]*) echo "번호는 숫자만"; exit 1;; esac
+          git fetch --depth 1 origin real-uploads
+          mkdir -p renders/real
+          git show "FETCH_HEAD:${NUM}.mp4" > "renders/real/${NUM}.mp4"
+          ls -l "renders/real/${NUM}.mp4"
+
+      - name: 게시
+        env:
+          NUM: ${{ github.event.inputs.number }}
+          REAL_PUBLISH: ${{ github.event.inputs.publish }}
+        run: npx tsx scripts/real-upload.ts "$NUM" "renders/real/${NUM}.mp4"
+
+      - name: 올린 영상 파일 지우기
+        if: success() && github.event.inputs.publish == 'yes'
+        env:
+          NUM: ${{ github.event.inputs.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan cleanup-tmp
+          git rm -rfq --cached . >/dev/null 2>&1 || true
+          git clean -fdxq -e node_modules
+          echo "올린 뒤 비워 둔 브랜치 (${NUM}번 게시 완료)" > README.md
+          git add README.md
+          git commit -qm "실제 영상 ${NUM}번 게시 완료 - 파일 삭제"
+          git push -f origin cleanup-tmp:real-uploads

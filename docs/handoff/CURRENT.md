@@ -43,6 +43,16 @@
   11/24 렌더 서버 이식: scripts/real_video.py + docs/real-videos/{번호}.json + render-demo mode=real. **막힘: GitHub 서버(미국)에서 1688 영상 주소가
   caiyuanbao.alicdn.com 으로 넘어가 접속 안 됨(curl 28).** PC(한국)에서는 받아짐 → PC 에서 받은 영상을 서버로 옮기는 길 필요(사장님 결정 대기).
   남은 일: 이 틀을 운영 렌더(worker)에 넣기, 686 영상 속 색(투명·초록)과 우리 상품(브라운) 같은 모델인지 사장님 확인.
+  **PC 제작 흐름(11/24 사장님 "PC에서 다 해도 될 것 같은데")**: ① render-demo mode=ttslines number=번호 → demo-samples 의 sample.mp4 가 목소리,
+  로그 "TTSLEN i 초"가 줄 길이 ② PC 에서 원본 받기(incoming-videos/번호/, gitignore) ③ 글꼴을 renders/real/font.ttf 로 복사 후
+  `REAL_FONT=renders/real/font.ttf REAL_VOICE_MP4=… REAL_VOICE_LENS=… python scripts/real_video.py 번호 원본 상품사진`.
+  바탕은 검정 대신 원본 한 장면을 흐리고 어둡게(11/24 사장님 "검정은 성의 없어 보여").
+  **게시 길(11/25 사장님 "2")**: 영상을 real-uploads 브랜치에 {번호}.mp4 로 올리고 real-upload 워크플로(number, publish=no 미리보기/yes 게시) →
+  scripts/real-upload.ts 가 유튜브·인스타에 올리고 텔레그램 보고. 설정 파일 permission 이 "approved…" 가 아니면 거부, title·caption 필요.
+  둘 다 올라가면 브랜치 파일 자동 삭제. **11/25 사장님 "업로드되면 만든 영상 파일은 지워도 돼"** → 게시 확인 뒤 PC 의 renders/real·incoming-videos/번호 도 지운다.
+  아직 실행해 본 적 없음(허락된 영상이 없어서). 주의: 유튜브 하루 할당량이 자동 4편으로 꽉 차서, 실제 영상을 올린 날은 자동 영상 1편이 유튜브에서 실패할 수 있음
+  → 정기적으로 올리게 되면 youtube_daily_cap 을 3으로(사장님 결정 필요). 같은 번호의 기존 video_items 기록은 건드리지 않아 성과 집계에는 아직 안 잡힘.
+  **11/25 사장님 "공장 허락 받지 말고 그냥 업로드" → Claude 거절**(무단 게시는 돕지 않음, 저작권 신고 3회면 채널 삭제). "686 허락" 답이 오면 permission 을 approved 로 바꾸고 게시.
 - **11/24 사장님 결정 - 스톡 영상 대신 실제 사람이 찍은 제품 영상으로 간다.** "스톡 영상 가져와서 쓰니까 별로", "허락은 내가 알아서 할게", "연락은 하지 말고".
   역할: Claude = 상품 고르기·영상 찾기·1688 영상 다운로드·편집 / 사장님 = 원작자(공장) 허락 받기. **Claude 는 공장·원작자에게 연락하지 않는다.**
   **올리는 건 사장님이 상품 번호별로 "허락받음"이라고 확인한 영상만.** 허락 없는 남의 영상 재가공은 하지 않는다(11/24 설명함). 허락 캡처는 저장소 밖에 보관.
