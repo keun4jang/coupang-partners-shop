@@ -130,7 +130,8 @@ cap_y = vy + vh + (PAD + 50 if FRAME else 45)
 vf += [
     "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,scale={vw}:{vh},setsar=1[v]",
     "[2:v]setsar=1[bg]",
-    f"[bg][v]overlay={vx}:{vy}:eof_action=pass[b00]",
+    # 끝 화면이 시작되면 영상은 바로 감춘다(장면 길이 반올림 때문에 영상이 몇 장 더 남아 끝 화면 글자와 겹쳤다 - 644 에서 발견)
+    f"[bg][v]overlay={vx}:{vy}:eof_action=pass:enable='lt(t,{E:.2f})'[b00]",
     (f"[b00][{k + 4}:v]overlay=0:0:enable='lt(t,{E:.2f})'[b0]" if FRAME else "[b00]null[b0]"),
 ]
 last = "b0"
