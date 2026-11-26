@@ -24,7 +24,7 @@ import { driveDirectDownloadUrl, ensureDateFolder, makeFilePublic, uploadFileToD
 import { getSetting } from "../src/lib/settings";
 import { sendTelegramMessage } from "../src/lib/telegram";
 
-type Spec = { permission?: string; title?: string; caption?: string };
+type Spec = { permission?: string; title?: string; caption?: string; name?: string };
 
 async function main() {
   const n = Number(process.argv[2]);
@@ -42,7 +42,8 @@ async function main() {
   if (error || !data) throw new Error(`${n}번 영상 기록을 찾지 못했습니다`);
   const product = (data as unknown as { products: { product_name: string; source_memo: string | null } }).products;
   const own = isOwnProduct(product);
-  const shortName = shortenProductName(stripBannedFromProductName(product.product_name));
+  // name: 자동으로 줄인 상품 이름이 어색할 때 설정 파일에서 직접 준다(610 - "다용도서랍 재단할 수 있다"). 정책 검사는 똑같이 거친다.
+  const shortName = spec.name?.trim() || shortenProductName(stripBannedFromProductName(product.product_name));
   const title = `${spec.title} #Shorts`;
   const description = youtubeShortsDescription(n, shortName, "classic", { own });
   const caption = instagramCaption(spec.caption, n, { own });
