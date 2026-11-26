@@ -80,7 +80,12 @@ open(f"{OUT}/num.txt", "w", encoding="utf-8").write(f"{N}번")
 
 # crop: [너비, 높이, x, y] (x·y 생략 시 0). 문장마다 "y" 로 세로 위치를 따로 줄 수 있다(662 - 장면마다 물건 높이가 다름)
 cw, ch, cx, cy = (list(spec.get("crop", [720, 780])) + [0, 0])[:4]
-vh = round(1080 * ch / cw)
+# frame: "memo" 면 메모지 바탕 + 사진처럼 테두리 두른 틀 안에서 영상이 나오고 자막은 틀 밖 아래(2026-11-26 사장님 "틀 안에서 재생, 자막은 밖")
+FRAME = os.environ.get("REAL_FRAME") or spec.get("frame")
+vw, vy = (940, 230) if FRAME else (1080, 140)
+vx = (1080 - vw) // 2
+vh = round(vw * ch / cw)
+INK, INK2 = ("0x3B2F2A", "0x7A6A5E") if FRAME else ("white", "0xDDDDDD")
 vf = []
 src = "[0:v]"
 # blur: [x, y, 너비, 높이, 시작초, 끝초, (세기 - 생략 시 25)]. 세기를 낮게(4~6) 주면 물건은 보이고 글자만 못 읽게 된다(610 - 포장지 중국어)
@@ -92,17 +97,18 @@ n = len(segs)
 vf.append(f"{src}split={n}" + "".join(f"[s{m}]" for m in range(n)))
 for m, (a, d, y) in enumerate(segs):
     vf.append(f"[s{m}]trim=start={a}:duration={d:.3f},setpts=PTS-STARTPTS,crop={cw}:{ch}:{cx}:{cy if y is None else y}[c{m}]")
-cap_y = 140 + vh + 45
+cap_y = vy + vh + (95 if FRAME else 45)
 vf += [
-    "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,scale=1080:{vh},setsar=1[v]",
+    "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,scale={vw}:{vh},setsar=1[v]",
     "[2:v]setsar=1[bg]",
-    "[bg][v]overlay=0:140:eof_action=pass[b0]",
+    f"[bg][v]overlay={vx}:{vy}:eof_action=pass[b00]",
+    (f"[b00][{k + 4}:v]overlay=0:0:enable='lt(t,{E:.2f})'[b0]" if FRAME else "[b00]null[b0]"),
 ]
 last = "b0"
 for i in range(k):
     a = 0 if i == 0 else start[i]
     b = start[i + 1] if i < k - 1 else E
-    vf.append(f"[{last}]drawtext=fontfile={FONT}:textfile={OUT}/t{i}.txt:fontsize=58:fontcolor=white:"
+    vf.append(f"[{last}]drawtext=fontfile={FONT}:textfile={OUT}/t{i}.txt:fontsize=58:fontcolor={INK}:"
               f"x=(w-text_w)/2:y={cap_y}:enable='between(t,{a:.2f},{b:.2f})'[k{i}]")
     last = f"k{i}"
 on = f"enable='gte(t,{E:.2f})'"
@@ -110,15 +116,39 @@ vf += [
     "[1:v]scale=600:600:force_original_aspect_ratio=decrease[pimg]",
     f"[{last}]null[k]",
     f"[k][pimg]overlay=(W-w)/2:500:{on}[p]",
-    f"[p]drawtext=fontfile={FONT}:text='오늘의 추천 상품':fontsize=60:fontcolor=white:x=(w-text_w)/2:y=380:{on}[p2]",
-    f"[p2]drawtext=fontfile={FONT}:text='프로필 링크에서':fontsize=50:fontcolor=0xDDDDDD:x=(w-text_w)/2:y=1150:{on}[p3]",
-    f"[p3]drawtext=fontfile={FONT}:textfile={OUT}/num.txt:fontsize=120:fontcolor=white:x=(w-text_w)/2:y=1230:{on}[p4]",
-    f"[p4]drawtext=fontfile={FONT}:textfile={OUT}/disc.txt:fontsize=36:fontcolor=white:x=(w-text_w)/2:y=1420:{on}[vout]",
+    f"[p]drawtext=fontfile={FONT}:text='오늘의 추천 상품':fontsize=60:fontcolor={INK}:x=(w-text_w)/2:y=380:{on}[p2]",
+    f"[p2]drawtext=fontfile={FONT}:text='프로필 링크에서':fontsize=50:fontcolor={INK2}:x=(w-text_w)/2:y=1150:{on}[p3]",
+    f"[p3]drawtext=fontfile={FONT}:textfile={OUT}/num.txt:fontsize=120:fontcolor={INK}:x=(w-text_w)/2:y=1230:{on}[p4]",
+    f"[p4]drawtext=fontfile={FONT}:textfile={OUT}/disc.txt:fontsize=36:fontcolor={INK}:x=(w-text_w)/2:y=1420:{on}[vout]",
 ]
 # 바탕: 그냥 검정은 성의 없어 보여서(2026-11-24 사장님) 원본 한 장면을 크게 흐리고 어둡게 한 은은한 바탕
 BG = f"{OUT}/bg.png"
-run(["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", SRC, "-frames:v", "1", "-vf",
-     "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=45,eq=brightness=-0.32:saturation=0.75", BG])
+if FRAME:
+    from PIL import Image, ImageDraw, ImageFilter
+    PAPER = (247, 243, 234)
+    Image.new("RGB", (1080, 1920), PAPER).save(BG)
+    # 틀: 메모지 바탕에 둥근 창을 뚫고, 흰 테두리(사진 느낌)·옅은 그림자·마스킹 테이프를 얹는다. 영상 위에 덮는다.
+    pad, rad = 18, 34
+    sh = Image.new("L", (1080, 1920), 0)
+    ImageDraw.Draw(sh).rounded_rectangle([vx - pad + 6, vy - pad + 14, vx + vw + pad + 6, vy + vh + pad + 14], rad + pad, fill=90)
+    sh = sh.filter(ImageFilter.GaussianBlur(16))
+    fr = Image.new("RGBA", (1080, 1920), PAPER + (255,))
+    fr.paste(Image.new("RGBA", (1080, 1920), (90, 70, 50, 255)), (0, 0), sh)
+    d = ImageDraw.Draw(fr)
+    d.rounded_rectangle([vx - pad, vy - pad, vx + vw + pad, vy + vh + pad], rad + pad, fill=(255, 255, 255, 255))
+    hole = Image.new("L", (1080, 1920), 255)
+    ImageDraw.Draw(hole).rounded_rectangle([vx, vy, vx + vw, vy + vh], rad, fill=0)
+    fr.putalpha(hole)
+    tape = Image.new("RGBA", (300, 64), (232, 196, 160, 215))
+    td = ImageDraw.Draw(tape)
+    for x in range(0, 300, 22):
+        td.line([(x, 0), (x + 12, 64)], fill=(245, 222, 196, 215), width=6)
+    tape = tape.rotate(-4, expand=True, resample=Image.BICUBIC)
+    fr.alpha_composite(tape, ((1080 - tape.width) // 2, vy - pad - tape.height // 2 - 4))
+    fr.save(f"{OUT}/frame.png")
+else:
+    run(["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", SRC, "-frames:v", "1", "-vf",
+         "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=45,eq=brightness=-0.32:saturation=0.75", BG])
 inputs = ["-i", SRC, "-loop", "1", "-t", f"{TOTAL:.2f}", "-i", IMG, "-loop", "1", "-t", f"{TOTAL:.2f}", "-i", BG]
 af = []
 starts = start + [E + 0.05]
@@ -127,6 +157,8 @@ for i in range(k + 1):
     ms = int(starts[i] * 1000)
     af.append(f"[{i + 3}:a]adelay={ms}|{ms},apad[a{i}]")
 af.append("".join(f"[a{i}]" for i in range(k + 1)) + f"amix=inputs={k + 1}:normalize=0,atrim=0:{TOTAL:.2f}[aout]")
+if FRAME:
+    inputs += ["-loop", "1", "-t", f"{TOTAL:.2f}", "-i", f"{OUT}/frame.png"]
 out = f"{OUT}/{N}번_실제영상.mp4"
 run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", ";".join(vf + af), "-map", "[vout]", "-map", "[aout]",
      "-t", f"{TOTAL:.2f}", "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-c:a", "aac", "-b:a", "160k", out])
