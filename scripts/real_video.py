@@ -83,8 +83,9 @@ cw, ch, cx, cy = (list(spec.get("crop", [720, 780])) + [0, 0])[:4]
 vh = round(1080 * ch / cw)
 vf = []
 src = "[0:v]"
-for j, (x, y, w, h, a, b) in enumerate(spec.get("blur", [])):
-    vf += [f"{src}split[o{j}][q{j}]", f"[q{j}]crop={w}:{h}:{x}:{y},boxblur=25:2[bl{j}]",
+# blur: [x, y, 너비, 높이, 시작초, 끝초, (세기 - 생략 시 25)]. 세기를 낮게(4~6) 주면 물건은 보이고 글자만 못 읽게 된다(610 - 포장지 중국어)
+for j, (x, y, w, h, a, b, *r) in enumerate(spec.get("blur", [])):
+    vf += [f"{src}split[o{j}][q{j}]", f"[q{j}]crop={w}:{h}:{x}:{y},boxblur={r[0] if r else 25}:2[bl{j}]",
            f"[o{j}][bl{j}]overlay={x}:{y}:enable='between(t,{a},{b})'[u{j}]"]
     src = f"[u{j}]"
 n = len(segs)
