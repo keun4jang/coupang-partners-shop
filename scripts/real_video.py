@@ -151,7 +151,9 @@ vf += [
     f"[p]drawtext=fontfile={FONT}:text='오늘의 추천 상품':fontsize=60:fontcolor={INK}:x=(w-text_w)/2:y=380:{on}[p2]",
     f"[p2]drawtext=fontfile={FONT}:text='프로필 링크에서':fontsize=50:fontcolor={INK2}:x=(w-text_w)/2:y=1150:{on}[p3]",
     f"[p3]drawtext=fontfile={FONT}:textfile={OUT}/num.txt:fontsize=120:fontcolor={INK}:x=(w-text_w)/2:y=1230:{on}[p4]",
-    f"[p4]drawtext=fontfile={FONT}:textfile={OUT}/disc.txt:fontsize=36:fontcolor={INK}:x=(w-text_w)/2:y={1385 if FRAME else 1420}:{on}[vout]",
+    # 본인 상품("own": true)은 파트너스 상품이 아니므로 화면에 수수료 문구를 띄우지 않는다(CLAUDE.md - 본인 상품 고지는 캡션·설명에만)
+    ("[p4]null[vout]" if spec.get("own") else
+     f"[p4]drawtext=fontfile={FONT}:textfile={OUT}/disc.txt:fontsize=36:fontcolor={INK}:x=(w-text_w)/2:y={1385 if FRAME else 1420}:{on}[vout]"),
 ]
 # 바탕: 그냥 검정은 성의 없어 보여서(2026-11-24 사장님) 원본 한 장면을 크게 흐리고 어둡게 한 은은한 바탕
 BG = f"{OUT}/bg.png"
