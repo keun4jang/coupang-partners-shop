@@ -24,7 +24,10 @@ export const OWN_SELLER_NAME = "근사장";
 
 // 2026-10-14 사장님: 멘트는 좋지만 '근사장'이라는 이름은 빼 달라 → 시청자에게 보이는 문구는 1인칭("제가")
 /** 캡션·설명에 들어가는 고지 (파트너스 DISCLOSURE_LINE 자리) */
-export const OWN_DISCLOSURE_LINE = "제가 쿠팡에서 직접 판매하는 제품이에요.";
+// 2026-11-26 사장님: "제가 쿠팡에서 직접 판매하는 제품이에요" 말고 "직접 판매하고 있습니다!" 로
+export const OWN_DISCLOSURE_LINE = "직접 판매하고 있습니다!";
+/** 예전 고지 문구 - 이미 써 둔 캡션 초안에 남아 있으면 발행할 때 떼어 낸다(새 문구와 겹치지 않게) */
+export const OWN_DISCLOSURE_LEGACY = ["제가 쿠팡에서 직접 판매하는 제품이에요.", "제가 직접 판매하는 제품이에요."];
 
 /** 영상 하단 화면 고지 (파트너스 DISCLOSURE_TEXT 자리) */
 export const OWN_SCREEN_DISCLOSURE = "제가 직접 판매하는 제품입니다";

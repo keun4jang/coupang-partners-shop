@@ -27,7 +27,7 @@
  */
 import { DISCLOSURE_LINE } from "./ai";
 import { FRIENDLY_DISCLOSURE_LINE } from "./policy";
-import { OWN_DISCLOSURE_LINE } from "./ownProducts";
+import { OWN_DISCLOSURE_LEGACY, OWN_DISCLOSURE_LINE } from "./ownProducts";
 
 /** 사장님 본인 상품(lib/ownProducts.ts)이면 파트너스 고지 대신 판매자 고지를 쓴다 */
 type CopyOpts = { own?: boolean };
@@ -90,6 +90,7 @@ export function instagramCaption(
     .split(DISCLOSURE_LINE).join("")
     .split(OWN_DISCLOSURE_LINE).join("")
     .split(FRIENDLY_DISCLOSURE_LINE).join("");
+  for (const old of OWN_DISCLOSURE_LEGACY) raw = raw.split(old).join("");
   if (opts.own) raw = raw.split(PARTNER_ONLY_SENTENCE).join("");
   const lines = raw
     .replace(/\n{3,}/g, "\n\n")

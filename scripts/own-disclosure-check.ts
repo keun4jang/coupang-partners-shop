@@ -41,12 +41,12 @@ async function main() {
   for (const r of rows) {
     const id = vid(r.youtube_url);
     const d = id ? desc.get(id) : undefined;
-    const draft = (r.caption_text ?? "").includes("직접 판매하는 제품") ? "초안○" : "초안×";
+    const draft = /직접 판매하(는 제품|고 있습니다)/.test((r.caption_text ?? "")) ? "초안○" : "초안×";
     if (d === undefined) {
       bad.push(`${r.display_number}번 유튜브에서 못 읽음 (${draft})`);
       continue;
     }
-    const seller = d.includes("직접 판매하는 제품");
+    const seller = /직접 판매하(는 제품|고 있습니다)/.test(d);
     const partner = d.includes("쿠팡파트너스");
     if (seller && !partner) ok++;
     else bad.push(`${r.display_number}번 판매자고지 ${seller ? "○" : "×"} · 파트너스문구 ${partner ? "있음" : "없음"} (${draft})`);
