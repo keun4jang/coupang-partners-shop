@@ -69,9 +69,11 @@ TOTAL = E + max(lens[k] + 0.5, 5.5)
 segs = []
 for i, ln in enumerate(spec["lines"]):
     dur = lens[i] + GAP + (0.15 if i == 0 else 0)
-    fixed = sum(c[1] for c in ln["clips"] if len(c) > 1)
+    # clips: [시작, 길이(없거나 0 이면 남은 시간), x, y] - x·y 는 그 장면만의 자르기 위치(없으면 문장의 x·y, 그것도 없으면 crop 값)
+    fixed = sum(c[1] for c in ln["clips"] if len(c) > 1 and c[1])
     for c in ln["clips"]:
-        segs.append((c[0], c[1] if len(c) > 1 else dur - fixed, ln.get("y")))
+        segs.append((c[0], c[1] if len(c) > 1 and c[1] else dur - fixed,
+                     c[2] if len(c) > 2 else ln.get("x"), c[3] if len(c) > 3 else ln.get("y")))
 
 for i, ln in enumerate(spec["lines"]):
     open(f"{OUT}/t{i}.txt", "w", encoding="utf-8").write(ln["caption"])
@@ -94,6 +96,8 @@ else:
     vw, vy = 1080, 140
 vx = (1080 - vw) // 2
 vh = round(vw * ch / cw)
+if FRAME:
+    vy += max(0, (SAFE_BOTTOM - 2 * CAP_LINE - 50 - PAD - SAFE_TOP - vh) // 2)   # 가로로 넓은 영상은 틀과 자막을 안전 구간 가운데로
 
 
 def fit_caption(text):
@@ -124,8 +128,8 @@ for j, (x, y, w, h, a, b, *r) in enumerate(spec.get("blur", [])):
     src = f"[u{j}]"
 n = len(segs)
 vf.append(f"{src}split={n}" + "".join(f"[s{m}]" for m in range(n)))
-for m, (a, d, y) in enumerate(segs):
-    vf.append(f"[s{m}]trim=start={a}:duration={d:.3f},setpts=PTS-STARTPTS,crop={cw}:{ch}:{cx}:{cy if y is None else y}[c{m}]")
+for m, (a, d, x, y) in enumerate(segs):
+    vf.append(f"[s{m}]trim=start={a}:duration={d:.3f},setpts=PTS-STARTPTS,crop={cw}:{ch}:{cx if x is None else x}:{cy if y is None else y}[c{m}]")
 cap_y = vy + vh + (PAD + 50 if FRAME else 45)
 vf += [
     "".join(f"[c{m}]" for m in range(n)) + f"concat=n={n}:v=1:a=0,scale={vw}:{vh},setsar=1[v]",
