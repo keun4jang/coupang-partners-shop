@@ -77,6 +77,7 @@ for (const [name, want] of expect) {
 }
 // 근사장 상품은 전부 꿀팁 후보가 있어야 하고, 타프류는 다시 나올 때 바꿔 쓸 후보가 2개 이상 (2026-10-24)
 for (const o of OWN_PRODUCTS) {
+  if (o.realOnly) continue; // 실제 사용 영상 전용 상품은 꿀팁 편성 대상이 아니다
   const n = matchTipTopicsByRule(o.name).length;
   check(`근사장 상품 꿀팁 후보 ${n}개 - ${o.name.slice(0, 24)}`, n >= 1);
 }

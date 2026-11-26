@@ -218,7 +218,11 @@ async function pickOwnProductsForToday(startOfDay: Date, room: number): Promise<
     .select("*")
     .ilike("source_memo", `%${OWN_MARKER}%`);
   if (error) throw new Error(`본인 상품 조회 실패: ${error.message}`);
-  const ownProducts = ((own ?? []) as Product[]).filter((p) => isOwnProduct(p) && p.image_url);
+  // 실제 사용 영상 전용(realOnly) 상품은 자동 꿀팁 편성에 넣지 않는다
+  const realOnlyInv = new Set(OWN_PRODUCTS.filter((o) => o.realOnly).map((o) => o.inv));
+  const ownProducts = ((own ?? []) as Product[]).filter(
+    (p) => isOwnProduct(p) && p.image_url && !realOnlyInv.has(p.source_memo?.match(/\[own:(\d+)\]/)?.[1] ?? "")
+  );
   if (ownProducts.length === 0) return [];
   const ids = ownProducts.map((p) => p.id);
 

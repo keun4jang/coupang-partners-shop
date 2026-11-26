@@ -13,11 +13,11 @@ on:
         description: "영상 번호 (예: 686)"
         required: true
       publish:
-        description: "yes 면 실제 게시, no 면 문구 미리보기만, landing 이면 번호 페이지만 연다(영상 없이)"
+        description: "yes 면 실제 게시, no 면 문구 미리보기만, landing 이면 번호 페이지만 연다(영상 없이), newnumber 면 본인 상품에 새 번호를 매긴다(number 칸에 윙 등록상품ID)"
         required: true
         default: "no"
         type: choice
-        options: ["no", "yes", "landing"]
+        options: ["no", "yes", "landing", "newnumber"]
 
 concurrency:
   group: real-upload
@@ -55,7 +55,7 @@ jobs:
         run: npm ci
 
       - name: 영상 받기 (real-uploads 브랜치)
-        if: github.event.inputs.publish != 'landing'
+        if: github.event.inputs.publish != 'landing' && github.event.inputs.publish != 'newnumber'
         env:
           NUM: ${{ github.event.inputs.number }}
         run: |
@@ -70,6 +70,8 @@ jobs:
           NUM: ${{ github.event.inputs.number }}
           REAL_PUBLISH: ${{ github.event.inputs.publish }}
         run: |
+          case "$NUM" in ''|*[!0-9]*) echo "번호는 숫자만"; exit 1;; esac
+          if [ "$REAL_PUBLISH" = "newnumber" ]; then npx tsx scripts/real-number.ts "$NUM"; exit $?; fi
           if [ "$REAL_PUBLISH" = "landing" ]; then mkdir -p renders/real; : > "renders/real/${NUM}.mp4"; fi
           npx tsx scripts/real-upload.ts "$NUM" "renders/real/${NUM}.mp4"
 

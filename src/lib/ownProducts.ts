@@ -51,6 +51,8 @@ export type Own = {
   productId: number;
   vendorItemId: number;
   image: string; // image.coupangcdn.com/image/ 뒤 경로
+  /** 실제 사용 영상으로만 소개하는 상품(2026-11-26 추가분) - 꺼 둔 자동 꿀팁 편성에는 넣지 않는다 */
+  realOnly?: boolean;
 };
 
 /** 상품 1개 → products 행 (DB 쓰기는 videoItems.ts ensureOwnProducts) */
@@ -81,6 +83,18 @@ export const OWN_PRODUCTS: Own[] = [
   { inv: "16400857663", name: "해먹 모기장 타프 세트", category: "캠핑", price: "45,500원", productId: 9758435938, vendorItemId: 96128851741, image: "vendor_inventory/9b88/2b82ba01fc71a91286f6f6de9674725a85691f914d6790c8f21d27917038.jpg" },
   { inv: "16400778007", name: "SUV 트렁크 테일 텐트 타프 현관폴 세트", category: "캠핑", price: "49,800원", productId: 9755076803, vendorItemId: 96128329595, image: "vendor_inventory/a326/ae210e6e513baeaa6eca3826e4241152c493b17983b74fae74a20937b89e.jpg" },
   { inv: "16399283403", name: "캠핑 타프 웨빙 스트랩 6종 세트 3m 4개 5m 2개 알루미늄 후크 길이조절 수납가방 포함", category: "캠핑", price: "30,000원", productId: 9751877497, vendorItemId: 96120917841, image: "vendor_inventory/64ea/608337d6c2d49819ccb290e06ac7a1e45318d47c0fc599f901fc02a60435.jpg" },
+  // 2026-11-26 쿠팡 윙에서 추가로 읽음(읽기만) - 실제 사용 영상 후보. 번호는 scripts/real-number.ts 로 매긴다.
+  { inv: "16477947342", name: "싱크대 물막이 가림막 투명 PVC 54cm 물튐 방지 커버", category: "생활템", price: "9,600원", productId: 9331254011, vendorItemId: 96397539792, image: "vendor_inventory/7413/7821967a392638570d4769dc620e3508b04d4ab90c644ab4fedef5e778b1.jpg", realOnly: true },
+  { inv: "16477612349", name: "물구멍 방충망 스티커 30개 창틀 배수구멍 접착식", category: "생활템", price: "10,300원", productId: 9844460108, vendorItemId: 96396516952, image: "vendor_inventory/d56e/8253f0bdb0f0292b8e759f4aa2b5c86dc9f4769aa11e7dc408c3656142ec.jpg", realOnly: true },
+  { inv: "16477601765", name: "방충망 보수테이프 7cm x 7cm 8매 구멍 틈새막이", category: "생활템", price: "13,100원", productId: 9844452375, vendorItemId: 96396485044, image: "vendor_inventory/75dc/5cb793c70395c9b51541dae3a960cbcf18f15ab29e692c4f52dcb5a1faee.jpg", realOnly: true },
+  { inv: "16477369407", name: "접이식 스텐 찜기 소형 2개 펼침 지름 21cm 찜망", category: "생활템", price: "13,700원", productId: 9844194596, vendorItemId: 96395745872, image: "vendor_inventory/097f/f78993fbe974a31577ce8dac93cacb496fcf9e432afb989aea363c2571e2.jpg", realOnly: true },
+  { inv: "16477366844", name: "사각 의자발패드 45×45mm 24매 접착식 펠트 바닥보호", category: "생활템", price: "10,700원", productId: 9844191756, vendorItemId: 96395738422, image: "vendor_inventory/8efe/ba09c0e3296804bd7f5f08d907606b9e86cb474b92aaa94d17db2b8596fe.jpg", realOnly: true },
+  { inv: "16477223097", name: "운전석 시트 틈새 사이드포켓 차량용 수납 정리함", category: "생활템", price: "18,100원", productId: 9675029870, vendorItemId: 96395267184, image: "vendor_inventory/f0ba/ac72be04d28491b7cdd0e01c839fc68a6589ff5e848edafc44ae04ba546e.jpg", realOnly: true },
+  { inv: "16477963480", name: "주름 접이식 물통 휴대용 미술 물통 3개입", category: "생활템", price: "10,700원", productId: 9844842215, vendorItemId: 96397589183, image: "vendor_inventory/f840/b0428101c3fda141b8d9214250fa891c88142cdd1461ba5f5e52b0a8d635.jpg", realOnly: true },
+  { inv: "16476331982", name: "흡착식 칫솔걸이 세트 컵 포함 욕실 벽 부착 거치대", category: "생활템", price: "20,000원", productId: 9843098783, vendorItemId: 96392618538, image: "vendor_inventory/d8ea/904b8f744bb060de0f38a0f1e981499522f32b6ceb6b7cb382b217dc487b.jpg", realOnly: true },
+  { inv: "16476700312", name: "창문 단열시트 100x180cm 2장 에어캡 유리 부착", category: "생활템", price: "10,700원", productId: 9843498597, vendorItemId: 96393783259, image: "vendor_inventory/7b66/027cbfa471071e011dc36adf8c5113007d31c938c498beb8d13a7713e49f.jpg", realOnly: true },
+  { inv: "16474980790", name: "싱크대 문 행주걸이 3개 무타공 스테인리스봉 수건걸이", category: "생활템", price: "10,000원", productId: 9841659961, vendorItemId: 96388207312, image: "vendor_inventory/dc30/1ff57d4ddcd86a8946353d4decb9b483b91fcc4f2db584d93da18d6b2afb.jpg", realOnly: true },
+  { inv: "16474122099", name: "조각형 얼음틀 아이스트레이 10칸 뚜껑 포함 3개", category: "생활템", price: "11,000원", productId: 9840825154, vendorItemId: 96385754932, image: "vendor_inventory/4196/fee6a47799b93ef5ea85608c12b11ebd73e3e57ab98606b3f42d33e674e7.jpg", realOnly: true },
 ];
 
 
