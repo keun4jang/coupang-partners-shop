@@ -46,7 +46,7 @@
   **11/27 사장님 "추천대로 진행" = "영상 먼저" 방식 승인**: ① 1688 에서 사용 장면이 좋은 영상을 먼저 고른다 ② `gh workflow run real-find.yml -f mode=search -f keyword="…"` 로 쿠팡에서 같은 물건을 찾는다(결과 10개, FOUND 줄에 productId·이름·사진 주소)
   ③ 사진으로 같은 물건인지 확인 뒤 `-f mode=add -f keyword="같은 검색어" -f product_id=… -f category=…` → 로그 "번호: N" ④ docs/real-videos/N.json 써서 제작·대기열. 쿠팡 호출은 실행당 1회(장부 경유), 영상 하나에 2회까지만.
   동작 확인(11/27, search 1회): "창틀 청소 도구" → 루바르 창틀틈새 청소브러시(8777241245) 등 스펀지형 10개. **첫 후보**: 1688 offer/711541255151 의 창틀 스펀지 청소 영상(36초, 사용 장면 좋음, 중국어 자막 위치가 바뀌니 장면별 crop 필요 - 파일은 지웠으니 다시 받기) ↔ 위 검색 결과 중 모양 같은 것.
-  **지금 대기: 605 사이드백 → 676 선풍기 청소 솔 (11/27 17:10 KST 이후 차례로).** 게시되면 링크를 여기 적고 incoming-videos/own-605·676 삭제.
+  **11/27 게시 완료(대기열로 자동)**: 605 사이드백(본인 상품) https://youtube.com/shorts/hUPTvG6hXFo · https://www.instagram.com/reel/DgPOEdXiwi_/ / 676 선풍기 청소 솔 https://youtube.com/shorts/YptRPbA3tWM · https://www.instagram.com/reel/DgPOes3pzA7/ . PC 원본 삭제함. **대기 영상 없음.**
 - **11/26 사장님: "이제 이런 류 영상(꿀팁) 안 만들고 안 올려도 돼. 바뀐 실사용 영상 릴스만 올리자"** → render-worker(render.yml) 예약 끔. 자동 꿀팁·드라마 발행 중단. 스카우트(상품 수집)·지표·진단은 그대로.
   **11/26 사장님 "추천대로 진행"**: 스카우트도 끔(scout.yml 예약 끔 + vercel.json 의 /api/cron/scout 제거 - 상품이 이미 540개쯤, 쿠팡 API 호출을 줄임. 되살리려면 `gh workflow enable scout.yml`). 11/29 병맛 드라마 판정 루틴은 끄고, 주간 판정표(월 09:47)는 실제 사용 영상 기준으로 문구를 바꿈.
   이제 유튜브 하루 4건 한도는 실제 영상이 다 쓸 수 있다(youtube_daily_cap 은 자동 영상용이라 무의미). 위쪽 "지금 운영 중인 것"의 꿀팁·드라마 설명과 11/29 병맛 드라마 판정 루틴은 예전 방식 기록이다.
