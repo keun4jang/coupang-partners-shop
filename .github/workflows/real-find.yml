@@ -1,0 +1,73 @@
+# "영상 먼저" 방식 (2026-11-27 사장님 "추천대로 진행"): 1688 에서 고른 영상의 물건을 쿠팡에서 찾아 번호를 매긴다.
+# - mode=search: 검색 결과 10개를 로그에 보여 주기만 한다.  mode=add: 그중 product_id 를 상품으로 넣고 실제 영상용 번호를 매긴다.
+# - 쿠팡 API 는 한 번 실행에 1회, src/lib/coupang.ts → 호출 장부(60분 35회 상한)를 거친다. 사람이(Claude 가) 직접 돌릴 때만 실행된다(예약 없음).
+name: real-find
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "search = 보기만, add = 상품 넣고 번호 매기기"
+        required: true
+        default: "search"
+        type: choice
+        options: ["search", "add"]
+      keyword:
+        description: "쿠팡 검색어 (2~40자)"
+        required: true
+      product_id:
+        description: "add 일 때: 검색 결과의 쿠팡 productId"
+        required: false
+        default: ""
+      category:
+        description: "add 일 때: 카테고리(생활템·주방템·청소템·수납템·자취템·차량용품·캠핑 등)"
+        required: false
+        default: "생활템"
+
+concurrency:
+  group: real-find
+  cancel-in-progress: false
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .env.local 생성 (시크릿에서)
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV }}
+        run: |
+          if [ -z "$WORKER_ENV" ]; then echo "WORKER_ENV 시크릿 없음"; exit 1; fi
+          printf '%s
+' "$WORKER_ENV" > .env.local
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node_modules 캐시
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 의존성 설치
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: 쿠팡에서 찾기
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+          KEYWORD: ${{ github.event.inputs.keyword }}
+          PID: ${{ github.event.inputs.product_id }}
+          CATEGORY: ${{ github.event.inputs.category }}
+        run: |
+          if [ "$MODE" = "add" ]; then
+            case "$PID" in ''|*[!0-9]*) echo "product_id 는 숫자만"; exit 1;; esac
+            npx tsx scripts/real-find.ts add "$KEYWORD" "$PID" "$CATEGORY"
+          else
+            npx tsx scripts/real-find.ts search "$KEYWORD"
+          fi
