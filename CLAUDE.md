@@ -88,6 +88,21 @@
   후 /home/user/claude-chat-archive 에 clone. 10/12~11/24 사이 자동 저장이 꺼져 있었던 건 연결이 안 돼서였다.
   SessionStart 훅이 보관소의 가장 최근 대화 끝부분을 함께 넣어 준다 - 터미널이든 웹이든 바로 앞 대화에서 이어간다.
 
+## PC 에서 크롬을 조종할 때 (PC 가 바뀌어도 지킨다 - 예전엔 PC 안 메모에만 있었음)
+- 사장님이 같은 PC 로 작업한다. 크롬 창은 **최소화된 그대로, 소리 없이**(2026-11-25·26 사장님): 새 창·창 크기 변경·앞으로 가져오기·화면 클릭·스크린샷 금지,
+  탭 + navigate + javascript + 글자 읽기만. 페이지를 열면 바로 video/audio 를 음소거·정지. mp4 주소는 `#t=99999` 를 붙여서만 연다.
+- 크롬 조작은 `model: "sonnet"` 하위 작업에 맡기고, 하위 작업이 연 탭은 닫는다. 사장님 탭·계정은 건드리지 않는다.
+- 1688: 사람 확인(캡차) 창은 풀거나 우회하지 않는다. 천천히(이동 사이 8초 이상, 한 번에 25회 이하), 뜨면 그 상품은 건너뛰고 두 번째면 멈춘다.
+  판매자·공장에 연락하지 않는다(채팅·문의·주문 버튼 금지). 검색어는 GBK 퍼센트 인코딩. 쿠팡 윙·도매꾹은 읽기만.
+
+## 새 PC 로 옮길 때 (2026-11-27 사장님 "매일 켜 놓는 컴퓨터로 옮길 거라 대비")
+1. 새 PC 에 Git 을 깔고 `C:\Projects` 에서 `git clone -b claude/blissful-noether-ofm9ww https://github.com/keun4jang/coupang-partners-shop.git`.
+2. 그 폴더에서 `powershell -ExecutionPolicy Bypass -File scripts\pc-setup.ps1` - 무료 도구(gh·node·python·ffmpeg) 설치, 글꼴 복사, npm ci, 대화 보관소 받기,
+   **게시 대기열 예약 작업 등록**(매일 17:15·로그인 3분 뒤 `scripts/real-publish-queue.sh` - Claude 가 꺼져 있어도 대기 영상이 올라간다). 여러 번 돌려도 된다.
+3. 스크립트가 마지막에 알려 주는 "사장님이 직접 하실 일"(GitHub·Claude 로그인, 크롬 확장과 1688·윙·도매꾹 로그인, 크롬 다운로드 저장 위치 묻기 끄기, 절전 끄기)을 한다.
+4. `이어하기.cmd` 를 두 번 누른다. 옮기기 전에 예전 PC 의 대기 영상(renders/real/wait-*.mp4)은 다 게시해 비우는 것이 가장 깔끔하다(남았으면 같은 자리로 복사).
+- 저장소에 없는 PC 전용 자리: `renders/`(글꼴·대기 영상·게시 기록), `incoming-videos/`(받아 둔 원본), 크롬 로그인. 나머지는 전부 GitHub·Vercel·Supabase 에 있다.
+
 ## 새 계정에서 시작하는 법
 1. claude.ai 설정 → 커넥터에서 GitHub 연결(저장소 keun4jang/coupang-partners-shop 권한).
 2. PC 터미널은 이 폴더에서 `claude`, 웹은 claude.ai/code 에서 이 저장소로 세션을 연다.
