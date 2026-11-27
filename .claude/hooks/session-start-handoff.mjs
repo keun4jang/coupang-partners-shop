@@ -77,6 +77,29 @@ try {
       "클라우드 세션이면 첫 작업 전에 add_repo(keun4jang/claude-chat-archive, push)로 붙이고 /home/user/claude-chat-archive 에 clone 한다. " +
       "PC 터미널이면 사장님께 이 저장소 옆 폴더(C:\\Projects)에서 git clone https://github.com/keun4jang/claude-chat-archive.git 을 한 번 해 달라고 안내한다.";
   }
+  // 2026-11-27 사장님 "폴더에서 터미널 열어 클로드 켜면 자동으로 이어서 할 수 있게": PC 에만 있는 일감(게시 대기 영상·받아 둔 원본·게시 결과)을 알려 준다.
+  try {
+    const real = join(root, "renders", "real");
+    const waits = existsSync(real) ? readdirSync(real).filter((n) => /^wait-\d+\.mp4$/.test(n)).map((n) => n.slice(5, -4)) : [];
+    const inc = join(root, "incoming-videos");
+    const incoming = existsSync(inc) ? readdirSync(inc) : [];
+    let log = "";
+    try {
+      log = readFileSync(join(real, "publish-log.txt"), "utf8").trim().split("\n").slice(-6).join("\n");
+    } catch {
+      // 게시 기록이 아직 없다
+    }
+    ctx += "\n\n[자동 이어가기 - 이 PC 에 남은 일감]\n" +
+      "사장님의 첫 말이 무엇이든(인사, '이어서', 'ㄱ' 포함) 되묻지 말고 아래를 바로 한다: " +
+      "① 게시 대기 영상이 있으면 대기열을 백그라운드로 다시 건다(`bash scripts/real-publish-queue.sh` - 유튜브 한도는 17:00 KST 에 새로 채워지니 그 전이면 `0810` 인자를 붙인다. 이미 돌고 있으면 스스로 빠진다) " +
+      "② 게시 기록에 새 '게시 완료'가 있는데 CURRENT.md 에 링크가 없으면 적고, 그 번호의 incoming-videos 폴더를 지운다 " +
+      "③ CURRENT.md '진행 중 / 다음 할 일'을 이어서 진행한다 ④ 지금 상황을 3~5줄로 알린다. 사장님이 다른 일을 시키면 그 일이 먼저다.\n" +
+      `게시 대기 영상(renders/real/wait-번호.mp4): ${waits.length ? waits.join(", ") + "번" : "없음"}\n` +
+      `받아 둔 원본(incoming-videos/): ${incoming.length ? incoming.join(", ") : "없음"}\n` +
+      (log ? `최근 게시 기록(renders/real/publish-log.txt):\n${log}` : "최근 게시 기록: 없음");
+  } catch {
+    // 일감 목록을 못 읽어도 메모만으로 진행
+  }
   if (ctx) {
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: ctx } }));
   }

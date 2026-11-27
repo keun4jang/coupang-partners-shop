@@ -80,6 +80,7 @@
 - **작업 한 덩어리를 마칠 때마다** CURRENT.md 를 최신으로 고친다: 최근에 한 것 / 진행 중·다음 할 일 /
   사장님 답 대기 / 예약 루틴. 1페이지를 넘기지 않게 오래된 줄은 지우고, 오래 남길 결정은
   docs/growth-plan.md 나 이 파일(CLAUDE.md)로 옮긴다. 고친 뒤 두 브랜치에 커밋·push.
+- **PC 터미널 자동 이어가기(2026-11-27)**: 훅이 넣어 주는 "[자동 이어가기]" 블록대로, 사장님 첫 말이 무엇이든 되묻지 말고 게시 대기열(`scripts/real-publish-queue.sh`, 대기 영상 `renders/real/wait-번호.mp4`)을 다시 걸고 CURRENT.md 의 다음 할 일을 이어서 한다.
 - 사장님 결정(승인·거절·방향 변경)은 날짜와 함께 그 자리에서 문서에 적는다 - 대화 기록은 계정과 함께 사라진다.
 - 대화 원문 자동 저장: Stop 훅이 `claude-chat-archive` 저장소(keun4jang/claude-chat-archive)가
   있으면 거기 저장한다. 위치는 CHAT_ARCHIVE_DIR, 없으면 이 저장소 옆 폴더(../claude-chat-archive).
